@@ -130,11 +130,8 @@ static int iommu_enable(struct omap_iommu *obj)
 	if (!arch_iommu)
 		return -ENODEV;
 
-	clk_enable(obj->clk);
-
 	err = arch_iommu->enable(obj);
 
-	clk_disable(obj->clk);
 	return err;
 }
 
@@ -143,11 +140,7 @@ static void iommu_disable(struct omap_iommu *obj)
 	if (!obj)
 		return;
 
-	clk_enable(obj->clk);
-
 	arch_iommu->disable(obj);
-
-	clk_disable(obj->clk);
 }
 
 /*
@@ -270,8 +263,6 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
 	if (!obj || !obj->nr_tlb_entries || !e)
 		return -EINVAL;
 
-	clk_enable(obj->clk);
-
 	iotlb_lock_get(obj, &l);
 	if (l.base == obj->nr_tlb_entries) {
 		dev_warn(obj->dev, "%s: preserve entries full\n", __func__);
@@ -300,7 +291,6 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
 
 	cr = iotlb_alloc_cr(obj, e);
 	if (IS_ERR(cr)) {
-		clk_disable(obj->clk);
 		return PTR_ERR(cr);
 	}
 
@@ -314,7 +304,6 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
 		l.vict = l.base;
 	iotlb_lock_set(obj, &l);
 out:
-	clk_disable(obj->clk);
 	return err;
 }
 
@@ -344,8 +333,6 @@ static void flush_iotlb_page(struct omap_iommu *obj, u32 da)
 	int i;
 	struct cr_regs cr;
 
-	clk_enable(obj->clk);
-
 	for_each_iotlb_cr(obj, obj->nr_tlb_entries, i, cr) {
 		u32 start;
 		size_t bytes;
@@ -363,7 +350,6 @@ static void flush_iotlb_page(struct omap_iommu *obj, u32 da)
 			iommu_write_reg(obj, 1, MMU_FLUSH_ENTRY);
 		}
 	}
-	clk_disable(obj->clk);
 
 	if (i == obj->nr_tlb_entries)
 		dev_dbg(obj->dev, "%s: no page for %08x\n", __func__, da);
@@ -377,16 +363,28 @@ static void flush_iotlb_all(struct omap_iommu *obj)
 {
 	struct iotlb_lock l;
 
-	clk_enable(obj->clk);
-
 	l.base = 0;
 	l.vict = 0;
 	iotlb_lock_set(obj, &l);
 
 	iommu_write_reg(obj, 1, MMU_GFLUSH);
-
-	clk_disable(obj->clk);
 }
+EXPORT_SYMBOL_GPL(flush_iotlb_all);
+
+/**
+ * iommu_set_twl - enable/disable table walking logic
+ * @obj:	target iommu
+ * @on:		enable/disable
+ *
+ * Function used to enable/disable TWL. If one wants to work
+ * exclusively with locked TLB entries and receive notifications
+ * for TLB miss then call this function to disable TWL.
+ */
+void iommu_set_twl(struct iommu *obj, bool on)
+{
+	arch_iommu->set_twl(obj, on);
+}
+EXPORT_SYMBOL_GPL(iommu_set_twl);
 
 #if defined(CONFIG_OMAP_IOMMU_DEBUG) || defined(CONFIG_OMAP_IOMMU_DEBUG_MODULE)
 
@@ -395,11 +393,7 @@ ssize_t omap_iommu_dump_ctx(struct omap_iommu *obj, char *buf, ssize_t bytes)
 	if (!obj || !buf)
 		return -EINVAL;
 
-	clk_enable(obj->clk);
-
 	bytes = arch_iommu->dump_ctx(obj, buf, bytes);
-
-	clk_disable(obj->clk);
 
 	return bytes;
 }
@@ -413,7 +407,6 @@ __dump_tlb_entries(struct omap_iommu *obj, struct cr_regs *crs, int num)
 	struct cr_regs tmp;
 	struct cr_regs *p = crs;
 
-	clk_enable(obj->clk);
 	iotlb_lock_get(obj, &saved);
 
 	for_each_iotlb_cr(obj, num, i, tmp) {
@@ -423,7 +416,6 @@ __dump_tlb_entries(struct omap_iommu *obj, struct cr_regs *crs, int num)
 	}
 
 	iotlb_lock_set(obj, &saved);
-	clk_disable(obj->clk);
 
 	return  p - crs;
 }
@@ -780,9 +772,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
 	if (!obj->refcount)
 		return IRQ_NONE;
 
-	clk_enable(obj->clk);
 	errs = iommu_report_fault(obj, &da);
-	clk_disable(obj->clk);
 	if (errs == 0)
 		return IRQ_HANDLED;
 
