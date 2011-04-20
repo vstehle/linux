@@ -307,7 +307,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= hwspinlock.o
 
 obj-y					+= common-board-devices.o twl-common.o
 
-# EMIF platform code
+# EMIF support
 obj-$(CONFIG_EMIF)			+= emif_omap.o
 
 # Serial ATA support
@@ -316,3 +316,4 @@ obj-$(CONFIG_ARCH_OMAP5) 		+= $(s-ata-m) $(s-ata-y)
 
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_dmm.o
 obj-$(CONFIG_ARCH_OMAP5)		+= omap_dmm.o
+obj-$(CONFIG_OMAP_REMOTE_PROC)          += remoteproc.o
