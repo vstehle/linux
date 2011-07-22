@@ -34,6 +34,7 @@
 #include <linux/if_ether.h>
 #include <linux/ti_wilink_st.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
+#include <linux/memblock.h>
 
 #include <mach/hardware.h>
 #include <asm/hardware/gic.h>
@@ -49,6 +50,8 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <video/omap-panel-dvi.h>
+#include <video/omap-panel-generic-dpi.h>
+#include <plat/remoteproc.h>
 
 #include "hsmmc.h"
 #include "control.h"
@@ -63,12 +66,17 @@
 #define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
 #define HDMI_GPIO_HPD  63 /* Hotplug detect */
 
-#define FIXED_REG_VWLAN_ID	0
-#define FIXED_REG_V2V1_ID	1
-#define FIXED_REG_V1V8_ID	2
+#define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
+#define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
+#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 101)
+#define PHYS_ADDR_DUCATI_MEM	(PHYS_ADDR_SMC_MEM - PHYS_ADDR_DUCATI_SIZE)
 
 /* wl127x BT, FM, GPS connectivity chip */
 static int wl1271_gpios[] = {46, -1, -1};
+
+#define FIXED_REG_VWLAN_ID	0
+#define FIXED_REG_V2V1_ID	1
+#define FIXED_REG_V1V8_ID	2
 
 static struct platform_device wl1271_device = {
 	.name	= "kim",
@@ -717,6 +725,17 @@ static void __init omap4_panda_map_io(void)
 	omap44xx_map_common_io();
 }
 
+static void __init omap4_panda_reserve(void)                                    
+{                                                                               
+        /* do the static reservations first */                                  
+        memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);                 
+        memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);           
+        omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM,                       
+                                                PHYS_ADDR_DUCATI_SIZE);         
+                                                                                
+        omap_reserve();                                                         
+}
+
 static const char *omap4_panda_match[] __initdata = {
 	"ti,omap4-panda",
 	NULL,
@@ -725,9 +744,9 @@ static const char *omap4_panda_match[] __initdata = {
 MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
 	/* Maintainer: David Anders - Texas Instruments Inc */
 	.atag_offset	= 0x100,
-	.reserve	= omap_reserve,
-	.map_io		= omap4_map_io,
-	.init_early	= omap4430_init_early,
+	.reserve	= omap4_panda_reserve,
+	.map_io		= omap4_panda_map_io,
+	.init_early	= omap4_panda_init_early,
 	.init_irq	= gic_init_irq,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= omap4_panda_init,
