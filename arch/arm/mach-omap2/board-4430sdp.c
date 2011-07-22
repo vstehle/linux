@@ -27,6 +27,7 @@
 #include <linux/regulator/fixed.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
+#include <linux/memblock.h>
 
 #include <mach/hardware.h>
 #include <asm/hardware/gic.h>
@@ -41,6 +42,7 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
+#include <plat/remoteproc.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
 #include <video/omap-panel-picodlp.h>
@@ -79,6 +81,11 @@
 #define FIXED_REG_VWLAN_ID	1
 #define FIXED_REG_V2V1_ID	2
 #define FIXED_REG_V1V8_ID	3
+
+#define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
+#define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
+#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 101)
+#define PHYS_ADDR_DUCATI_MEM	(PHYS_ADDR_SMC_MEM - PHYS_ADDR_DUCATI_SIZE)
 
 static const int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -1553,12 +1560,31 @@ static void __init omap_4430sdp_init(void)
 	}
 }
 
+static void __init omap_4430sdp_map_io(void)                                    
+{                                                                               
+        omap2_set_globals_443x();                                               
+        omap44xx_map_common_io();                                               
+}                                                                               
+                                                                                
+static void __init omap_4430sdp_reserve(void)                                   
+{                                                                               
+        /* do the static reservations first */                                  
+        memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);                 
+        memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);           
+        omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM,                       
+                                                PHYS_ADDR_DUCATI_SIZE);         
+                                                                                
+        omap_reserve();                                                         
+} 
+
+
+<<<<<<< current
 MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.atag_offset	= 0x100,
-	.reserve	= omap_reserve,
-	.map_io		= omap4_map_io,
-	.init_early	= omap4430_init_early,
+	.reserve	= omap_4430sdp_reserve,
+	.map_io		= omap_4430sdp_map_io,
+	.init_early	= omap_4430sdp_init_early,
 	.init_irq	= gic_init_irq,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= omap_4430sdp_init,
