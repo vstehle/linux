@@ -813,6 +813,31 @@ static int device_match_by_alias(struct device *dev, void *data)
  * omap_iommu_attach() - attach iommu device to an iommu domain
  * @name:	name of target omap iommu device
  * @iopgd:	page table
+ * iommu_set_da_range - Set a valid device address range
+ * @obj:		target iommu
+ * @start		Start of valid range
+ * @end			End of valid range
+ **/
+int iommu_set_da_range(struct iommu *obj, u32 start, u32 end)
+{
+
+	if (!obj)
+		return -EIO;
+
+	if (end < start || !PAGE_ALIGN(start | end))
+		return -EINVAL;
+
+	obj->da_start = start;
+	obj->da_end = end;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(iommu_set_da_range);
+
+/**                                                                             
+ *  * omap_iommu_attach() - attach iommu device to an iommu domain                 
+ *   * @name:       name of target omap iommu device                                
+ *    * @iopgd:      page table  
  **/
 static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
 {
