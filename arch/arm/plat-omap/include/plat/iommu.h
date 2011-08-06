@@ -55,6 +55,8 @@ struct omap_iommu {
 	u32 da_end;
 	struct platform_device *pdev;
 	struct pm_qos_request_list *qos_request;
+	void *secure_ttb;
+	bool secure_mode;
 };
 
 struct cr_regs {
@@ -196,6 +198,7 @@ extern int omap_iommu_set_isr(const char *name,
 
 extern void omap_iommu_save_ctx(struct device *dev);
 extern void omap_iommu_restore_ctx(struct device *dev);
+extern int iommu_set_secure(const char *name, bool enable, void *data);
 
 extern int omap_install_iommu_arch(const struct iommu_functions *ops);
 extern void omap_uninstall_iommu_arch(const struct iommu_functions *ops);
