@@ -84,8 +84,10 @@
 
 #define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
 #define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
-#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 101)
-#define PHYS_ADDR_DUCATI_MEM	(PHYS_ADDR_SMC_MEM - PHYS_ADDR_DUCATI_SIZE)
+#define OMAP_ION_HEAP_SECURE_INPUT_SIZE	(SZ_1M * 30)
+#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 103)
+#define PHYS_ADDR_DUCATI_MEM	(PHYS_ADDR_SMC_MEM - PHYS_ADDR_DUCATI_SIZE - \
+				OMAP_ION_HEAP_SECURE_INPUT_SIZE)
 
 static const int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -1577,8 +1579,24 @@ static void __init omap_4430sdp_reserve(void)
         omap_reserve();                                                         
 } 
 
+static void __init omap_4430sdp_map_io(void)
+{
+	omap2_set_globals_443x();
+	omap44xx_map_common_io();
+}
 
-<<<<<<< current
+static void __init omap_4430sdp_reserve(void)
+{
+	/* do the static reservations first */
+	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
+	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
+	/* ipu needs to recognize secure input buffer area as well */
+	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM,
+		PHYS_ADDR_DUCATI_SIZE + OMAP_ION_HEAP_SECURE_INPUT_SIZE);
+
+	omap_reserve();
+}
+
 MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.atag_offset	= 0x100,
