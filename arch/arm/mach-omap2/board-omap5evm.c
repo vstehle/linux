@@ -37,6 +37,7 @@
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/mfd/twl6040.h>
+#include <linux/memblock.h>
 
 #include <drm/drm_edid.h>
 
@@ -51,6 +52,7 @@
 #include <mach/hardware.h>
 #include "common.h"
 #include <plat/common.h>
+#include <plat/remoteproc.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
@@ -71,6 +73,21 @@
 #define	OMAP5_MPU6050_INT_GPIO		150
 
 #define GPIO_WIFI_PMENA			140
+
+#define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
+#define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
+#define OMAP_ION_HEAP_SECURE_INPUT_SIZE	(SZ_1M * 90)
+#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 105)
+#define PHYS_ADDR_DUCATI_MEM	(PHYS_ADDR_SMC_MEM - PHYS_ADDR_DUCATI_SIZE - \
+					OMAP_ION_HEAP_SECURE_INPUT_SIZE)
+
+#define MUX_FLAG_REG_LOW_HALF 0
+#define MUX_FLAG_REG_HIGH_HALF (1 << 0)
+#define MUX_FLAG_REG_CORE 0
+#define MUX_FLAG_REG_WKUP (1 << 1)
+
+#define MUX_PHYS_BASE_CORE 0x4a002800
+#define MUX_PHYS_BASE_WKUP 0x4ae0c800
 
 #define HDMI_OE_GPIO                   256
 #define HDMI_HPD_EN_GPIO               257
@@ -1788,6 +1805,17 @@ static void __init omap_54xx_init(void)
 		omap_5430_sevm_init();
 }
 
+static void __init omap_5430evm_reserve(void)                                   
+{                                                                               
+        /* do the static reservations first */                                  
+        memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);                 
+        memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);           
+        /* ipu needs to recognize secure input buffer area as well */           
+        omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM,                       
+                PHYS_ADDR_DUCATI_SIZE + OMAP_ION_HEAP_SECURE_INPUT_SIZE);       
+                                                                                
+        omap_reserve();                                                         
+}
 
 static void __init omap_5430evm_map_io(void)
 {
@@ -1805,8 +1833,8 @@ MACHINE_START(OMAP5_SEVM, "TI OMAP5 Eval Board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.atag_offset    = 0x100,  
 	.map_io		= omap_5430evm_map_io,
-	.reserve	= omap_reserve,
 	.init_early	= omap54xx_init_early,
+	.reserve        = omap_5430evm_reserve,
 	.init_irq	= gic_init_irq,
 	.handle_irq     = gic_handle_irq,
 	.init_machine	= omap_54xx_init,
