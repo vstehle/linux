@@ -884,7 +884,6 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
 	if (++obj->refcount > 1) {
 		dev_err(dev, "%s: already attached!\n", obj->name);
 		err = -EBUSY;
-		goto err_enable;
 	}
 
 	dev_info(obj->dev, "%s: %s qos_request\n", __func__, obj->name);
@@ -933,7 +932,7 @@ static void omap_iommu_detach(struct omap_iommu *obj)
 
 	if (--obj->refcount == 0) {
 		iommu_disable(obj);
-		pm_qos_update_request(obj->qos_request, -1);
+		dev_pm_qos_update_request(obj->qos_request, -1);
 	}
 
 	module_put(obj->owner);
@@ -1006,8 +1005,8 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	pm_qos_add_request(obj->qos_request, PM_QOS_CPU_DMA_LATENCY,
-				PM_QOS_DEFAULT_VALUE);
+	dev_pm_qos_add_request(obj->dev, obj->qos_request,
+					PM_QOS_DEFAULT_VALUE);
 
 	err = request_irq(pdata->irq, iommu_fault_handler, IRQF_SHARED,
 			  dev_name(&pdev->dev), obj);
@@ -1036,7 +1035,7 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
 
 	iopgtable_clear_entry_all(obj);
 
-	pm_qos_remove_request(obj->qos_request);
+	dev_pm_qos_remove_request(obj->qos_request);
 	kfree(obj->qos_request);
 
 	dev_info(&pdev->dev, "%s removed\n", obj->name);

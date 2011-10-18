@@ -13,7 +13,7 @@
 #ifndef __MACH_IOMMU_H
 #define __MACH_IOMMU_H
 
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 
 struct iotlb_entry {
 	u32 da;
@@ -54,7 +54,7 @@ struct omap_iommu {
 	u32 da_start;
 	u32 da_end;
 	struct platform_device *pdev;
-	struct pm_qos_request_list *qos_request;
+	struct dev_pm_qos_request *qos_request;
 	void *secure_ttb;
 	bool secure_mode;
 };
