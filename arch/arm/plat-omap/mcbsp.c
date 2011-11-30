@@ -187,6 +187,9 @@ void omap_mcbsp_config(unsigned int id, const struct omap_mcbsp_reg_cfg *config)
 		MCBSP_WRITE(mcbsp, RCCR, config->rccr);
 		MCBSP_WRITE(mcbsp, WAKEUPEN, XRDYEN | RRDYEN);
 	}
+	/* Enable wakeup behavior */
+	if (mcbsp->pdata->has_wakeup)
+		MCBSP_WRITE(mcbsp, WAKEUPEN, XRDYEN | RRDYEN);
 }
 EXPORT_SYMBOL(omap_mcbsp_config);
 
@@ -732,10 +735,6 @@ int omap_mcbsp_request(unsigned int id)
 		mcbsp->pdata->ops->request(id);
 
 	pm_runtime_get_sync(mcbsp->dev);
-
-	/* Enable wakeup behavior */
-	if (mcbsp->pdata->has_wakeup)
-		MCBSP_WRITE(mcbsp, WAKEUPEN, XRDYEN | RRDYEN);
 
 	/*
 	 * Make sure that transmitter, receiver and sample-rate generator are
