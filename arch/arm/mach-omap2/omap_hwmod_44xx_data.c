@@ -3173,8 +3173,18 @@ static struct omap_hwmod_ocp_if *omap44xx_iss_masters[] = {
 
 static struct omap_hwmod_addr_space omap44xx_iss_addrs[] = {
 	{
-		.pa_start	= 0x52000000,
-		.pa_end		= 0x520000ff,
+		.pa_start	= OMAP44XX_ISS_TOP_BASE,
+		.pa_end		= OMAP44XX_ISS_TOP_END,
+		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.pa_start	= OMAP44XX_ISS_CSI2_A_REGS1_BASE,
+		.pa_end		= OMAP44XX_ISS_CSI2_A_REGS1_END,
+		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.pa_start	= OMAP44XX_ISS_CAMERARX_CORE1_BASE,
+		.pa_end		= OMAP44XX_ISS_CAMERARX_CORE1_END,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
