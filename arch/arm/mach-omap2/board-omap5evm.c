@@ -44,6 +44,7 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/hardware/gic.h>
+#include <mach/dmm.h>
 
 #include <mach/hardware.h>
 #include "common.h"
@@ -1620,6 +1621,9 @@ static void __init omap54xx_common_init(void)
 	omap2_hsmmc_init(mmc);
 	omap_ehci_ohci_init();
 	platform_device_register(&leds_gpio);
+
+	omap_dmm_init(); /* needs to be before display_init */
+
 	omap5evm_display_init();
 }
 
