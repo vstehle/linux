@@ -41,6 +41,9 @@
 #include "mux.h"
 #include <linux/qtouch_obp_ts.h>
 
+#include <video/omapdss.h>
+#include <video/omap-panel-lg4591.h>
+
 #include "common-board-devices.h"
 
 #define OMAP5_TOUCH_IRQ_1              179
@@ -544,17 +547,23 @@ static struct regulator_init_data omap5_ldo1 = {
 	},
 };
 
+static struct regulator_consumer_supply omap5evm_lcd_panel_supply[] = {
+	REGULATOR_SUPPLY("panel_supply", "omapdss_dsi.0"),
+};
+
 static struct regulator_init_data omap5_ldo2 = {
 	.constraints = {
 		.min_uV			= 2900000,
 		.max_uV			= 2900000,
-		.apply_uV               = true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on              = true,
+		.apply_uV		= 1
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap5evm_lcd_panel_supply),
+	.consumer_supplies	= omap5evm_lcd_panel_supply,
 };
 
 static struct regulator_init_data omap5_ldo3 = {
@@ -609,7 +618,10 @@ static struct regulator_init_data omap5_ldo7 = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.apply_uV		= 1
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap5_dss_phy_supply),
+	.consumer_supplies	= omap5_dss_phy_supply,
 };
 
 static struct regulator_init_data omap5_ldo8 = {
@@ -1107,6 +1119,12 @@ static void __init omap_5430evm_init(void)
 	platform_device_register(&dummy_sd_regulator_device);
 	omap2_hsmmc_init(mmc);
 	omap_ehci_ohci_init();
+#if 0
+	status = omap4_keyboard_init(&evm5430_keypad_data, &keypad_data);
+	if (status)
+		pr_err("Keypad initialization failed: %d\n", status);
+#endif
+	omap5evm_display_init();
 }
 
 static void __init omap_5430evm_map_io(void)
