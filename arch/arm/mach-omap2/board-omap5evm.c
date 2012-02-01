@@ -63,6 +63,8 @@
 #define GPIO_WIFI_PMENA			140
 #define GPIO_WIFI_IRQ			9
 
+#define HDMI_GPIO_HPD 193
+
 static struct gpio_led gpio_leds[] = {
 	{
 		.name			= "red",
@@ -1294,9 +1296,23 @@ static void omap5evm_lcd_init(void)
 	omap_writel(0x1FF80000, 0x4A002E14);
 }
 
+static void omap5evm_hdmi_init(void)
+{
+	int r;
+
+	r = gpio_request_one(HDMI_GPIO_HPD, GPIOF_DIR_IN,
+		"hdmi_gpio_hpd");
+	if (r)
+		pr_err("%s: Could not get HDMI\n", __func__);
+
+	/* Need to configure HPD as a gpio in mux */
+	omap_writel(0x1060100, 0x4A00293C);
+}
+
 static void __init omap5evm_display_init(void)
 {
 	omap5evm_lcd_init();
+	omap5evm_hdmi_init();
 	omap_display_init(&omap5evm_dss_data);
 }
 
@@ -1367,6 +1383,7 @@ static struct omap_dss_device omap5evm_hdmi_device = {
 	.platform_enable = omap5evm_panel_enable_hdmi,
 	.platform_disable = omap5evm_panel_disable_hdmi,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
+	.hpd_gpio = 193,
 };
 
 static struct omap_dss_device *omap5evm_dss_devices[] = {
