@@ -28,6 +28,7 @@
 #include <plat/sram.h>
 #include <plat/board.h>
 #include <plat/cpu.h>
+#include <plat/common.h>
 
 #include "sram.h"
 
@@ -42,9 +43,9 @@
 #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
 
 #ifdef CONFIG_OMAP4_ERRATA_I688
-#define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
+#define OMAP4_SRAM_PA_START	OMAP4_SRAM_PA
 #else
-#define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
+#define OMAP4_SRAM_PA_START	(OMAP4_SRAM_PA + 0x4000)
 #endif
 
 #define OMAP3_SRAM_PUB_VA       (OMAP3_SRAM_VA + 0x8000)
@@ -53,7 +54,7 @@
 #define OMAP4_SRAM_VA           0xfe400000
 #define OMAP4_HS_SRAM_SIZE      0x1000 /*  4K */
 #define OMAP4_HS_SRAM_OFFSET    (OMAP4_SRAM_MAX - OMAP4_HS_SRAM_SIZE)
-#define OMAP4_SRAM_PUB_PA       (OMAP4_SRAM_PA + OMAP4_HS_SRAM_OFFSET)
+#define OMAP4_SRAM_PUB_PA       (OMAP4_SRAM_PA_START + OMAP4_HS_SRAM_OFFSET)
 #define OMAP4_SRAM_PUB_VA       (OMAP4_SRAM_VA + OMAP4_HS_SRAM_OFFSET)
 
 /* Reserve 60K bytes of SRAM for HS/EMU devices */
@@ -141,7 +142,7 @@ static void __init omap_detect_sram(void)
 				omap_sram_start = OMAP4_SRAM_PUB_PA;
 				omap_sram_size = OMAP4_HS_SRAM_SIZE; /* 4K */
 			} else if (cpu_is_omap54xx()) {
-				omap_sram_base = OMAP5_SRAM_PUB_VA;
+				omap_sram_base = (void *)OMAP5_SRAM_PUB_VA;
 				omap_sram_start = OMAP5_SRAM_PUB_PA;
 				omap_sram_size = SZ_128K; /* 128KB */
 				omap_sram_size -= OMAP5_SRAM_RESERVED_SIZE;
@@ -157,7 +158,7 @@ static void __init omap_detect_sram(void)
 				omap_sram_start = OMAP4_SRAM_PA;
 				omap_sram_size = OMAP4_HS_SRAM_SIZE; /* 4K */
 			} else if (cpu_is_omap54xx()) {
-				omap_sram_base = OMAP5_SRAM_VA;
+				omap_sram_base = (void *)OMAP5_SRAM_VA;
 				omap_sram_start = OMAP5_SRAM_PA;
 				omap_sram_size = SZ_128K; /* 128KB */
 				omap_sram_size -= OMAP5_SRAM_RESERVED_SIZE;
@@ -184,6 +185,8 @@ static void __init omap_detect_sram(void)
 			omap_sram_size = 0x4000;
 		}
 	}
+
+	omap_sram_ceil = omap_sram_base + omap_sram_size;
 }
 
 /*
@@ -191,7 +194,10 @@ static void __init omap_detect_sram(void)
  */
 static void __init omap_map_sram(void)
 {
+	unsigned long base;
 	int cached = 1;
+	struct map_desc omap_sram_io_desc[2];
+	int nr_desc = 1;
 
 	if (omap_sram_size == 0)
 		return;
@@ -224,8 +230,8 @@ static void __init omap_map_sram(void)
 		} else {
 			omap_sram_io_desc[0].length = ROUND_DOWN(omap_sram_size
 						- PAGE_SIZE, PAGE_SIZE);
-			omap_sram_io_desc[1].virtual =
-				omap_sram_base + omap_sram_io_desc[0].length;
+			omap_sram_io_desc[1].virtual = (long)(
+				omap_sram_base + omap_sram_io_desc[0].length);
 			base = omap_sram_start + omap_sram_io_desc[0].length;
 			base = ROUND_DOWN(base, PAGE_SIZE);
 			omap_sram_io_desc[1].pfn = __phys_to_pfn(base);
@@ -237,6 +243,23 @@ static void __init omap_map_sram(void)
 		}
 	}
 
+
+        iotable_init(omap_sram_io_desc, nr_desc);
+
+        pr_info("SRAM: Mapped pa 0x%08llx to va 0x%08lx size: 0x%lx\n",
+                (long long) __pfn_to_phys(omap_sram_io_desc[0].pfn),
+                omap_sram_io_desc[0].virtual,
+                omap_sram_io_desc[0].length);
+
+        /*
+	 * Normally devicemaps_init() would flush caches and tlb after
+	 * mdesc->map_io(), but since we're called from map_io(), we
+ 	 * must do it here.
+	 */
+        local_flush_tlb_all();
+        flush_cache_all();
+
+#if 0
 	omap_sram_start = ROUND_DOWN(omap_sram_start, PAGE_SIZE);
 	omap_sram_base = __arm_ioremap_exec(omap_sram_start, omap_sram_size,
 						cached);
@@ -246,6 +269,7 @@ static void __init omap_map_sram(void)
 	}
 
 	omap_sram_ceil = omap_sram_base + omap_sram_size;
+#endif
 
 	/*
 	 * Looks like we need to preserve some bootloader code at the
