@@ -434,6 +434,11 @@ static void __init omap_common_init_early(void)
 	omap_init_consistent_dma_size();
 }
 
+/* not used, and no powerdomain stuff for omap2 */
+
+#if 0
+
+
 static void __init omap_hwmod_init_postsetup(void)
 {
 	u8 postsetup_state;
@@ -507,6 +512,7 @@ static void __init omap_hwmod_init_postsetup(void)
                 pr_err("Could not init clock framework - unknown SoC\n");  
 
 }
+#endif
 
 #ifdef CONFIG_SOC_OMAP2420
 void __init omap2420_init_early(void)
