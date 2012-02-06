@@ -42,10 +42,12 @@ extern struct sys_timer omap5_timer;
 extern bool omap_32k_timer_init(void);
 extern int __init omap_init_clocksource_32k(void);
 
+extern void __iomem *dram_sync, *sram_sync;
+
 extern void omap_reserve(void);
 extern int omap_dss_reset(struct omap_hwmod *);
 
-void omap_sram_init(void);
+int __init  omap_sram_init(void);
 
 void omap2_set_globals_242x(void);
 void omap2_set_globals_243x(void);
