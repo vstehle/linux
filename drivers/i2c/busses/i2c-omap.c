@@ -212,6 +212,7 @@ struct omap_i2c_dev {
 	u16			sclhstate;
 	u16			bufstate;
 	u16			westate;
+	u16			syscstate;
 	u16			errata;
 };
 
@@ -302,7 +303,7 @@ static void omap_i2c_hwspinlock_unlock(struct omap_i2c_dev *dev)
 
 static void omap_i2c_unidle(struct omap_i2c_dev *dev)
 {
-	pm_runtime_get_sync(&pdev->dev);
+//	pm_runtime_get_sync(dev->dev);
 
 	if ((dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) || cpu_is_omap34xx() || cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
@@ -320,6 +321,7 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
 	 */
 	if (dev->iestate)
 		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+
 }
 
 static void omap_i2c_idle(struct omap_i2c_dev *dev)
@@ -358,6 +360,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 	unsigned long fclk_rate = 12000000;
 	unsigned long internal_clk = 0;
 	struct clk *fclk;
+	unsigned long timeout;
 
 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
 		/* Disable I2C controller before soft reset */
@@ -915,7 +918,7 @@ complete:
 				~(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
 				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
 
-		if (stat & OMAP_I2C_STAT_NACK)
+		if (stat & OMAP_I2C_STAT_NACK) {
 			err |= OMAP_I2C_STAT_NACK;
 			w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
 			w |= OMAP_I2C_CON_STP;
@@ -1132,7 +1135,7 @@ omap_i2c_probe(struct platform_device *pdev)
 		dev->dtrev = pdata->rev;
 		dev->device_reset = pdata->device_reset;
 	} else {
-		speed = 100;	/* Default speed */
+		dev->speed = 100;	/* Default speed */
 		dev->set_mpu_wkup_lat = NULL;
 	}
 
@@ -1159,7 +1162,7 @@ omap_i2c_probe(struct platform_device *pdev)
 		dev->reg_shift = 2;
 
 	if (cpu_is_omap44xx() ||  cpu_is_omap54xx())
-		dev->regs = (u8 *) omap4_reg_map;
+		dev->regs = (u8 *) reg_map_ip_v2;
 	else
 		dev->regs = (u8 *)reg_map_ip_v1;
 
