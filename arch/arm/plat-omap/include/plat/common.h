@@ -46,6 +46,8 @@ extern void __iomem *dram_sync, *sram_sync;
 
 extern void omap_reserve(void);
 extern int omap_dss_reset(struct omap_hwmod *);
+extern int omap4_prcm_freq_update(void);
+
 
 int __init  omap_sram_init(void);
 
