@@ -1250,6 +1250,10 @@ static void __init omap_5430evm_init(void)
 	omap_5430evm_i2c_init();
 	omap_serial_init();
 	platform_device_register(&dummy_sd_regulator_device);
+	if (cpu_is_omap5432()) {
+		mmc[1].gpio_cd = 152;
+		pr_err("DDR3VB: re-configuring MMC CD GPIO");
+	}
 	omap2_hsmmc_init(mmc);
 	omap_ehci_ohci_init();
 #if 0
