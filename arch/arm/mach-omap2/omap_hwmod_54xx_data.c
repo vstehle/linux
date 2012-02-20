@@ -2685,6 +2685,10 @@ static struct omap_hwmod omap54xx_hsi_hwmod = {
  * multimaster high-speed i2c controller
  */
 
+static struct omap_i2c_dev_attr i2c_dev_attr = {                                
+        .flags  = OMAP_I2C_FLAG_BUS_SHIFT_NONE,                                 
+};
+
 static struct omap_hwmod_class_sysconfig omap54xx_i2c_sysc = {
 	.sysc_offs	= 0x0010,
 	.syss_offs	= 0x0090,
@@ -2756,6 +2760,7 @@ static struct omap_hwmod omap54xx_i2c1_hwmod = {
 	},
 	.slaves		= omap54xx_i2c1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_i2c1_slaves),
+	.dev_attr       = &i2c_dev_attr,
 };
 
 /* i2c2 */
@@ -2811,6 +2816,7 @@ static struct omap_hwmod omap54xx_i2c2_hwmod = {
 	},
 	.slaves		= omap54xx_i2c2_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_i2c2_slaves),
+	.dev_attr       = &i2c_dev_attr,
 };
 
 /* i2c3 */
@@ -2866,6 +2872,7 @@ static struct omap_hwmod omap54xx_i2c3_hwmod = {
 	},
 	.slaves		= omap54xx_i2c3_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_i2c3_slaves),
+	.dev_attr       = &i2c_dev_attr,
 };
 
 /* i2c4 */
@@ -2921,6 +2928,7 @@ static struct omap_hwmod omap54xx_i2c4_hwmod = {
 	},
 	.slaves		= omap54xx_i2c4_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_i2c4_slaves),
+	.dev_attr       = &i2c_dev_attr,
 };
 
 /* i2c5 */
@@ -2969,6 +2977,7 @@ static struct omap_hwmod omap54xx_i2c5_hwmod = {
 	},
 	.slaves		= omap54xx_i2c5_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_i2c5_slaves),
+	.dev_attr       = &i2c_dev_attr,
 };
 
 /*
