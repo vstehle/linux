@@ -744,9 +744,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 
 	omap_i2c_wait_for_bb(dev);
 out:
-	pm_runtime_put(dev->dev);
-
 	omap_i2c_idle(dev);
+
+	pm_runtime_put(dev->dev);
 	omap_i2c_hwspinlock_unlock(dev);
 
 	return r;
