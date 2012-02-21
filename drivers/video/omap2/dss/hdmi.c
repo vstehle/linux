@@ -211,13 +211,14 @@ int hdmi_init_display(struct omap_dss_device *dssdev)
 static int omapdss_hdmi_io_configure(void)
 {
 	int r;
-	printk(KERN_DEBUG "configure TPD\n");
+	pr_err("configure TPD\n");
 	r = pio_a_read_byte(0xC);
 	r &= 0xFC;
 	pio_a_i2c_write(0xC, r);
 	r = pio_a_read_byte(0x4);
 	r |= 0x3;
 	pio_a_i2c_write(0x4, r);
+	pr_err("TPD configure done\n");
 
 	return 0;
 }
@@ -779,6 +780,13 @@ int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
+	if (priv == NULL) {
+		pr_err("NULL priv!\n");
+		WARN_ON(1);
+                r = -ENODEV;                                                    
+                goto err0;                                                      
+	}
+
 	hdmi.ip_data.hpd_gpio = priv->hpd_gpio;
 
 	r = omap_dss_start_device(dssdev);
@@ -786,7 +794,6 @@ int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev)
 		DSSERR("failed to start device\n");
 		goto err0;
 	}
-
 	if (dssdev->platform_enable) {
 		r = dssdev->platform_enable(dssdev);
 		if (r) {
@@ -794,16 +801,13 @@ int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev)
 			goto err1;
 		}
 	}
-
 	if (cpu_is_omap54xx())
 		omapdss_hdmi_io_configure();
-
 	r = hdmi_power_on(dssdev);
 	if (r) {
 		DSSERR("failed to power on device\n");
 		goto err2;
 	}
-
 	mutex_unlock(&hdmi.lock);
 	return 0;
 
