@@ -340,6 +340,9 @@ int ti_hdmi_4xxx_phy_poweron(struct hdmi_ip_data *ip_data)
 		hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
 		return r;
 	}
+
+	ip_data->has_irq = true;
+
 	/* enable divby2 */
 	if (cpu_is_omap54xx())
 		REG_FLD_MOD(phy_base, HDMI_TXPHY_BIST_CONTROL, 1, 11, 11);
@@ -358,8 +361,10 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 
 void ti_hdmi_4xxx_phy_disable(struct hdmi_ip_data *ip_data)
 {
-	free_irq(gpio_to_irq(ip_data->hpd_gpio), ip_data);
-
+	if (ip_data->has_irq) {
+		free_irq(gpio_to_irq(ip_data->hpd_gpio), ip_data);
+		ip_data->has_irq = false;
+	}
 	hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
 	ip_data->phy_tx_enabled = false;
 	ip_data->cfg.hdmi_phy_tx_enabled = 0;
