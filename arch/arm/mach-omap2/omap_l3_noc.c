@@ -27,7 +27,7 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
-
+#include <linux/delay.h>
 #include "omap_l3_noc.h"
 
 /*
@@ -184,7 +184,10 @@ static int __devinit omap4_l3_probe(struct platform_device *pdev)
 	/*
 	 * Setup interrupt Handlers
 	 */
+
 	l3->debug_irq = platform_get_irq(pdev, 0);
+	pr_err("l3->debug_irq %d\n", l3->debug_irq);
+
 	ret = request_irq(l3->debug_irq,
 			l3_interrupt_handler,
 			IRQF_DISABLED, "l3-dbg-irq", l3);
@@ -195,6 +198,8 @@ static int __devinit omap4_l3_probe(struct platform_device *pdev)
 	}
 
 	l3->app_irq = platform_get_irq(pdev, 1);
+	pr_err("l3->app_irq %d\n", l3->app_irq);
+// !!! during this request_irq, we blow an l3 custom error: MASTER: MPU TARGET: L4CFG
 	ret = request_irq(l3->app_irq,
 			l3_interrupt_handler,
 			IRQF_DISABLED, "l3-app-irq", l3);
