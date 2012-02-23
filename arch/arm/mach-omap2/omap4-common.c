@@ -84,7 +84,6 @@ core_initcall(omap_barriers_init);
 void __init gic_init_irq(void)
 {
 	void __iomem *omap_irq_base;
-	void __iomem *gic_dist_base_addr;
 
 	/* Static mapping, never released */
 	if (cpu_is_omap44xx())
