@@ -246,6 +246,10 @@ static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
 
 	pr_err("hdmi_check_hpd_state says %d\n", hpd);
 
+    // Hack! Force HPD.
+	printk("Hack! Force HPD in hdmi_check_hpd_state\n");
+    hpd = 1;
+
 	if (hpd == ip_data->phy_tx_enabled) {
 		spin_unlock_irqrestore(&phy_tx_lock, flags);
 		return 0;
@@ -520,6 +524,10 @@ int ti_hdmi_4xxx_read_edid(struct hdmi_ip_data *ip_data,
 
 bool ti_hdmi_4xxx_detect(struct hdmi_ip_data *ip_data)
 {
+    // Hack! Force detect.
+	printk("Hack! Force detect in ti_hdmi_4xxx_detect\n");
+    return 1;
+
 	return gpio_get_value(ip_data->hpd_gpio);
 }
 

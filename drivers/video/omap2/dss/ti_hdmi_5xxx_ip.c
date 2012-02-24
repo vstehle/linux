@@ -272,6 +272,10 @@ int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 
 bool ti_hdmi_5xxx_detect(struct hdmi_ip_data *ip_data)
 {
+    // Hack!
+    printk("Hack! force detect in ti_hdmi_5xxx_detect\n");
+    return 1;
+
         return gpio_get_value(ip_data->hpd_gpio);
 }
 
