@@ -75,8 +75,6 @@ static int omap2_mcbsp_reparent_clk(struct device *dev, struct clk *clk,
 		fck_src_name = "pad_fck";
 	else if (!strcmp(fck_src_name, "clks_fclk"))
 		fck_src_name = "prcm_fck";
-	else
-		return -EINVAL;
 
 	fck_src = clk_get(dev, fck_src_name);
 	if (IS_ERR_OR_NULL(fck_src)) {
