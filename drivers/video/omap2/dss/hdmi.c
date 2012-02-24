@@ -712,6 +712,12 @@ void hdmi_dump_regs(struct seq_file *s)
 
 static int hdmi_get_current_hpd(void)
 {
+
+
+    // Hack! Force HPD.
+    return 1;
+
+
 	if (!hdmi.ip_data.hpd_gpio)
 		return 0;
 	return gpio_get_value(hdmi.ip_data.hpd_gpio);
