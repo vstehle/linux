@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 
 #include <plat/mcbsp.h>
+#include <plat/omap_device.h>
 #include <linux/pm_runtime.h>
 
 struct omap_mcbsp **mcbsp_ptr;
@@ -72,7 +73,6 @@ static int omap_mcbsp_st_read(struct omap_mcbsp *mcbsp, u16 reg)
 			omap_mcbsp_st_read(mcbsp, OMAP_ST_REG_##reg)
 #define MCBSP_ST_WRITE(mcbsp, reg, val) \
 			omap_mcbsp_st_write(mcbsp, OMAP_ST_REG_##reg, val)
-#endif
 
 #define MCBSP_READ(mcbsp, reg) \
 		omap_mcbsp_read(mcbsp, OMAP_MCBSP_REG_##reg, 0)
@@ -1232,7 +1232,7 @@ static void __devexit omap_st_remove(struct omap_mcbsp *mcbsp)
 	}
 }
 #else
-static inline int __devinit omap_st_add(struct omap_mcbsp *mcbsp) { return 0; }
+static inline int __devinit omap_st_add(struct omap_mcbsp *mcbsp, struct resource *res) { return 0; }
 static inline void __devexit omap_st_remove(struct omap_mcbsp *mcbsp) {}
 #endif
 
@@ -1279,9 +1279,8 @@ static inline void __devexit omap34xx_device_exit(struct omap_mcbsp *mcbsp)
 	if (cpu_is_omap34xx())
 		if (mcbsp->id == 2 || mcbsp->id == 3)
 			omap_st_remove(mcbsp);
->>>>>>> patched
 }
-
+#endif
 /*
  * McBSP1 and McBSP3 are directly mapped on 1610 and 1510.
  * 730 has only 2 McBSP, and both of them are MPU peripherals.
