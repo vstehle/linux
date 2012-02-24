@@ -1266,7 +1266,7 @@ static inline void __devinit omap34xx_device_init(struct omap_mcbsp *mcbsp)
 
 	if (cpu_is_omap34xx()) {
 		if (mcbsp->id == 2 || mcbsp->id == 3)
-			if (omap_st_add(mcbsp))
+			if (omap_st_add(mcbsp, NULL))
 				dev_warn(mcbsp->dev,
 				 "Unable to create sidetone controls\n");
 	}
