@@ -747,6 +747,11 @@ static int __hdmi_get_current_hpd(void)
 {
 	int r = 1;
 
+
+    // Hack! Force HPD.
+    return 1;
+
+
         if (hdmi.ip_data.ops->detect)
                 r = hdmi.ip_data.ops->detect(&hdmi.ip_data);
 

@@ -245,6 +245,12 @@ static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
 
 	pr_err("hdmi_check_hpd_state says %d\n", hpd);
 
+
+    // Hack! Force HPD.
+	pr_err("Hack! Force HPD\n");
+    hpd = 1;
+
+
 	if (hpd == ip_data->phy_tx_enabled) {
 		spin_unlock_irqrestore(&phy_tx_lock, flags);
 		return 0;
