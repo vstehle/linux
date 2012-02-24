@@ -75,18 +75,6 @@ static int omap2_mcbsp_reparent_clk(struct device *dev, struct clk *clk,
 		fck_src_name = "pad_fck";
 	else if (!strcmp(fck_src_name, "clks_fclk"))
 		fck_src_name = "prcm_fck";
-	if (!omap_mcbsp_check_valid_id(id)) {
-		pr_err("%s: Invalid id (%d)\n", __func__, id + 1);
-		return -EINVAL;
-	}
-	mcbsp = id_to_mcbsp_ptr(id);
-
-	if (fck_src_id == MCBSP_CLKS_PAD_SRC)
-		fck_src_name = mcbsp->pdata->clks_pad_src;
-	else if (fck_src_id == MCBSP_CLKS_PRCM_SRC)
-		fck_src_name = mcbsp->pdata->clks_prcm_src;
-	else
-		return -EINVAL;
 
 	fck_src = clk_get(dev, fck_src_name);
 	if (IS_ERR_OR_NULL(fck_src)) {
