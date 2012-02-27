@@ -1150,6 +1150,9 @@ static void omap5evm_hdmi_init(void)
 
 	/* Need to configure HPD as a gpio in mux */
 	omap_writel(0x1060100, 0x4A00293C);
+
+	/* Disable pulls on DCC lines - necessary for EDID detection */
+	omap_writel(0x50000000, 0x4A002E20);
 }
 
 static void __init omap5evm_display_init(void)
