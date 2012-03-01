@@ -1347,7 +1347,6 @@ static void __init omap_5430evm_init(void)
 
 	omap_5430evm_i2c_init();
 	omap_serial_init();
-	platform_device_register(&dummy_sd_regulator_device);
 	platform_device_register(&omap5sevm_abe_audio);
 	omap2_hsmmc_init(mmc);
 	omap_ehci_ohci_init();
