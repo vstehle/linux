@@ -498,6 +498,7 @@ static struct regulator_init_data omap5_smps7 = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.always_on		= 1,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_vdds1v8_main_supply),
 	.consumer_supplies	= omap5_vdds1v8_main_supply,
@@ -527,6 +528,7 @@ static struct regulator_init_data omap5_smps9 = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.always_on		= 1,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_adac_supply),
 	.consumer_supplies	= omap5_adac_supply,
@@ -662,7 +664,7 @@ static struct regulator_consumer_supply omap5_mmc1_io_supply[] = {
 static struct regulator_init_data omap5_ldo9 = {
 	.constraints = {
 		.min_uV			= 1800000,
-		.max_uV			= 3300000,
+		.max_uV			= 3000000,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
