@@ -22,6 +22,7 @@
 #include <linux/i2c/pca953x.h>
 #include <linux/input/mpu6050.h>
 #include <linux/of_fdt.h>
+#include <linux/i2c-gpio.h>
 
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
@@ -1420,6 +1421,8 @@ static void __init omap54xx_common_init(void)
 	omap_5430evm_i2c_init();
 	omap_serial_init();
 	omap5_sdp5430_wifi_init();
+	i2c_register_board_info(0, hdmi_i2c_eeprom, ARRAY_SIZE(hdmi_i2c_eeprom));
+	platform_device_register(&hdmi_edid_device);
 	omap2_hsmmc_init(mmc);
 	omap_ehci_ohci_init();
 	platform_device_register(&leds_gpio);
