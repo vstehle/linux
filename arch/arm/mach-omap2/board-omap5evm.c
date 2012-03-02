@@ -1422,6 +1422,8 @@ static void __init omap54xx_common_init(void)
 	omap_5430evm_i2c_init();
 	omap_serial_init();
 	omap5_sdp5430_wifi_init();
+	i2c_register_board_info(0, hdmi_i2c_eeprom, ARRAY_SIZE(hdmi_i2c_eeprom));
+	platform_device_register(&hdmi_edid_device);
 	omap2_hsmmc_init(mmc);
 	omap_ehci_ohci_init();
 	platform_device_register(&leds_gpio);
