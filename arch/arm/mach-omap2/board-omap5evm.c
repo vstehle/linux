@@ -63,6 +63,9 @@
 #define OMAP5_TSL2771_INT_GPIO          149
 #define	OMAP5_MPU6050_INT_GPIO		150
 
+#define HDMI_OE_GPIO			256
+#define HDMI_HPD_EN_GPIO		257
+
 #define HDMI_GPIO_HPD 193
 
 static const int evm5430_keymap[] = {
@@ -1257,9 +1260,6 @@ static void omap5evm_hdmi_init(void)
 
 	/* Need to configure HPD as a gpio in mux */
 	omap_writel(0x1060100, 0x4A00293C);
-
-	/* Disable pulls on DCC lines - necessary for EDID detection */
-	omap_writel(0x50000000, 0x4A002E20);
 }
 
 static void __init omap5evm_display_init(void)
@@ -1321,12 +1321,25 @@ static struct omap_dss_device omap5evm_lcd_device = {
 
 static int omap5evm_panel_enable_hdmi(struct omap_dss_device *dssdev)
 {
+	int r;
+	/* Requesting HDMI OE GPIO and enable it, at bootup */
+	r = gpio_request_one(HDMI_OE_GPIO,
+				GPIOF_OUT_INIT_HIGH, "HDMI_OE");
+	if (r)
+		pr_err("Failed to get HDMI OE GPIO\n");
+
+	/* Requesting HDMI HPD_EN GPIO and enable it, at bootup */
+	r = gpio_request_one(HDMI_HPD_EN_GPIO,
+				GPIOF_OUT_INIT_HIGH, "HDMI_HPD_EN");
+	if (r)
+		pr_err("Failed to get HDMI HPD EN GPIO\n");
 	return 0;
 }
 
 static void omap5evm_panel_disable_hdmi(struct omap_dss_device *dssdev)
 {
-
+	gpio_free(HDMI_HPD_EN_GPIO);
+	gpio_free(HDMI_OE_GPIO);
 }
 
 static struct omap_dss_hdmi_data omap5evm_hdmi_data = {                      
@@ -1375,6 +1388,9 @@ static void __init omap_5430_sevm_init(void)
 
 	omap_mux_init_signal("gpio_172", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
 	omap_mux_init_signal("gpio_173", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+
+        /* Disable pulls on DCC lines - necessary for EDID detection */         
+        omap_writel(0x50000000, 0x4A002E20);                                    
 	
 	omap54xx_common_init();
 	status = omap4_keyboard_init(&evm5430_keypad_data, &keypad_data);
@@ -1402,6 +1418,7 @@ static void __init omap_5432_uevm_init(void)
 
 	omap_mux_init_signal("gpio_194", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE);
 	omap_mux_init_signal("gpio_195", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE);
+	omap5evm_dss_data.default_device = &omap5evm_hdmi_device,
 
 	/* AUXCLK1 at 19.2kHz for Usb Host chip */
         omap_writel(0x01000100, 0x4ae0a314);    

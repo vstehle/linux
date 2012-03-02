@@ -805,7 +805,7 @@ int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev)
 			goto err1;
 		}
 	}
-#if 1
+#if 0
 	if (cpu_is_omap54xx())
 		omapdss_hdmi_io_configure();
 #endif
