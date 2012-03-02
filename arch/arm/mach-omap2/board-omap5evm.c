@@ -68,6 +68,9 @@
 #define GPIO_WIFI_PMENA			140
 #define GPIO_WIFI_IRQ			9
 
+#define HDMI_OE_GPIO			256
+#define HDMI_HPD_EN_GPIO		257
+
 #define HDMI_GPIO_HPD 193
 
 static struct gpio_led gpio_leds[] = {
@@ -823,6 +826,30 @@ static struct palmas_platform_data palmas_omap5 = {
 };
 #endif  /* CONFIG_OMAP5_SEVM_PALMAS */
 
+/*
+ *  * Display monitor features are burnt in their EEPROM as EDID data. The EEPROM
+ *   * is connected as I2C slave device, and can be accessed at address 0x50
+ *    */
+static struct i2c_board_info __initdata hdmi_i2c_eeprom[] = {
+        {
+                I2C_BOARD_INFO("eeprom", DDC_ADDR),
+        },
+};
+
+static struct i2c_gpio_platform_data i2c_gpio_pdata = {
+        .sda_pin                = 195,
+        .sda_is_open_drain      = 0,
+        .scl_pin                = 194,
+        .scl_is_open_drain      = 0,
+        .udelay                 = 2,            /* ~100 kHz */
+};
+
+static struct platform_device hdmi_edid_device = {
+        .name                   = "i2c-gpio",
+        .id                     = -1,
+        .dev.platform_data      = &i2c_gpio_pdata,
+};
+
 static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 #ifdef CONFIG_OMAP5_SEVM_PALMAS
 	{
@@ -1373,12 +1400,25 @@ static struct omap_dss_device omap5evm_lcd_device = {
 
 static int omap5evm_panel_enable_hdmi(struct omap_dss_device *dssdev)
 {
+	int r;
+	/* Requesting HDMI OE GPIO and enable it, at bootup */
+	r = gpio_request_one(HDMI_OE_GPIO,
+				GPIOF_OUT_INIT_HIGH, "HDMI_OE");
+	if (r)
+		pr_err("Failed to get HDMI OE GPIO\n");
+
+	/* Requesting HDMI HPD_EN GPIO and enable it, at bootup */
+	r = gpio_request_one(HDMI_HPD_EN_GPIO,
+				GPIOF_OUT_INIT_HIGH, "HDMI_HPD_EN");
+	if (r)
+		pr_err("Failed to get HDMI HPD EN GPIO\n");
 	return 0;
 }
 
 static void omap5evm_panel_disable_hdmi(struct omap_dss_device *dssdev)
 {
-
+	gpio_free(HDMI_HPD_EN_GPIO);
+	gpio_free(HDMI_OE_GPIO);
 }
 
 static struct omap_dss_hdmi_data omap5evm_hdmi_data = {                      
@@ -1571,6 +1611,8 @@ static void __init omap_5432_uevm_init(void)
 	usbhs_bdata.reset_gpio_port[2] = GPIO_ETH_NRESET_UEVM;
 
 	omap_mux_init_array(omap5432_uevm_mux, ARRAY_SIZE(omap5432_uevm_mux));
+
+	omap5evm_dss_data.default_device = &omap5evm_hdmi_device,
 
 	omap54xx_common_init();
 }
