@@ -30,6 +30,13 @@
 #include <linux/mfd/palmas.h>
 #endif
 #include <linux/i2c/smsc.h>
+#include <linux/i2c/twl.h>
+#include <linux/regulator/machine.h>
+#include <linux/regulator/fixed.h>
+#include <linux/mfd/twl6040.h>
+
+#include <drm/drm_edid.h>
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -1304,7 +1311,7 @@ static struct omap_dss_device *omap5evm_dss_devices[] = {
 static struct omap_dss_board_info omap5evm_dss_data = {
 	.num_devices	= ARRAY_SIZE(omap5evm_dss_devices),
 	.devices	= omap5evm_dss_devices,
-	.default_device	= &omap5evm_lcd_device,
+	.default_device	= &omap5evm_hdmi_device,
 };
 
 static void __init omap54xx_common_init(void)  
@@ -1355,8 +1362,12 @@ static void __init omap_5432_uevm_init(void)
 	omap_mux_init_signal("gpio_80", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
 	omap_mux_init_signal("gpio_15", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
 
-	omap_mux_init_signal("gpio_194", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6);
-	omap_mux_init_signal("gpio_195", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6);
+	omap_mux_init_signal("gpio_194", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE);
+	omap_mux_init_signal("gpio_195", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE);
+
+	/* AUXCLK1 at 19.2kHz for Usb Host chip */
+        omap_writel(0x01000100, 0x4ae0a314);    
+	omap_writel(0, 0x4AE0C858);
 
 	omap54xx_common_init();
 }
