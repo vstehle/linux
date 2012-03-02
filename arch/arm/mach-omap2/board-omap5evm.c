@@ -1450,7 +1450,7 @@ static struct omap_dss_device *omap5evm_dss_devices[] = {
 static struct omap_dss_board_info omap5evm_dss_data = {
 	.num_devices	= ARRAY_SIZE(omap5evm_dss_devices),
 	.devices	= omap5evm_dss_devices,
-	.default_device	= &omap5evm_hdmi_device,
+	.default_device	= &omap5evm_lcd_device,
 };
 
 static void __init omap54xx_common_init(void)  
@@ -1594,16 +1594,22 @@ struct hack_mux_entry omap5432_uevm_mux[] = {
                 .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,    
         },
         {                                                                       
-                /* FREF_CLK1_OUT - Usb hub clock */                       
+                /* FREF_CLK0_OUT - Camera clock */                       
                 .offset = 0x58,                                                
                 .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_WKUP,             
                 .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,    
         },
         {                                                                       
-                /* GPIO_159 USB HOST 3 HSIC - ethernet */                       
+                /* FREF_CLK1 OUT - hub clock */                       
                 .offset = 0x58,                                                
                 .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_WKUP,             
                 .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,    
+        },
+        {                                                                       
+                /* GPIO_141 AUDPWRON */                       
+                .offset = 0x1bc,
+                .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_CORE,             
+                .mode = OMAP_PIN_OUTPUT | OMAP_MUX_MODE6,
         },
 };
 
@@ -1622,6 +1628,9 @@ static void __init omap_5432_uevm_init(void)
 	hack_mux_array(omap5432_uevm_mux, ARRAY_SIZE(omap5432_uevm_mux));
 
 	omap5evm_dss_data.default_device = &omap5evm_hdmi_device,
+
+	/* AUDPWRON gpio */
+	twl6040_data.audpwron_gpio = 141;
 
 	omap54xx_common_init();
 }
