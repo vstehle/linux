@@ -1563,6 +1563,9 @@ static void __init omap_5432_uevm_init(void)
 
 	omap_mux_init_array(omap5432_uevm_mux, ARRAY_SIZE(omap5432_uevm_mux));
 
+	omap_mux_init_signal("gpio_194", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6);
+	omap_mux_init_signal("gpio_195", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6);
+
 	omap54xx_common_init();
 }
 
