@@ -40,6 +40,7 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
+#include <plat/omap_hwmod.h>
 #include "hsmmc.h"
 #include "mux.h"
 #include <linux/qtouch_obp_ts.h>
@@ -51,6 +52,44 @@
 
 #define OMAP5_TSL2771_INT_GPIO          149
 #define	OMAP5_MPU6050_INT_GPIO		150
+
+#define MUX_FLAG_REG_LOW_HALF 0
+#define MUX_FLAG_REG_HIGH_HALF (1 << 0)
+#define MUX_FLAG_REG_CORE 0
+#define MUX_FLAG_REG_WKUP (1 << 1)
+
+#define MUX_PHYS_BASE_CORE 0x4a002800
+#define MUX_PHYS_BASE_WKUP 0x4ae0c800
+
+struct hack_mux_entry {
+	u16 offset;
+	u16 flags;
+	u16 mode;
+};
+
+void hack_mux_array(struct hack_mux_entry *hm, int count)
+{
+	u32 v;
+	u32 a;
+
+	while (count--) {
+
+		if (hm->flags & MUX_FLAG_REG_WKUP)
+			a = MUX_PHYS_BASE_WKUP;
+		else
+			a = MUX_PHYS_BASE_CORE;
+
+		v = omap_readl(a + hm->offset);
+		if (hm->flags & MUX_FLAG_REG_HIGH_HALF)
+			v = (v & 0xffff) | ((u32)hm->mode << 16);
+		else
+			v = (v & 0xffff0000) | hm->mode;
+	        omap_writel(v, a + hm->offset);
+		hm++;
+	}
+}
+
+
 
 static struct gpio_led gpio_leds[] = {
 	{
@@ -1148,7 +1187,7 @@ static struct omap2_hsmmc_info mmc[] = {
 #define GPIO_HUB_NRESET_SEVM	173
 #define GPIO_HUB_NRESET_UEVM    80
 
-static struct usbhs_omap_board_data usbhs_bdata __initconst = {
+static struct usbhs_omap_board_data usbhs_bdata __initdata = {
 	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[1] = OMAP_EHCI_PORT_MODE_HSIC,
 	.port_mode[2] = OMAP_EHCI_PORT_MODE_HSIC,
@@ -1172,14 +1211,29 @@ static void __init omap54xx_common_init(void)
 	platform_device_register(&leds_gpio);
 }
 
+struct hack_mux_entry omap5432_sevm_mux[] = {                                   
+        {                                                                       
+                /* GPIO 172 - Ethernet bridge nRESET */
+                .offset = 0x114,                                                
+                .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_CORE,            
+                .mode = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,                 
+        },                                                                      
+        {                                                                       
+                /* GPIO 173 - Hub nRESET */
+                .offset = 0x114,                                                
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_CORE,             
+                .mode = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,                 
+        },
+};
+
+
 static void __init omap_5430_sevm_init(void)
 {
 	int status;
 
 	pr_info("Starting 5430 sEVM setup\n");
 
-	omap_mux_init_signal("gpio_172", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
-	omap_mux_init_signal("gpio_173", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+	hack_mux_array(omap5432_sevm_mux, ARRAY_SIZE(omap5432_sevm_mux));
 
         /* Disable pulls on DCC lines - necessary for EDID detection */         
         omap_writel(0x50000000, 0x4A002E20);                                    
@@ -1190,20 +1244,124 @@ static void __init omap_5430_sevm_init(void)
 		pr_err("Keypad initialization failed: %d\n", status);
 }
 
+struct hack_mux_entry omap5432_uevm_mux[] = {
+	{
+		/* I2C1 / PMIC scl */
+		.offset = 0x1f0,
+		.flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_CORE,
+		.mode = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+        {                                                                       
+                /* I2C1 / PMIC sda */                                           
+                .offset = 0x1f4,                                                
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_CORE,            
+                .mode = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+        }, 
+        {                                                                       
+                /* I2C5 / expander scl */                                           
+                .offset = 0x1c4,                                                
+                .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_CORE,            
+                .mode = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+        },                                                                      
+        {                                                                       
+                /* I2C5 / expander sda */                                           
+                .offset = 0x1c8,                                                
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_CORE,             
+                .mode = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+        },
+        {                                                                       
+                /* GPIO152 Card detect */                                           
+                .offset = 0x1d4,                                                
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_CORE,            
+                .mode = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE6,
+        },
+        {                                                                       
+                /* GPIO80 USB host reset */                                       
+                .offset = 0xb0,
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_CORE,             
+                .mode = OMAP_PIN_OUTPUT | OMAP_MUX_MODE6,
+        },
+        {                                                                       
+                /* GPIO 15 Ethernet reset */                                       
+                .offset = 0x40,                                                
+                .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_WKUP,             
+                .mode = OMAP_PIN_OUTPUT | OMAP_MUX_MODE6,
+        },
+        {                                                                       
+                /* HDMI CEC */                                           
+                .offset = 0x13c,                                                
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_CORE,            
+                .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+        },                                                                      
+        {                                                                       
+                /* HDMI HPD */                                           
+                .offset = 0x13c,                                                
+                .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_CORE,             
+                .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+        },
+        {                                                                       
+                /* GPIO 194 HDMI EDID BITBANG I2C scl */                                       
+                .offset = 0x140,                                                
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_CORE,             
+                .mode = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE6,
+        },                                                                      
+        {                                                                       
+                /* GPIO 195 HDMI EDID BITBANG I2C sda */
+                .offset = 0x140,
+                .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_CORE,
+                .mode = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE6,
+        },
+        {                                                                       
+                /* GPIO_94 USB HOST 2 HSIC - hub */                                                  
+                .offset = 0xc4,
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_CORE,            
+                .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,    
+        },
+        {                                                                       
+                /* GPIO_95 USB HOST 2 HSIC - hub */                                                  
+                .offset = 0xc4,                                                
+                .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_CORE,            
+                .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,    
+        },
+        {                                                                       
+                /* GPIO_158 USB HOST 3 HSIC - ethernet */                                                  
+                .offset = 0x1dc,                                                
+                .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_CORE,            
+                .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,    
+        },
+        {                                                                       
+                /* GPIO_159 USB HOST 3 HSIC - ethernet */                                                  
+                .offset = 0x1e0,                                                
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_CORE,            
+                .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,    
+        },
+        {                                                                       
+                /* FREF_CLK1_OUT - Usb hub clock */                       
+                .offset = 0x58,                                                
+                .flags = MUX_FLAG_REG_HIGH_HALF | MUX_FLAG_REG_WKUP,             
+                .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,    
+        },
+        {                                                                       
+                /* GPIO_159 USB HOST 3 HSIC - ethernet */                       
+                .offset = 0x58,                                                
+                .flags = MUX_FLAG_REG_LOW_HALF | MUX_FLAG_REG_WKUP,             
+                .mode = OMAP_PIN_INPUT | OMAP_MUX_MODE0,    
+        },
+};
+
+
 static void __init omap_5432_uevm_init(void)
 {
 	pr_info("Starting 5432 uEVM setup");
 
+	/* SD Card Detect */
 	mmc[1].gpio_cd = 152;
-	omap_mux_init_signal("gpio_152", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE);
 
-	omap_mux_init_signal("gpio_147", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE);
-	omap_mux_init_signal("gpio_148", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE);
-
+	/* uEVM-specific ethernet resets */
 	usbhs_bdata.reset_gpio_port[1] = GPIO_HUB_NRESET_UEVM;
 	usbhs_bdata.reset_gpio_port[2] = GPIO_ETH_NRESET_UEVM;
-	omap_mux_init_signal("gpio_80", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
-	omap_mux_init_signal("gpio_15", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+
+	hack_mux_array(omap5432_uevm_mux, ARRAY_SIZE(omap5432_uevm_mux));
 
 	omap54xx_common_init();
 }
