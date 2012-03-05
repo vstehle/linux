@@ -110,6 +110,8 @@ struct tcm {
 #define TCM_INIT(name, attr_t, lut) \
 struct tcm *name(u16 width, u16 height, typeof(attr_t) *attr, u32 lut);
 
+struct tcm *sita_init(u16 width, u16 height, struct tcm_pt *attr, u32 lut);
+
 /**
  * Deinitialize tiler container manager.
  *
