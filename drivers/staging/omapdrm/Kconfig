@@ -9,6 +9,7 @@ config DRM_OMAP
 	select FB_SYS_COPYAREA
 	select FB_SYS_IMAGEBLIT
 	select FB_SYS_FOPS
+	select TI_TILER
 	default n
 	help
 	  DRM display driver for OMAP2/3/4 based boards.
@@ -18,6 +19,7 @@ config DRM_OMAP_NUM_CRTCS
 	range 1 10
 	default 1  if ARCH_OMAP2 || ARCH_OMAP3
 	default 2  if ARCH_OMAP4
+	default 3  if ARCH_OMAP5
 	depends on DRM_OMAP
 	help
 	  Select the number of video overlays which can be used as framebuffers.

@@ -179,7 +179,7 @@ static int dmm_txn_append(struct dmm_txn *txn, struct pat_area *area,
 	int columns = (1 + area->x1 - area->x0);
 	int rows = (1 + area->y1 - area->y0);
 	int i = columns*rows;
-	u32 *lut = omap_dmm->lut + (engine->tcm->lut_id * omap_dmm->lut_width *
+	u32 *lut = omap_dmm->lut + (engine->tcm->lut * omap_dmm->lut_width *
 			omap_dmm->lut_height) +
 			(area->y0 * omap_dmm->lut_width) + area->x0;
 
@@ -191,7 +191,7 @@ static int dmm_txn_append(struct dmm_txn *txn, struct pat_area *area,
 	pat->area = *area;
 	pat->ctrl = (struct pat_ctrl){
 			.start = 1,
-			.lut_id = engine->tcm->lut_id,
+			.lut_id = engine->tcm->lut,
 		};
 
 	data = alloc_dma(txn, 4*i, &pat->data_pa);
@@ -633,7 +633,7 @@ int omap_dmm_init(struct drm_device *dev)
 	for (i = 0; i < omap_dmm->num_lut; i++) {
 		omap_dmm->tcm[i] = sita_init(omap_dmm->container_width,
 						omap_dmm->container_height,
-						NULL);
+						NULL, i);
 
 		if (!omap_dmm->tcm[i]) {
 			dev_err(dev->dev, "failed to allocate container\n");
@@ -641,7 +641,7 @@ int omap_dmm_init(struct drm_device *dev)
 			goto fail;
 		}
 
-		omap_dmm->tcm[i]->lut_id = i;
+		omap_dmm->tcm[i]->lut = i;
 	}
 
 	/* assign access mode containers to applicable tcm container */
