@@ -159,6 +159,6 @@ struct omap_dmm_platform_data {
  * Init function for use in board init file
  *
  */
-void omap_dmm_init(void);
+void omap_dmm_device_init(void);
 
 #endif
