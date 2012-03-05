@@ -1299,7 +1299,6 @@ static struct omap_hwmod omap54xx_dsp_c0_hwmod = {
 			.rstctrl_offs = OMAP54XX_RM_DSP_RSTCTRL_OFFSET,
 		},
 	},
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 };
 
 static struct omap_hwmod omap54xx_dsp_hwmod = {
@@ -2081,7 +2080,6 @@ static struct omap_hwmod omap54xx_fdif_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_fdif_slaves),
 	.masters	= omap54xx_fdif_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_fdif_masters),
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP5430),
 };
 
 /*
@@ -3161,7 +3159,6 @@ static struct omap_hwmod omap54xx_ipu_c0_hwmod = {
 			.rstctrl_offs = OMAP54XX_RM_IPU_RSTCTRL_OFFSET,
 		},
 	},
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP5430),
 };
 
 static struct omap_hwmod omap54xx_ipu_c1_hwmod = {
@@ -3177,7 +3174,6 @@ static struct omap_hwmod omap54xx_ipu_c1_hwmod = {
 			.rstctrl_offs = OMAP54XX_RM_IPU_RSTCTRL_OFFSET,
 		},
 	},
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP5430),
 };
 
 /*
@@ -3378,7 +3374,6 @@ static struct omap_hwmod omap54xx_iva_seq0_hwmod = {
 			.rstctrl_offs = OMAP54XX_RM_IVA_RSTCTRL_OFFSET,
 		},
 	},
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP5430),
 };
 
 /* Pseudo hwmod for reset control purpose only */
@@ -3395,7 +3390,6 @@ static struct omap_hwmod omap54xx_iva_seq1_hwmod = {
 			.rstctrl_offs = OMAP54XX_RM_IVA_RSTCTRL_OFFSET,
 		},
 	},
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP5430),
 };
 
 static struct omap_hwmod omap54xx_iva_hwmod = {
@@ -4508,7 +4502,6 @@ static struct omap_hwmod omap54xx_sl2if_hwmod = {
 	},
 	.slaves		= omap54xx_sl2if_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_sl2if_slaves),
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP5430),
 };
 
 /*
