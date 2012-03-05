@@ -17,7 +17,7 @@
 #define OMAP_DMM_TILER_H
 
 #include "omap_drv.h"
-#include "tcm.h"
+#include "../../../drivers/media/video/tiler/tcm.h"
 
 enum tiler_fmt {
 	TILFMT_8BIT = 0,
