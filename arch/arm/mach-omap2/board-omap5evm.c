@@ -1563,7 +1563,7 @@ static void __init omap54xx_common_init(void)
 	omap_ehci_ohci_init();
 	platform_device_register(&leds_gpio);
 
-	omap_dmm_init(); /* needs to be before display_init */
+	omap_dmm_device_init(); /* needs to be before display_init */
 
 	omap5evm_display_init();
 }
