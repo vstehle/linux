@@ -19,6 +19,7 @@
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/virtio.h>
