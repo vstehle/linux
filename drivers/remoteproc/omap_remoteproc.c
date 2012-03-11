@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/remoteproc.h>
 #include <linux/sched.h>
+#include <linux/iommu.h>
 
 #include <plat/iommu.h>
 #include <plat/omap_device.h>
@@ -38,7 +39,9 @@
 #define PM_SUSPEND_TIMEOUT	300
 
 struct omap_rproc_priv {
-	struct iommu *iommu;
+//	struct omap_iommu *iommu;
+	struct iommu_domain *domain;
+	bool is_attached; /* autosuspend can detatch it */
 	int (*iommu_cb)(struct rproc *, u64, u32);
 	int (*wdt_cb)(struct rproc *);
 #ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
@@ -125,7 +128,7 @@ static void omap_rproc_dump_registers(struct rproc *rproc)
 }
 
 static int
-omap_rproc_map(struct device *dev, struct iommu *obj, u32 da, u32 pa, u32 size)
+omap_rproc_map(struct device *dev, struct omap_iommu *obj, u32 da, u32 pa, u32 size)
 {
 	struct iotlb_entry e;
 	u32 all_bits;
@@ -171,7 +174,7 @@ omap_rproc_map(struct device *dev, struct iommu *obj, u32 da, u32 pa, u32 size)
 }
 
 
-static int omap_rproc_iommu_isr(struct iommu *iommu, u32 da, u32 errs, void *p)
+static int omap_rproc_iommu_isr(struct omap_iommu *iommu, u32 da, u32 errs, void *p)
 {
 	struct rproc *rproc = p;
 	struct omap_rproc_priv *rpp = rproc->priv;
@@ -192,16 +195,14 @@ int omap_rproc_activate(struct omap_device *od)
 	struct omap_rproc_timers_info *timers = pdata->timers;
 #ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
 	struct omap_rproc_priv *rpp = rproc->priv;
-	struct iommu *iommu;
 
-	if (!rpp->iommu) {
-		iommu = iommu_get(pdata->iommu_name);
-		if (IS_ERR(iommu)) {
-			dev_err(dev, "iommu_get error: %ld\n",
-				PTR_ERR(iommu));
-			return PTR_ERR(iommu);
-		}
-		rpp->iommu = iommu;
+	if (!rpp->is_attached) {
+        	ret = iommu_attach_device(rpp->domain, &od->pdev->dev);                     
+        	if (ret) {                                                              
+        	        dev_err(&od->pdev->dev, "can't attach iommu device: %d\n", ret);    
+			return -EIO;
+        	}    
+		rpp->is_attached = 1;
 	}
 
 	if (!rpp->mbox)
@@ -262,9 +263,9 @@ int omap_rproc_deactivate(struct omap_device *od)
 		omap_dm_timer_stop(timers[i].odt);
 
 #ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
-	if (rpp->iommu) {
-		iommu_put(rpp->iommu);
-		rpp->iommu = NULL;
+	if (rpp->is_attached) {
+		iommu_detach_device(rpp->domain, &od->pdev->dev);
+		rpp->is_attached = 0;
 	}
 
 	if (rpp->mbox) {
@@ -283,9 +284,9 @@ static int omap_rproc_iommu_init(struct rproc *rproc,
 		 int (*callback)(struct rproc *rproc, u64 fa, u32 flags))
 {
 	struct device *dev = rproc->dev;
+	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_rproc_pdata *pdata = dev->platform_data;
 	int ret, i;
-	struct iommu *iommu;
 	struct omap_rproc_priv *rpp;
 
 	rpp = kzalloc(sizeof(*rpp), GFP_KERNEL);
@@ -297,14 +298,20 @@ static int omap_rproc_iommu_init(struct rproc *rproc,
 	iommu_set_isr(pdata->iommu_name, omap_rproc_iommu_isr, rproc);
 	iommu_set_secure(pdata->iommu_name, rproc->secure_mode,
 						rproc->secure_ttb);
-	iommu = iommu_get(pdata->iommu_name);
-	if (IS_ERR(iommu)) {
-		ret = PTR_ERR(iommu);
-		dev_err(dev, "iommu_get error: %d\n", ret);
-		goto err_mmu;
-	}
 
-	rpp->iommu = iommu;
+        rpp->domain = iommu_domain_alloc(pdev->dev.bus);                        
+        if (!rpp->domain) {                                                     
+                dev_err(dev, "can't alloc iommu domain\n");                
+                ret = -ENOMEM;                                                  
+                goto err_mmu;                                                 
+        }                                                                       
+                                                                                
+        ret = iommu_attach_device(rpp->domain, &pdev->dev);                     
+        if (ret) {                                                              
+                dev_err(dev, "can't attach iommu device: %d\n", ret);    
+                goto err_map;                                               
+        }  
+	rpp->is_attached = 1;
 	rpp->iommu_cb = callback;
 	rproc->priv = rpp;
 
@@ -316,7 +323,7 @@ static int omap_rproc_iommu_init(struct rproc *rproc,
 			ret = omap_rproc_map(dev, iommu, me->da, me->pa,
 								 me->size);
 			if (ret)
-				goto err_map;
+				goto err_detach;
 		}
 	}
 	if (pdata->clkdm)
@@ -324,8 +331,10 @@ static int omap_rproc_iommu_init(struct rproc *rproc,
 
 	return 0;
 
+err_detach:
+	iommu_detach_device(rpp->domain, &pdev->dev);
 err_map:
-	iommu_put(iommu);
+	iommu_domain_free(rpp->domain);
 err_mmu:
 	iommu_set_secure(pdata->iommu_name, false, NULL);
 	if (pdata->clkdm)
@@ -494,8 +503,12 @@ static int omap_rproc_iommu_exit(struct rproc *rproc)
 	if (pdata->clkdm)
 		clkdm_wakeup(pdata->clkdm);
 
-	if (rpp->iommu)
-		iommu_put(rpp->iommu);
+	if (rpp->is_attached)
+	        iommu_detach_device(rpp->domain, rproc->dev);                           
+
+	if (rpp->domain)
+		iommu_domain_free(rpp->domain);
+
 	kfree(rpp);
 	if (pdata->clkdm)
 		clkdm_allow_idle(pdata->clkdm);
