@@ -390,7 +390,7 @@ EXPORT_SYMBOL_GPL(flush_iotlb_all);
  * exclusively with locked TLB entries and receive notifications
  * for TLB miss then call this function to disable TWL.
  */
-void iommu_set_twl(struct iommu *obj, bool on)
+void iommu_set_twl(struct omap_iommu *obj, bool on)
 {
 	arch_iommu->set_twl(obj, on);
 }
@@ -843,7 +843,7 @@ static int device_match_by_alias(struct device *dev, void *data)
  * @start		Start of valid range
  * @end			End of valid range
  **/
-int iommu_set_da_range(struct iommu *obj, u32 start, u32 end)
+int iommu_set_da_range(struct omap_iommu *obj, u32 start, u32 end)
 {
 
 	if (!obj)
@@ -887,11 +887,11 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
 	}
 
 	dev_info(obj->dev, "%s: %s qos_request\n", __func__, obj->name);
-	pm_qos_update_request(obj->qos_request, 10);
+	dev_pm_qos_update_request(obj->qos_request, 10);
 	obj->iopgd = iopgd;
 	err = iommu_enable(obj);
 	if (err) {
-		pm_qos_update_request(obj->qos_request, -1);
+		dev_pm_qos_update_request(obj->qos_request, -1);
 		goto err_enable;
 	}
 	flush_iotlb_all(obj);
