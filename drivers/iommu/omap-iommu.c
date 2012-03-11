@@ -974,10 +974,7 @@ EXPORT_SYMBOL_GPL(iommu_set_secure);
 static int __devinit omap_iommu_probe(struct platform_device *pdev)
 {
 	int err = -ENODEV;
-	int irq;
 	struct omap_iommu *obj;
-	struct resource *res;
-	void *p;
 	struct iommu_platform_data *pdata = pdev->dev.platform_data;
 
 	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
@@ -1024,8 +1021,6 @@ err_irq:
 
 static int __devexit omap_iommu_remove(struct platform_device *pdev)
 {
-	int irq;
-	struct resource *res;
 	struct omap_iommu *obj = platform_get_drvdata(pdev);
 	struct iommu_platform_data *pdata = pdev->dev.platform_data;
 
@@ -1208,7 +1203,7 @@ static phys_addr_t omap_iommu_iova_to_phys(struct iommu_domain *domain,
 	struct omap_iommu_domain *omap_domain = domain->priv;
 	struct omap_iommu *oiommu = omap_domain->iommu_dev;
 	struct device *dev = oiommu->dev;
-	u32 *pgd, *pte;
+	u32 *pgd = NULL, *pte = NULL;
 	phys_addr_t ret = 0;
 
 	iopgtable_lookup_entry(oiommu, da, &pgd, &pte);
