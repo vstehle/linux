@@ -947,7 +947,7 @@ static void omap_iommu_detach(struct omap_iommu *obj)
 int iommu_set_secure(const char *name, bool enable, void *data)
 {
 	struct device *dev;
-	struct iommu *obj;
+	struct omap_iommu *obj;
 
 	dev = driver_find_device(&omap_iommu_driver.driver, NULL, (void *)name,
 				device_match_by_alias);
