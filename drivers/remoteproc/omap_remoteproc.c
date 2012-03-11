@@ -156,7 +156,7 @@ omap_rproc_map(struct device *dev, struct iommu *obj, u32 da, u32 pa, u32 size)
 		e.endian = MMU_RAM_ENDIAN_LITTLE;
 		e.elsz = MMU_RAM_ELSZ_32;
 
-		ret = iopgtable_store_entry(obj, &e);
+		ret = omap_iopgtable_store_entry(obj, &e);
 		if (ret) {
 			dev_err(dev, "iopgtable_store_entry fail: %d\n", ret);
 			return ret;
@@ -186,7 +186,7 @@ static int omap_rproc_iommu_isr(struct iommu *iommu, u32 da, u32 errs, void *p)
 int omap_rproc_activate(struct omap_device *od)
 {
 	int i, ret = 0;
-	struct rproc *rproc = platform_get_drvdata(&od->pdev);
+	struct rproc *rproc = platform_get_drvdata(od->pdev);
 	struct device *dev = rproc->dev;
 	struct omap_rproc_pdata *pdata = dev->platform_data;
 	struct omap_rproc_timers_info *timers = pdata->timers;
@@ -242,7 +242,7 @@ int omap_rproc_activate(struct omap_device *od)
 int omap_rproc_deactivate(struct omap_device *od)
 {
 	int i, ret = 0;
-	struct rproc *rproc = platform_get_drvdata(&od->pdev);
+	struct rproc *rproc = platform_get_drvdata(od->pdev);
 	struct device *dev = rproc->dev;
 	struct omap_rproc_pdata *pdata = dev->platform_data;
 	struct omap_rproc_timers_info *timers = pdata->timers;
