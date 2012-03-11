@@ -955,14 +955,14 @@ int iommu_set_secure(const char *name, bool enable, void *data)
 		return -ENODEV;
 
 	obj = to_iommu(dev);
-	mutex_lock(&obj->iommu_lock);
+	spin_lock(&obj->iommu_lock);
 	if (obj->refcount) {
-		mutex_unlock(&obj->iommu_lock);
+		spin_unlock(&obj->iommu_lock);
 		return -EBUSY;
 	}
 	obj->secure_mode = enable;
 	obj->secure_ttb = data;
-	mutex_unlock(&obj->iommu_lock);
+	spin_unlock(&obj->iommu_lock);
 
 	return 0;
 }
