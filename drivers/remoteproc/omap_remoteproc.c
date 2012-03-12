@@ -322,8 +322,11 @@ static int omap_rproc_iommu_init(struct rproc *rproc,
 			const struct rproc_mem_entry *me =
 							&rproc->memory_maps[i];
 
-			ret = omap_rproc_map(dev, iommu, me->da, me->pa,
-								 me->size);
+//			ret = omap_rproc_map(dev, iommu, me->da, me->pa,
+//
+//								 me->size);
+			ret = -EINVAL; // !!! BROKEN
+
 			if (ret)
 				goto err_detach;
 		}
