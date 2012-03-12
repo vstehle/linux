@@ -295,7 +295,9 @@ static int omap_rproc_iommu_init(struct rproc *rproc,
 
 	if (pdata->clkdm)
 		clkdm_wakeup(pdata->clkdm);
-	iommu_set_isr(pdata->iommu_name, omap_rproc_iommu_isr, rproc);
+//	iommu_set_isr(pdata->iommu_name, omap_rproc_iommu_isr, rproc);
+	return -EINVAL; // BROKEN
+
 	iommu_set_secure(pdata->iommu_name, rproc->secure_mode,
 						rproc->secure_ttb);
 
