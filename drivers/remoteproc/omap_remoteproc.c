@@ -301,7 +301,9 @@ static int omap_rproc_iommu_init(struct rproc *rproc,
 	iommu_set_secure(pdata->iommu_name, rproc->secure_mode,
 						rproc->secure_ttb);
 
-        rpp->domain = iommu_domain_alloc(pdev->dev.bus);                        
+	// !!! are we providing this bus index meaningfully?
+	return -EINVAL; // !!! BROKEN
+        rpp->domain = iommu_domain_alloc(pdev->dev.bus);
         if (!rpp->domain) {                                                     
                 dev_err(dev, "can't alloc iommu domain\n");                
                 ret = -ENOMEM;                                                  
