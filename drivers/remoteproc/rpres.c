@@ -133,6 +133,11 @@ static int rpres_probe(struct platform_device *pdev)
 	struct rpres *obj;
 	int ret = 0;
 
+	if (!pdata) {
+		pr_err("rpres_probe: no pdata\n");
+		return -EINVAL;
+	}
+
 	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 	if (!obj)
 		return -ENOMEM;
