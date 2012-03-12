@@ -1015,6 +1015,9 @@ static int iss_probe(struct platform_device *pdev)
 	struct iss_device *iss;
 	int i, ret;
 
+	pr_err("iss probe disabled due to pm problems with iss domain on 54xx\n");
+	return -EINVAL;
+
 	if (pdata == NULL)
 		return -EINVAL;
 
