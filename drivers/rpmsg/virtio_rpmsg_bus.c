@@ -518,9 +518,9 @@ int rpmsg_send_offchannel_raw(struct rpmsg_channel *rpdev, u32 src, u32 dst,
 	sg_init_one(&sg, sim_addr, sizeof(*msg) + len);
 
 	/* add message to the remote processor's virtqueue */
-	err = virtqueue_add_buf_gfp(vrp->svq, &sg, 1, 0, msg, GFP_KERNEL);
+	err = virtqueue_add_buf(vrp->svq, &sg, 1, 0, msg, GFP_KERNEL);
 	if (err < 0) {
-		dev_err(dev, "virtqueue_add_buf_gfp failed: %d\n", err);
+		dev_err(dev, "virtqueue_add_buf failed: %d\n", err);
 		goto out;
 	}
 	/* descriptors must be written before kicking remote processor */
@@ -579,7 +579,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	sim_addr = vrp->sim_base + offset;
 	sg_init_one(&sg, sim_addr, sizeof(*msg) + len);
 
-	err = virtqueue_add_buf_gfp(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
+	err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
 	if (err < 0) {
 		dev_err(dev, "failed to add a virtqueue buffer: %d\n", err);
 		return;
@@ -710,7 +710,7 @@ static int rpmsg_probe(struct virtio_device *vdev)
 		void *simaddr = vrp->sim_base + i * buf_size;
 
 		sg_init_one(&sg, simaddr, buf_size);
-		err = virtqueue_add_buf_gfp(vrp->rvq, &sg, 0, 1, tmpaddr,
+		err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, tmpaddr,
 								GFP_KERNEL);
 		WARN_ON(err < 0); /* sanity check; this can't really happen */
 	}
