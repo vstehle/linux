@@ -339,8 +339,9 @@ static int sysfs_open_file(struct inode *inode, struct file *file)
 	if (kobj->ktype && kobj->ktype->sysfs_ops)
 		ops = kobj->ktype->sysfs_ops;
 	else {
-		WARN(1, KERN_ERR "missing sysfs attribute operations for "
+		pr_err("missing sysfs attribute operations for "
 		       "kobject: %s\n", kobject_name(kobj));
+//		WARN_ON(1);
 		goto err_out;
 	}
 
