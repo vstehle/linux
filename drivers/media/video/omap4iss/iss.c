@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/vmalloc.h>
+#include <linux/pm_runtime.h>
 
 #include <media/v4l2-common.h>
 #include <media/v4l2-device.h>
@@ -782,6 +783,8 @@ struct iss_device *omap4iss_get(struct iss_device *iss)
 	else
 		iss->has_context = 1;
 
+	pm_runtime_get_sync(&iss->dev);
+
 	iss_enable_interrupts(iss);
 
 out:
@@ -811,6 +814,7 @@ void omap4iss_put(struct iss_device *iss)
 		iss_disable_clocks(iss);
 	}
 	mutex_unlock(&iss->iss_mutex);
+	pm_runtime_put(&iss->dev);
 }
 
 static int iss_map_mem_resource(struct platform_device *pdev,
@@ -1040,6 +1044,8 @@ static int iss_probe(struct platform_device *pdev)
 	ret = iss_get_clocks(iss);
 	if (ret < 0)
 		goto error;
+
+	pm_runtime_enable(&pdev->dev);
 
 	if (omap4iss_get(iss) == NULL)
 		goto error;
