@@ -30,7 +30,7 @@
 #include <linux/err.h>
 #include <linux/notifier.h>
 #include <linux/module.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 
 #include <plat/mailbox.h>
 
