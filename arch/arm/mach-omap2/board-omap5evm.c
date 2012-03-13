@@ -70,12 +70,13 @@
 #define	OMAP5_MPU6050_INT_GPIO		150
 
 #define GPIO_WIFI_PMENA			140
-#define GPIO_WIFI_IRQ			9
 
 #define HDMI_OE_GPIO                   256
 #define HDMI_HPD_EN_GPIO               257
 
 #define HDMI_GPIO_HPD 193
+
+static int gpio_wlan_irq = 9; /* correct for sEVM */
 
 static struct gpio_led gpio_leds[] = {
 	{
@@ -1216,35 +1217,6 @@ int __init omap5evm_touch_init(void)
 	return 0;
 }
 
-static struct regulator_consumer_supply omap5_evm_vmmc1_supply[] = {
-	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
-	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
-};
-
-static struct regulator_init_data omap5_evm_vmmc1 = {
-	.constraints = {
-		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-		.always_on	= true,
-	},
-	.num_consumer_supplies = ARRAY_SIZE(omap5_evm_vmmc1_supply),
-	.consumer_supplies = omap5_evm_vmmc1_supply,
-};
-
-static struct fixed_voltage_config omap5_evm_sd_dummy = {
-	.supply_name = "vmmc_supply",
-	.microvolts = 3000000, /* 3.0V */
-	.gpio = -EINVAL,
-	.init_data = &omap5_evm_vmmc1,
-};
-
-static struct platform_device dummy_sd_regulator_device = {
-	.name		= "reg-fixed-voltage",
-	.id		= 1,
-	.dev = {
-		.platform_data = &omap5_evm_sd_dummy,
-	}
-};
-
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 2,
@@ -1274,17 +1246,16 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}	/* Terminator */
 };
 
-static struct regulator_consumer_supply omap5_sdp5430_vmmc3_supply = {
-	.supply         = "vmmc",
-	.dev_name       = "omap_hsmmc.2",
+static struct regulator_consumer_supply omap5_sdp5430_vmmc3_supply[] = {
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.2"),
 };
 
 static struct regulator_init_data sdp5430_vmmc3 = {
 	.constraints            = {
 		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 	},
-	.num_consumer_supplies  = 1,
-	.consumer_supplies      = &omap5_sdp5430_vmmc3_supply,
+	.num_consumer_supplies  = ARRAY_SIZE(omap5_sdp5430_vmmc3_supply),
+	.consumer_supplies      = omap5_sdp5430_vmmc3_supply,
 };
 
 static struct fixed_voltage_config sdp5430_vwlan = {
@@ -1299,7 +1270,7 @@ static struct fixed_voltage_config sdp5430_vwlan = {
 
 static struct platform_device omap_vwlan_device = {
 	.name           = "reg-fixed-voltage",
-	.id             = 2,
+	.id             = 1,
 	.dev = {
 		.platform_data = &sdp5430_vwlan,
 	},
@@ -1307,7 +1278,7 @@ static struct platform_device omap_vwlan_device = {
 
 static void omap5_sdp5430_wifi_mux_init(void)
 {
-	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT |
+	omap_mux_init_gpio(gpio_wlan_irq, OMAP_PIN_INPUT |
 				OMAP_PIN_OFF_WAKEUPENABLE);
 	omap_mux_init_gpio(GPIO_WIFI_PMENA, OMAP_PIN_OUTPUT);
 
@@ -1326,24 +1297,24 @@ static void omap5_sdp5430_wifi_mux_init(void)
 }
 
 static struct wl12xx_platform_data omap5_sdp5430_wlan_data __initdata = {
-	.irq                = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock    = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock   = WL12XX_TCXOCLOCK_26,
 };
 
 static void omap5_sdp5430_wifi_init(void)
 {
-/* PRDP: To be enabled on production */
-#if 0
 	omap5_sdp5430_wifi_mux_init();
-#endif
 
-	if (gpio_request_one(GPIO_WIFI_IRQ, GPIOF_IN, "wlan"))
+	omap5_sdp5430_wlan_data.irq = OMAP_GPIO_IRQ(gpio_wlan_irq);
+
+	if (gpio_request_one(gpio_wlan_irq, GPIOF_IN, "wlan"))
 		printk(KERN_INFO "wlan: IRQ gpio request failure in board file\n");
 
 	if (wl12xx_set_platform_data(&omap5_sdp5430_wlan_data))
 		pr_err("Error setting wl12xx data\n");
-	platform_device_register(&omap_vwlan_device);
+
+// !!! allowing this regulator registration kills mcpdm / audio !!!
+//	platform_device_register(&omap_vwlan_device);
 }
 
 /* USBB3 to SMSC LAN9730 */
@@ -1595,6 +1566,8 @@ static void __init omap54xx_common_init(void)
         omap_mux_init_array(omap5432_common_mux,                                
                                               ARRAY_SIZE(omap5432_common_mux)); 
 
+	omap5_sdp5430_wifi_init();
+
 	omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_x2_info,
 			lpddr2_elpida_4G_S4_timings,
 			ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
@@ -1614,7 +1587,6 @@ static void __init omap54xx_common_init(void)
 
 	omap_5430evm_i2c_init();
 	omap_serial_init();
-	omap5_sdp5430_wifi_init();
 	i2c_register_board_info(0, hdmi_i2c_eeprom, ARRAY_SIZE(hdmi_i2c_eeprom));
 	platform_device_register(&hdmi_edid_device);
 	platform_device_register(&omap5sevm_abe_audio);
@@ -1783,6 +1755,9 @@ static void __init omap_5432_uevm_init(void)
 
 	/* AUDPWRON gpio */
 	twl6040_data.audpwron_gpio = 141;
+
+	/* WLAN module IRQ */
+	gpio_wlan_irq = 14;
 
 	omap54xx_common_init();
 }
