@@ -311,9 +311,9 @@ static int omap_i2c_unidle(struct omap_i2c_dev *dev)
 	pdata = pdev->dev.platform_data;
 
 	// !!! was commented out since no put
-	ret = pm_runtime_get_sync(&pdev->dev);
-	if (ret < 0)
-		return ret;
+//	ret = pm_runtime_get_sync(&pdev->dev);
+//	if (ret < 0)
+//		return ret;
 
 	if (cpu_is_omap34xx() || cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
