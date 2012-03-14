@@ -783,7 +783,7 @@ struct iss_device *omap4iss_get(struct iss_device *iss)
 	else
 		iss->has_context = 1;
 
-	pm_runtime_get_sync(&iss->dev);
+	pm_runtime_get_sync(iss->dev);
 
 	iss_enable_interrupts(iss);
 
@@ -814,7 +814,7 @@ void omap4iss_put(struct iss_device *iss)
 		iss_disable_clocks(iss);
 	}
 	mutex_unlock(&iss->iss_mutex);
-	pm_runtime_put(&iss->dev);
+	pm_runtime_put(iss->dev);
 }
 
 static int iss_map_mem_resource(struct platform_device *pdev,
