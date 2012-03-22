@@ -1698,7 +1698,7 @@ static void __init omap54xx_common_init(void)
                                               ARRAY_SIZE(omap5432_common_mux)); 
 
 	omap_5430evm_i2c_init();
-#ifdef CONFIG_WL18XX
+#ifdef CONFIG_WL12XX_PLATFORM_DATA
 	omap5_sdp5430_wifi_init();
 #endif
 	omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_x2_info,
