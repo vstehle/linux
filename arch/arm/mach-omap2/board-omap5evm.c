@@ -1721,6 +1721,7 @@ static void __init omap54xx_common_init(void)
 #endif
 	omap_5430evm_bluetooth_init();
 	omap_serial_init();
+	omap_sdrc_init(NULL, NULL);
 	omap2_hsmmc_init(mmc);
 	i2c_register_board_info(0, hdmi_i2c_eeprom, ARRAY_SIZE(hdmi_i2c_eeprom));
 	platform_device_register(&hdmi_edid_device);
