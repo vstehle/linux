@@ -1729,7 +1729,9 @@ static void __init omap54xx_common_init(void)
 	omap_ehci_ohci_init();
 	platform_device_register(&leds_gpio);
 	omap5evm_display_init();
+#ifdef CONFIG_MACH_OMAP4_PANDA_CAMERA_SUPPORT
 	panda_camera_init(&omap5evm_camera_board_info);
+#endif
 	omap2_hsmmc_init(mmc);
 }
 
