@@ -203,6 +203,7 @@ static void vb2_dma_contig_unmap_dmabuf(void *mem_priv)
 	struct vb2_dc_buf *buf = mem_priv;
 	struct dma_buf *dmabuf;
 	struct sg_table *sg;
+	enum dma_data_direction dir;
 
 	if (!buf || !buf->db_attach)
 		return;
@@ -212,10 +213,13 @@ static void vb2_dma_contig_unmap_dmabuf(void *mem_priv)
 	dmabuf = buf->db_attach->dmabuf;
 	sg = buf->sg;
 
+	// TODO need a way to know if we are camera or display, etc..
+	dir = DMA_BIDIRECTIONAL;
+
 	/*
 	 * Put the sg for this buffer:
 	 */
-	dma_buf_unmap_attachment(buf->db_attach, sg);
+	dma_buf_unmap_attachment(buf->db_attach, sg, dir);
 
 	buf->dma_addr = 0;
 	buf->size = 0;
