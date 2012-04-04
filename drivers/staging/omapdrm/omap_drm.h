@@ -105,6 +105,28 @@ struct drm_omap_gem_info {
 	uint32_t __pad;
 };
 
+/*
+Table 15-11. Coding and Description of TILER Orientations
+S Y X	Description				Alternate description
+0 0 0	0-degree view				Natural view
+0 0 1	0-degree view with vertical mirror 	180-degree view with horizontal mirror
+0 1 0	0-degree view with horizontal mirror 	180-degree view with vertical mirror
+0 1 1	180-degree view
+1 0 0	90-degree view with vertical mirror	270-degree view with horizontal mirror
+1 0 1	270-degree view
+1 1 0	90-degree view
+1 1 1	90-degree view with horizontal mirror	270-degree view with vertical mirror
+ */
+
+#define OMAP_ORIENT_MASK_XY_FLIP		0x4		/* S */
+#define OMAP_ORIENT_MASK_Y_INVERT		0x2		/* Y */
+#define OMAP_ORIENT_MASK_X_INVERT		0x1		/* X */
+
+struct drm_omap_set_orientation {
+	uint32_t crtc_or_plane_id;
+	uint32_t orientation;		/* mask of XY_FLIP, Y_INVERT, and/or X_INVERT */
+};
+
 #define DRM_OMAP_GET_PARAM		0x00
 #define DRM_OMAP_SET_PARAM		0x01
 #define DRM_OMAP_GET_BASE		0x02
@@ -112,7 +134,8 @@ struct drm_omap_gem_info {
 #define DRM_OMAP_GEM_CPU_PREP		0x04
 #define DRM_OMAP_GEM_CPU_FINI		0x05
 #define DRM_OMAP_GEM_INFO		0x06
-#define DRM_OMAP_NUM_IOCTLS		0x07
+#define DRM_OMAP_SET_ORIENTATION	0x07
+#define DRM_OMAP_NUM_IOCTLS		0x08
 
 #define DRM_IOCTL_OMAP_GET_PARAM	DRM_IOWR(DRM_COMMAND_BASE + DRM_OMAP_GET_PARAM, struct drm_omap_param)
 #define DRM_IOCTL_OMAP_SET_PARAM	DRM_IOW (DRM_COMMAND_BASE + DRM_OMAP_SET_PARAM, struct drm_omap_param)
@@ -121,5 +144,6 @@ struct drm_omap_gem_info {
 #define DRM_IOCTL_OMAP_GEM_CPU_PREP	DRM_IOW (DRM_COMMAND_BASE + DRM_OMAP_GEM_CPU_PREP, struct drm_omap_gem_cpu_prep)
 #define DRM_IOCTL_OMAP_GEM_CPU_FINI	DRM_IOW (DRM_COMMAND_BASE + DRM_OMAP_GEM_CPU_FINI, struct drm_omap_gem_cpu_fini)
 #define DRM_IOCTL_OMAP_GEM_INFO		DRM_IOWR(DRM_COMMAND_BASE + DRM_OMAP_GEM_INFO, struct drm_omap_gem_info)
+#define DRM_IOCTL_OMAP_SET_ORIENTATION	DRM_IOWR(DRM_COMMAND_BASE + DRM_OMAP_SET_ORIENTATION, struct drm_omap_set_orientation)
 
 #endif /* __OMAP_DRM_H__ */
