@@ -152,28 +152,43 @@ static uint32_t get_inc_addr(struct plane *plane, const struct format *format,
 
 /* update ovl info for scanout, handles cases of multi-planar fb's, etc.
  */
-void omap_framebuffer_update_scanout(struct drm_framebuffer *fb, int x, int y,
-		struct omap_overlay_info *info)
+void omap_framebuffer_update_scanout(struct drm_framebuffer *fb,
+		struct omap_drm_window *win, struct omap_overlay_info *info)
 {
 	struct omap_framebuffer *omap_fb = to_omap_framebuffer(fb);
 	const struct format *format = omap_fb->format;
 	struct plane *plane = &omap_fb->planes[0];
-	uint32_t orient;
-
-	/*
-	 * we don't have any userspace API yet for setting rotation,
-	 * so just hard-code it to zero-degree (no rotation/mirroring)
-	 * for now:
-	 */
-	orient = 0;
+	uint32_t x, y;
 
 	info->color_mode = format->dss_format;
 
+	info->pos_x      = win->crtc_x;
+	info->pos_y      = win->crtc_y;
+	info->out_width  = win->crtc_w;
+	info->out_height = win->crtc_h;
+	info->width      = win->src_w;
+	info->height     = win->src_h;
+
+	x = win->src_x;
+	y = win->src_y;
+
 	if (omap_gem_flags(plane->bo) & OMAP_BO_TILED) {
-		omap_gem_rotated_paddr(plane->bo, orient, x, y, &info->paddr);
+		uint32_t w = win->src_w;
+		uint32_t h = win->src_h;
+
+		/* adjust x,y offset for flip/invert: */
+		if (win->orientation & OMAP_ORIENT_MASK_XY_FLIP)
+			swap(w, h);
+		if (win->orientation & OMAP_ORIENT_MASK_Y_INVERT)
+			y += h - 1;
+		if (win->orientation & OMAP_ORIENT_MASK_X_INVERT)
+			x += w - 1;
+
+		omap_gem_rotated_paddr(plane->bo, win->orientation,
+				x, y, &info->paddr);
 		info->burst_type   = OMAP_DSS_BURST_2D;
 		info->screen_width = tiler_stride(gem2fmt(
-				omap_gem_flags(plane->bo)));
+				omap_gem_flags(plane->bo)), win->orientation);
 	} else {
 		info->paddr        = get_inc_addr(plane, format, 0, x, y);
 		info->burst_type   = OMAP_DSS_BURST_INC;
@@ -188,8 +203,8 @@ void omap_framebuffer_update_scanout(struct drm_framebuffer *fb, int x, int y,
 
 		if (info->burst_type == OMAP_DSS_BURST_2D) {
 			WARN_ON(!(omap_gem_flags(plane->bo) & OMAP_BO_TILED));
-			omap_gem_rotated_paddr(plane->bo, orient, x/2, y/2,
-					&info->p_uv_addr);
+			omap_gem_rotated_paddr(plane->bo, win->orientation,
+					x/2, y/2, &info->p_uv_addr);
 		} else {
 			info->p_uv_addr = get_inc_addr(plane, format, 1, x, y);
 		}
@@ -406,7 +421,7 @@ struct drm_framebuffer *omap_framebuffer_init(struct drm_device *dev,
 
 		size = pitch * mode_cmd->height / format->planes[i].sub_y;
 
-		if (size > (bos[i]->size - mode_cmd->offsets[i])) {
+		if (size > (omap_gem_mmap_size(bos[i]) - mode_cmd->offsets[i])) {
 			dev_err(dev->dev, "provided buffer object is too small! %d < %d\n",
 					bos[i]->size - mode_cmd->offsets[i], size);
 			ret = -EINVAL;

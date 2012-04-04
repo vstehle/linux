@@ -570,6 +570,36 @@ static int ioctl_gem_info(struct drm_device *dev, void *data,
 	return ret;
 }
 
+static int ioctl_set_orientation(struct drm_device *dev, void *data,
+		struct drm_file *file_priv)
+{
+	struct drm_omap_set_orientation *args = data;
+	struct drm_mode_object *obj;
+	struct drm_plane *plane = NULL;
+	int ret = -ENOENT;
+
+	mutex_lock(&dev->mode_config.mutex);
+	obj = drm_mode_object_find(dev, args->crtc_or_plane_id,
+			DRM_MODE_OBJECT_PLANE);
+	if (obj) {
+		plane = obj_to_plane(obj);
+	} else {
+		obj = drm_mode_object_find(dev, args->crtc_or_plane_id,
+				DRM_MODE_OBJECT_CRTC);
+		if (obj) {
+			struct drm_crtc *crtc = obj_to_crtc(obj);
+			plane = omap_crtc_plane(crtc);
+		}
+	}
+
+	if (plane)
+		ret = omap_plane_set_orientation(plane, args->orientation);
+
+	mutex_unlock(&dev->mode_config.mutex);
+
+	return ret;
+}
+
 struct drm_ioctl_desc ioctls[DRM_COMMAND_END - DRM_COMMAND_BASE] = {
 	DRM_IOCTL_DEF_DRV(OMAP_GET_PARAM, ioctl_get_param, DRM_UNLOCKED|DRM_AUTH),
 	DRM_IOCTL_DEF_DRV(OMAP_SET_PARAM, ioctl_set_param, DRM_UNLOCKED|DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY),
@@ -578,6 +608,7 @@ struct drm_ioctl_desc ioctls[DRM_COMMAND_END - DRM_COMMAND_BASE] = {
 	DRM_IOCTL_DEF_DRV(OMAP_GEM_CPU_PREP, ioctl_gem_cpu_prep, DRM_UNLOCKED|DRM_AUTH),
 	DRM_IOCTL_DEF_DRV(OMAP_GEM_CPU_FINI, ioctl_gem_cpu_fini, DRM_UNLOCKED|DRM_AUTH),
 	DRM_IOCTL_DEF_DRV(OMAP_GEM_INFO, ioctl_gem_info, DRM_UNLOCKED|DRM_AUTH),
+	DRM_IOCTL_DEF_DRV(OMAP_SET_ORIENTATION, ioctl_set_orientation, DRM_MASTER|DRM_CONTROL_ALLOW|DRM_UNLOCKED),
 };
 
 /*

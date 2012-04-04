@@ -418,7 +418,7 @@ int tiler_release(struct tiler_block *block)
  * Otherwise the bits indicated the corresponding bit address to access
  * the SDRAM.
  */
-static u32 tiler_get_address(u32 orient, enum tiler_fmt fmt, u32 x, u32 y)
+static u32 tiler_get_address(enum tiler_fmt fmt, u32 orient, u32 x, u32 y)
 {
 	u32 x_bits, y_bits, tmp, x_mask, y_mask, alignment;
 
@@ -430,8 +430,11 @@ static u32 tiler_get_address(u32 orient, enum tiler_fmt fmt, u32 x, u32 y)
 	x_mask = MASK(x_bits);
 	y_mask = MASK(y_bits);
 
-	if (x < 0 || x > x_mask || y < 0 || y > y_mask)
+	if (x < 0 || x > x_mask || y < 0 || y > y_mask) {
+		DBG("invalid coords: %u < 0 || %u > %u || %u < 0 || %u > %u",
+				x, x, x_mask, y, y, y_mask);
 		return 0;
+	}
 
 	/* account for mirroring */
 	if (orient & MASK_X_INVERT)
@@ -452,7 +455,7 @@ dma_addr_t tiler_ssptr(struct tiler_block *block)
 {
 	BUG_ON(!validfmt(block->fmt));
 
-	return TILVIEW_8BIT + tiler_get_address(0, block->fmt,
+	return TILVIEW_8BIT + tiler_get_address(block->fmt, 0,
 			block->area.p0.x * geom[block->fmt].slot_w,
 			block->area.p0.y * geom[block->fmt].slot_h);
 }
@@ -463,9 +466,9 @@ dma_addr_t tiler_tsptr(struct tiler_block *block, uint32_t orient,
 	struct tcm_pt *p = &block->area.p0;
 	BUG_ON(!validfmt(block->fmt));
 
-	return tiler_get_address(orient, block->fmt,
-			(p->x + x) * geom[block->fmt].slot_w,
-			(p->y + y) * geom[block->fmt].slot_h);
+	return tiler_get_address(block->fmt, orient << 29,
+			(p->x * geom[block->fmt].slot_w) + x,
+			(p->y * geom[block->fmt].slot_h) + y);
 }
 
 void tiler_align(enum tiler_fmt fmt, uint16_t *w, uint16_t *h)
@@ -475,11 +478,14 @@ void tiler_align(enum tiler_fmt fmt, uint16_t *w, uint16_t *h)
 	*h = round_up(*h, geom[fmt].slot_h);
 }
 
-uint32_t tiler_stride(enum tiler_fmt fmt)
+uint32_t tiler_stride(enum tiler_fmt fmt, uint32_t orient)
 {
 	BUG_ON(!validfmt(fmt));
 
-	return 1 << (CONT_WIDTH_BITS + geom[fmt].y_shft);
+	if ((orient << 29) & MASK_XY_FLIP)
+		return 1 << (CONT_HEIGHT_BITS + geom[fmt].x_shft);
+	else
+		return 1 << (CONT_WIDTH_BITS + geom[fmt].y_shft);
 }
 
 size_t tiler_size(enum tiler_fmt fmt, uint16_t w, uint16_t h)
