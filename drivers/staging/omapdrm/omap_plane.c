@@ -31,6 +31,11 @@
  * plane funcs
  */
 
+struct callback {
+	void (*fxn)(void *);
+	void *arg;
+};
+
 #define to_omap_plane(x) container_of(x, struct omap_plane, base)
 
 struct omap_plane {
@@ -57,6 +62,9 @@ struct omap_plane {
 
 	/* for deferred unpin when we need to wait for scanout complete irq */
 	struct work_struct work;
+
+	/* callback on next endwin irq */
+	struct callback endwin;
 };
 
 /* map from ovl->id to the irq we are interested in for scanout-done */
@@ -83,6 +91,7 @@ static void unpin_worker(struct work_struct *work)
 {
 	struct omap_plane *omap_plane =
 			container_of(work, struct omap_plane, work);
+	struct callback endwin;
 
 	mutex_lock(&omap_plane->unpin_mutex);
 	DBG("unpinning %d of %d", omap_plane->num_unpins,
@@ -95,16 +104,29 @@ static void unpin_worker(struct work_struct *work)
 		drm_gem_object_unreference_unlocked(bo);
 		omap_plane->num_unpins--;
 	}
+	endwin = omap_plane->endwin;
+	omap_plane->endwin.fxn = NULL;
 	mutex_unlock(&omap_plane->unpin_mutex);
+
+	if (endwin.fxn)
+		endwin.fxn(endwin.arg);
 }
 
-/*
- * work around for PM issue in omapdss.. otherwise omap_dispc_register_isr(),
- * otherwise calls to omap_dispc_register_isr() result in register writes
- * with clocks off:
- */
-int dispc_runtime_get(void);
-int dispc_runtime_put(void);
+static void install_irq(struct drm_plane *plane)
+{
+	struct omap_plane *omap_plane = to_omap_plane(plane);
+	struct omap_overlay *ovl = omap_plane->ovl;
+	int ret;
+
+	ret = omap_dispc_register_isr(dispc_isr, plane, id2irq[ovl->id]);
+
+	/*
+	 * omapdss has upper limit on # of registered irq handlers,
+	 * which we shouldn't hit.. but if we do the limit should
+	 * be raised or bad things happen:
+	 */
+	WARN_ON(ret == -EBUSY);
+}
 
 /* push changes down to dss2 */
 static int commit(struct drm_plane *plane)
@@ -153,16 +175,9 @@ static int commit(struct drm_plane *plane)
 		 * NOTE: really this should be atomic w/ mgr->apply() but
 		 * omapdss does not expose such an API
 		 */
-		dispc_runtime_get();
-		ret = omap_dispc_register_isr(dispc_isr, plane, id2irq[ovl->id]);
-		dispc_runtime_put();
 
-		/*
-		 * omapdss has upper limit on # of registered irq handlers,
-		 * which we shouldn't hit.. but if we do the limit should
-		 * be raised or bad things happen:
-		 */
-		WARN_ON(ret == -EBUSY);
+		if (omap_plane->num_unpins > 0)
+			install_irq(plane);
 
 	} else {
 		struct omap_drm_private *priv = dev->dev_private;
