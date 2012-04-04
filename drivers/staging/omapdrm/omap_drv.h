@@ -167,6 +167,9 @@ uint32_t omap_gem_flags(struct drm_gem_object *obj);
 uint64_t omap_gem_mmap_offset(struct drm_gem_object *obj);
 size_t omap_gem_mmap_size(struct drm_gem_object *obj);
 int omap_gem_tiled_size(struct drm_gem_object *obj, uint16_t *w, uint16_t *h);
+int omap_gem_tiled_size(struct drm_gem_object *obj, uint16_t *w, uint16_t *h);
+struct dma_buf * omap_gem_prime_export(struct drm_device *dev,
+		struct drm_gem_object *obj, int flags);
 
 
 /****** PLUGIN API specific ******/
@@ -197,7 +200,8 @@ void omap_drm_unregister_mapper(int id);
 void * omap_drm_file_priv(struct drm_file *file, int mapper_id);
 void omap_drm_file_set_priv(struct drm_file *file, int mapper_id, void *priv);
 
-int omap_gem_get_pages(struct drm_gem_object *obj, struct page ***pages);
+int omap_gem_get_pages(struct drm_gem_object *obj, struct page ***pages,
+		bool atomic);
 int omap_gem_put_pages(struct drm_gem_object *obj);
 
 uint32_t omap_gem_flags(struct drm_gem_object *obj);
