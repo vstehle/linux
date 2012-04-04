@@ -191,6 +191,12 @@ static const struct drm_crtc_helper_funcs omap_crtc_helper_funcs = {
 	.load_lut = omap_crtc_load_lut,
 };
 
+struct drm_plane *omap_crtc_plane(struct drm_crtc *crtc)
+{
+	struct omap_crtc *omap_crtc = to_omap_crtc(crtc);
+	return omap_crtc->plane;
+}
+
 /* initialize crtc */
 struct drm_crtc *omap_crtc_init(struct drm_device *dev,
 		struct omap_overlay *ovl, int id)

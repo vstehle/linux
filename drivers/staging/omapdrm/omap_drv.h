@@ -65,6 +65,15 @@ struct omap_drm_private {
 	bool has_dmm;
 };
 
+/* parameters which describe (unrotated) coordinates of scanout within a fb: */
+struct omap_drm_window {
+	uint32_t orientation;
+	int32_t  crtc_x, crtc_y;		/* signed because can be offscreen */
+	uint32_t crtc_w, crtc_h;
+	uint32_t src_x, src_y;
+	uint32_t src_w, src_h;
+};
+
 #ifdef CONFIG_DEBUG_FS
 int omap_debugfs_init(struct drm_minor *minor);
 void omap_debugfs_cleanup(struct drm_minor *minor);
@@ -78,10 +87,12 @@ void omap_fbdev_free(struct drm_device *dev);
 
 struct drm_crtc *omap_crtc_init(struct drm_device *dev,
 		struct omap_overlay *ovl, int id);
+struct drm_plane *omap_crtc_plane(struct drm_crtc *crtc);
 
 struct drm_plane *omap_plane_init(struct drm_device *dev,
 		struct omap_overlay *ovl, unsigned int possible_crtcs,
 		bool priv);
+int omap_plane_set_orientation(struct drm_plane *plane, uint32_t orientation);
 int omap_plane_dpms(struct drm_plane *plane, int mode);
 int omap_plane_mode_set(struct drm_plane *plane,
 		struct drm_crtc *crtc, struct drm_framebuffer *fb,
@@ -116,10 +127,10 @@ struct drm_gem_object *omap_framebuffer_bo(struct drm_framebuffer *fb, int p);
 int omap_framebuffer_replace(struct drm_framebuffer *a,
 		struct drm_framebuffer *b, void *arg,
 		void (*unpin)(void *arg, struct drm_gem_object *bo));
-void omap_framebuffer_update_scanout(struct drm_framebuffer *fb, int x, int y,
-		struct omap_overlay_info *info);
 int omap_framebuffer_get_buffer(struct drm_framebuffer *fb, int x, int y,
 		void **vaddr, dma_addr_t *paddr, unsigned int *screen_width);
+void omap_framebuffer_update_scanout(struct drm_framebuffer *fb,
+		struct omap_drm_window *win, struct omap_overlay_info *info);
 struct drm_connector *omap_framebuffer_get_next_connector(
 		struct drm_framebuffer *fb, struct drm_connector *from);
 void omap_framebuffer_flush(struct drm_framebuffer *fb,
@@ -154,6 +165,7 @@ int omap_gem_get_paddr(struct drm_gem_object *obj,
 int omap_gem_put_paddr(struct drm_gem_object *obj);
 int omap_gem_rotated_paddr(struct drm_gem_object *obj, uint32_t orient,
 		int x, int y, dma_addr_t *paddr);
+uint32_t omap_gem_flags(struct drm_gem_object *obj);
 uint64_t omap_gem_mmap_offset(struct drm_gem_object *obj);
 size_t omap_gem_mmap_size(struct drm_gem_object *obj);
 int omap_gem_tiled_size(struct drm_gem_object *obj, uint16_t *w, uint16_t *h);

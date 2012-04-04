@@ -38,10 +38,9 @@ struct omap_plane {
 	struct omap_overlay *ovl;
 	struct omap_overlay_info info;
 
-	/* Source values, converted to integers because we don't support
-	 * fractional positions:
-	 */
-	unsigned int src_x, src_y;
+	/* position/orientation of scanout within the fb: */
+	struct omap_drm_window win;
+
 
 	/* last fb that we pinned: */
 	struct drm_framebuffer *pinned_fb;
@@ -172,7 +171,8 @@ static int commit(struct drm_plane *plane)
 
 
 	if (ovl->is_enabled(ovl)) {
-		omap_framebuffer_flush(plane->fb, info->pos_x, info->pos_y,
+		omap_framebuffer_flush(plane->fb,
+				info->pos_x, info->pos_y,
 				info->out_width, info->out_height);
 	}
 
@@ -275,6 +275,7 @@ static void update_scanout(struct drm_plane *plane)
 {
 	struct omap_plane *omap_plane = to_omap_plane(plane);
 	struct omap_overlay_info *info = &omap_plane->info;
+	struct omap_drm_window *win = &omap_plane->win;
 	int ret;
 
 	ret = update_pin(plane, plane->fb);
@@ -285,11 +286,10 @@ static void update_scanout(struct drm_plane *plane)
 		return;
 	}
 
-	omap_framebuffer_update_scanout(plane->fb,
-			omap_plane->src_x, omap_plane->src_y, info);
+	omap_framebuffer_update_scanout(plane->fb, win, info);
 
 	DBG("%s: %d,%d: %08x %08x (%d)", omap_plane->ovl->name,
-			omap_plane->src_x, omap_plane->src_y,
+			win->src_x, win->src_y,
 			(u32)info->paddr, (u32)info->p_uv_addr,
 			info->screen_width);
 }
@@ -302,21 +302,18 @@ int omap_plane_mode_set(struct drm_plane *plane,
 		uint32_t src_w, uint32_t src_h)
 {
 	struct omap_plane *omap_plane = to_omap_plane(plane);
+	struct omap_drm_window *win = &omap_plane->win;
+
+	win->crtc_x = crtc_x;
+	win->crtc_y = crtc_y;
+	win->crtc_w = crtc_w;
+	win->crtc_h = crtc_h;
 
 	/* src values are in Q16 fixed point, convert to integer: */
-	src_x = src_x >> 16;
-	src_y = src_y >> 16;
-	src_w = src_w >> 16;
-	src_h = src_h >> 16;
-
-	omap_plane->info.pos_x = crtc_x;
-	omap_plane->info.pos_y = crtc_y;
-	omap_plane->info.out_width = crtc_w;
-	omap_plane->info.out_height = crtc_h;
-	omap_plane->info.width = src_w;
-	omap_plane->info.height = src_h;
-	omap_plane->src_x = src_x;
-	omap_plane->src_y = src_y;
+	win->src_x = src_x >> 16;
+	win->src_y = src_y >> 16;
+	win->src_w = src_w >> 16;
+	win->src_h = src_h >> 16;
 
 	/* note: this is done after this fxn returns.. but if we need
 	 * to do a commit/update_scanout, etc before this returns we
@@ -345,6 +342,8 @@ static int omap_plane_update(struct drm_plane *plane,
 
 static int omap_plane_disable(struct drm_plane *plane)
 {
+	struct omap_plane *omap_plane = to_omap_plane(plane);
+	omap_plane->win.orientation = 0;
 	return omap_plane_dpms(plane, DRM_MODE_DPMS_OFF);
 }
 
@@ -380,6 +379,41 @@ int omap_plane_dpms(struct drm_plane *plane, int mode)
 	}
 
 	return r;
+}
+
+void omap_plane_on_endwin(struct drm_plane *plane,
+		void (*fxn)(void *), void *arg)
+{
+	struct omap_plane *omap_plane = to_omap_plane(plane);
+
+	mutex_lock(&omap_plane->unpin_mutex);
+	omap_plane->endwin.fxn = fxn;
+	omap_plane->endwin.arg = arg;
+	mutex_unlock(&omap_plane->unpin_mutex);
+
+	install_irq(plane);
+}
+
+int omap_plane_set_orientation(struct drm_plane *plane, uint32_t orientation)
+{
+	struct omap_plane *omap_plane = to_omap_plane(plane);
+	struct omap_overlay *ovl = omap_plane->ovl;
+	int ret = 0;
+
+	DBG("orientation: %02x", orientation);
+
+	if (orientation & ~(OMAP_ORIENT_MASK_XY_FLIP |
+			OMAP_ORIENT_MASK_Y_INVERT | OMAP_ORIENT_MASK_X_INVERT)) {
+		dev_err(plane->dev->dev, "invalid orientation: %08x", orientation);
+		return -EINVAL;
+	}
+
+	omap_plane->win.orientation = orientation;
+
+	if (ovl->is_enabled(ovl))
+		ret = omap_plane_dpms(plane, DRM_MODE_DPMS_ON);
+
+	return ret;
 }
 
 static const struct drm_plane_funcs omap_plane_funcs = {
