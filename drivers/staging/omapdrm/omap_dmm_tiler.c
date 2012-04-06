@@ -556,6 +556,11 @@ static int omap_dmm_probe(struct platform_device *dev)
 	u32 hwinfo, pat_geom, lut_table_size;
 	struct resource *mem;
 
+	if (cpu_is_omap54xx()) {
+		pr_err("FIXME: DMM disabled as a workaround for bus execptions on OMAP5 right now\n");
+		return -EINVAL;
+	}
+
 	omap_dmm = kzalloc(sizeof(*omap_dmm), GFP_KERNEL);
 	if (!omap_dmm) {
 		dev_err(&dev->dev, "failed to allocate driver data section\n");
