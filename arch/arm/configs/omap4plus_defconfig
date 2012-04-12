@@ -46,7 +46,8 @@ CONFIG_HIGHMEM=y
 CONFIG_LEDS=y
 CONFIG_ZBOOT_ROM_TEXT=0x0
 CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_CMDLINE="console=ttyO2,115200n8 root=/dev/mmcblk0p2 rootwait earlyprintk earlycon=ttyO2.115200n8"
+CONFIG_CMDLINE="console=ttyO2,115200n8 root=/dev/mmcblk0p3 rootwait earlyprintk earlycon=ttyO2.115200n8 test=1"
+CONFIG_CMDLINE_FORCE=y
 CONFIG_CPU_FREQ=y
 CONFIG_CPU_FREQ_GOV_USERSPACE=y
 CONFIG_CPU_FREQ_GOV_ONDEMAND=y

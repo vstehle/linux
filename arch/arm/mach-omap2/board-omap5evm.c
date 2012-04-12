@@ -1168,7 +1168,7 @@ int __init omap5evm_touch_init(void)
 
 static struct omap2_hsmmc_info mmc[] = {
 	{
-		.mmc		= 2,
+		.mmc		= 1,
 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
 					MMC_CAP_1_8V_DDR,
 		.gpio_cd	= -EINVAL,
@@ -1178,7 +1178,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.no_off_init	= true,
 	},
 	{
-		.mmc		= 1,
+		.mmc		= 2,
 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_UHS_SDR12 |
 					MMC_CAP_UHS_SDR25 | MMC_CAP_UHS_DDR50,
 		.gpio_cd	= 67,
@@ -1569,7 +1569,7 @@ static void __init omap_5430_sevm_init(void)
 {
 	int status;
 
-	pr_info("Starting 5430 sEVM setup\n");
+	pr_info("************************Starting 5430 sEVM setup\n");
 
 	omap_mux_init_array(omap5432_sevm_mux, ARRAY_SIZE(omap5432_sevm_mux));
 
@@ -1732,10 +1732,10 @@ static void __init omap_54xx_init(void)
 
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 
-	if (!strcmp(dt_selected_model, "TI OMAP5 uEVM"))
+	//if (!strcmp(dt_selected_model, "TI OMAP5 uEVM"))
 		omap_5432_uevm_init();
-	else
-		omap_5430_sevm_init();
+	//else
+	//	omap_5430_sevm_init();
 }
 
 static void __init omap_5430evm_map_io(void)
