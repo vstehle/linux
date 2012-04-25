@@ -16,25 +16,22 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/smp.h>
-#include <linux/cpu.h>
 #include <linux/jiffies.h>
 #include <linux/clockchips.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
-#include <linux/interrupt.h>
 
 #include <asm/smp_twd.h>
 #include <asm/localtimer.h>
+#include <asm/hardware/gic.h>
 
 /* set up by the platform code */
 static void __iomem *twd_base;
 
 static struct clk *twd_clk;
 static unsigned long twd_timer_rate;
-static struct clock_event_device __percpu **twd_evt;
-
 static struct clock_event_device __percpu **twd_evt;
 static int twd_ppi;
 
@@ -91,13 +88,12 @@ static int twd_timer_ack(void)
 
 	return 0;
 }
-#if 1
+
 static void twd_timer_stop(struct clock_event_device *clk)
 {
 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
 	disable_percpu_irq(clk->irq);
 }
-#endif
 
 #ifdef CONFIG_CPU_FREQ
 
@@ -186,7 +182,7 @@ static void __cpuinit twd_calibrate_rate(void)
 
 static irqreturn_t twd_handler(int irq, void *dev_id)
 {
-	struct clock_event_device *evt = dev_id;
+	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
 
 	if (twd_timer_ack()) {
 		evt->event_handler(evt);
@@ -225,8 +221,6 @@ static struct clk *twd_get_clock(void)
 	return clk;
 }
 
-extern void smp_timer_broadcast(const struct cpumask *mask);
-
 /*
  * Setup the local clock events for a CPU.
  */
@@ -247,15 +241,10 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
 	clk->name = "local_timer";
 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
 			CLOCK_EVT_FEAT_C3STOP;
-	clk->rating = 450;	/* Make sure this is higher than broadcast */
+	clk->rating = 350;
 	clk->set_mode = twd_set_mode;
 	clk->set_next_event = twd_set_next_event;
 	clk->irq = twd_ppi;
-	clk->shift = 20;
-	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
-	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
-	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
-	clk->broadcast	= smp_timer_broadcast;
 
 	this_cpu_clk = __this_cpu_ptr(twd_evt);
 	*this_cpu_clk = clk;
@@ -355,86 +344,3 @@ out:
 	WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
 }
 #endif
-static struct clock_event_device __percpu *twd_clock_event;
-static int twd_ppi;
-
-static void __cpuinit twd_setup(void *data)
-{
-	struct clock_event_device *clk = data;
-	clk->cpumask = cpumask_of(smp_processor_id());
-	clk->irq = twd_ppi;
-	twd_timer_setup(clk);
-}
-
-static void __cpuinit twd_teardown(void *data)
-{
-	struct clock_event_device *clk = data;
-	twd_timer_stop(clk);
-}
-
-static int __cpuinit twd_cpu_notify(struct notifier_block *self,
-				    unsigned long action, void *data)
-{
-	int cpu = (int)data;
-	struct clock_event_device *clk = per_cpu_ptr(twd_clock_event, cpu);
-
-	switch (action) {
-	case CPU_STARTING:
-	case CPU_STARTING_FROZEN:
-		smp_call_function_single(cpu, twd_setup, clk, 1);
-		break;
-
-	case CPU_DOWN_PREPARE:
-	case CPU_DOWN_PREPARE_FROZEN:
-		smp_call_function_single(cpu, twd_teardown, clk, 1);
-		break;
-	}
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block __cpuinitdata twd_cpu_nb = {
-	.notifier_call = twd_cpu_notify,
-};
-
-int __init twd_timer_register(struct resource *res, int res_nr)
-{
-	struct clock_event_device *clk;
-	int err;
-
-	if (res_nr != 2 || res[1].start < 0)
-		return -EINVAL;
-
-	if (twd_base)
-		return -EBUSY;
-
-	twd_ppi		= res[1].start;
-	twd_base	= ioremap(res[0].start, resource_size(&res[0]));
-	twd_clock_event	= alloc_percpu(struct clock_event_device);
-	if (!twd_base || !twd_clock_event) {
-		err = -ENOMEM;
-		goto out_free;
-	}
-
-	err = request_percpu_irq(twd_ppi, twd_handler, "twd", twd_clock_event);
-	if (err) {
-		pr_err("twd: can't register interrupt %d (%d)\n",
-		       twd_ppi, err);
-		goto out_free;
-	}
-
-	/* Immediately configure the timer on the boot CPU */
-	clk = per_cpu_ptr(twd_clock_event, smp_processor_id());
-	twd_setup(clk);
-
-	register_cpu_notifier(&twd_cpu_nb);
-
-	return 0;
-
-out_free:
-	iounmap(twd_base);
-	twd_base = NULL;
-	free_percpu(twd_clock_event);
-
-	return err;
-}

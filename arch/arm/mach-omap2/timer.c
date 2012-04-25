@@ -339,45 +339,6 @@ OMAP_SYS_TIMER_INIT(3_secure, OMAP3_SECURE_TIMER, OMAP3_CLKEV_SOURCE,
 OMAP_SYS_TIMER(3_secure)
 #endif
 
-#ifdef CONFIG_ARM_SMP_TWD
-static struct resource omap4_twd_resources[] __initdata = {
-	{
-		.start	= OMAP44XX_LOCAL_TWD_BASE,
-		.end	= OMAP44XX_LOCAL_TWD_BASE + 0x10,
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.start	= OMAP44XX_IRQ_LOCALTIMER,
-		.end	= OMAP44XX_IRQ_LOCALTIMER,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static void __init omap4_twd_init(void)
-{
-	int err;
-
-	/* Local timers are not supprted on OMAP4430 ES1.0 */
-	if (omap_rev() == OMAP4430_REV_ES1_0)
-		return;
-
-	err = twd_timer_register(omap4_twd_resources,
-				 ARRAY_SIZE(omap4_twd_resources));
-	if (err)
-		pr_err("twd_timer_register failed %d\n", err);
-}
-
-#else
-#define omap4_twd_init	NULL
-#endif
-
-/* main twd code wants to see this, despite it is deprecated now */             
-                                                                                
-int __cpuinit local_timer_setup(struct clock_event_device *evt)                 
-{                                                                               
-        return 0;                                                               
-}   
-
 #ifdef CONFIG_ARCH_OMAP4
 #ifdef CONFIG_LOCAL_TIMERS
 static DEFINE_TWD_LOCAL_TIMER(twd_local_timer,
@@ -389,7 +350,6 @@ static void __init omap4_timer_init(void)
 {
 	omap2_gp_clockevent_init(1, OMAP4_CLKEV_SOURCE);
 	omap2_gp_clocksource_init(2, OMAP4_MPU_SOURCE);
-
 #ifdef CONFIG_LOCAL_TIMERS
 	/* Local timers are not supprted on OMAP4430 ES1.0 */
 	if (omap_rev() != OMAP4430_REV_ES1_0) {
@@ -400,10 +360,9 @@ static void __init omap4_timer_init(void)
 			pr_err("twd_local_timer_register failed %d\n", err);
 	}
 #endif
-	late_time_init = omap4_twd_init;
 }
 OMAP_SYS_TIMER(4)
-#endif  /* CONFIG_ARCH_OMAP4  */
+#endif
 
 #ifdef CONFIG_ARM_ARCH_TIMER
 static struct resource arch_timer_resources[] = {
@@ -442,7 +401,7 @@ static void __init omap5_timer_init(void)
 	late_time_init = arch_timer_init;
 }
 OMAP_SYS_TIMER(5)
-#endif /* CONFIG_ARCH_OMAP5 */
+#endif
 
 /**
  * omap2_dm_timer_set_src - change the timer input clock source
