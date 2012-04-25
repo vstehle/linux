@@ -16,25 +16,19 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/smp.h>
-#include <linux/cpu.h>
 #include <linux/jiffies.h>
 #include <linux/clockchips.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-<<<<<<< current
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
-=======
 #include <linux/interrupt.h>
->>>>>>> patched
 
 #include <asm/smp_twd.h>
 #include <asm/localtimer.h>
+#include <asm/hardware/gic.h>
 
-<<<<<<< current
 /* set up by the platform code */
-=======
->>>>>>> patched
 static void __iomem *twd_base;
 
 static struct clk *twd_clk;
@@ -44,12 +38,9 @@ static struct clock_event_device __percpu **twd_clock_event;
 extern void smp_timer_broadcast(const struct cpumask *mask);
 extern struct clock_event_device percpu_clockevent;
 
-<<<<<<< current
 static struct clock_event_device __percpu **twd_evt;
 static int twd_ppi;
 
-=======
->>>>>>> patched
 static void twd_set_mode(enum clock_event_mode mode,
 			struct clock_event_device *clk)
 {
@@ -103,13 +94,12 @@ static int twd_timer_ack(void)
 
 	return 0;
 }
-#if 1
+
 static void twd_timer_stop(struct clock_event_device *clk)
 {
 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
 	disable_percpu_irq(clk->irq);
 }
-#endif
 
 #ifdef CONFIG_CPU_FREQ
 
@@ -237,16 +227,10 @@ static struct clk *twd_get_clock(void)
 	return clk;
 }
 
-extern void smp_timer_broadcast(const struct cpumask *mask);
-
 /*
  * Setup the local clock events for a CPU.
  */
-<<<<<<< current
 static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
-=======
-static void __cpuinit twd_timer_setup(struct clock_event_device *clk)
->>>>>>> patched
 {
 	struct clock_event_device **this_cpu_clk;
 
@@ -263,7 +247,7 @@ static void __cpuinit twd_timer_setup(struct clock_event_device *clk)
 	clk->name = "local_timer";
 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
 			CLOCK_EVT_FEAT_C3STOP;
-	clk->rating = 450;	/* Make sure this is higher than broadcast */
+	clk->rating = 350;
 	clk->set_mode = twd_set_mode;
 	clk->set_next_event = twd_set_next_event;
 	clk->irq = twd_ppi;
