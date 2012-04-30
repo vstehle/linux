@@ -695,8 +695,13 @@ bool omapdss_hdmi_detect(void)
 	BUG_ON(r);
 
 	r = 1;
-	if (hdmi.ip_data.ops->detect)
+	if (hdmi.ip_data.ops->detect){
 		r = hdmi.ip_data.ops->detect(&hdmi.ip_data);
+
+        // Hack! Force detect.
+        printk("Hack! Force detect in omapdss_hdmi_detect\n");
+        r = 1;
+    }
 
 	hdmi_runtime_put();
 	mutex_unlock(&hdmi.lock);
