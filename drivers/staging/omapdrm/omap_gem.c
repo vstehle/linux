@@ -218,13 +218,27 @@ static inline bool is_shmem(struct drm_gem_object *obj)
 	return obj->filp != NULL;
 }
 
+/* shmem buffers that are mapped cached can simulate coherency via using
+ * page faulting to keep track of dirty pages
+ * TODO: should this be default for cached buffers, or opt-in (or opt-out)?
+ */
+static inline bool is_cached_coherent(struct drm_gem_object *obj)
+{
+	struct omap_gem_object *omap_obj = to_omap_bo(obj);
+	return is_shmem(obj) &&
+		((omap_obj->flags & OMAP_BO_CACHE_MASK) == OMAP_BO_CACHED);
+}
+
 static DEFINE_SPINLOCK(sync_lock);
 
 /** ensure backing pages are allocated */
 static int omap_gem_attach_pages(struct drm_gem_object *obj)
 {
+	struct drm_device *dev = obj->dev;
 	struct omap_gem_object *omap_obj = to_omap_bo(obj);
 	struct page **pages;
+	int i, npages = obj->size >> PAGE_SHIFT;
+	dma_addr_t *addrs;
 
 	WARN_ON(omap_obj->pages);
 
@@ -242,16 +256,18 @@ static int omap_gem_attach_pages(struct drm_gem_object *obj)
 	 * DSS, GPU, etc. are not cache coherent:
 	 */
 	if (omap_obj->flags & (OMAP_BO_WC|OMAP_BO_UNCACHED)) {
-		int i, npages = obj->size >> PAGE_SHIFT;
-		dma_addr_t *addrs = kmalloc(npages * sizeof(addrs), GFP_KERNEL);
+		addrs = kmalloc(npages * sizeof(addrs), GFP_KERNEL);
 		for (i = 0; i < npages; i++) {
-			addrs[i] = dma_map_page(obj->dev->dev, pages[i],
+			addrs[i] = dma_map_page(dev->dev, pages[i],
 					0, PAGE_SIZE, DMA_BIDIRECTIONAL);
 		}
-		omap_obj->addrs = addrs;
+	} else {
+		addrs = kzalloc(npages * sizeof(addrs), GFP_KERNEL);
 	}
 
+	omap_obj->addrs = addrs;
 	omap_obj->pages = pages;
+
 	return 0;
 }
 
@@ -269,9 +285,10 @@ static void omap_gem_detach_pages(struct drm_gem_object *obj)
 			dma_unmap_page(obj->dev->dev, omap_obj->addrs[i],
 					PAGE_SIZE, DMA_BIDIRECTIONAL);
 		}
-		kfree(omap_obj->addrs);
-		omap_obj->addrs = NULL;
 	}
+
+	kfree(omap_obj->addrs);
+	omap_obj->addrs = NULL;
 
 	_drm_gem_put_pages(obj, omap_obj->pages, true, false);
 	omap_obj->pages = NULL;
@@ -358,6 +375,7 @@ static int fault_1d(struct drm_gem_object *obj,
 			vma->vm_start) >> PAGE_SHIFT;
 
 	if (omap_obj->pages) {
+		omap_gem_cpu_sync(obj, pgoff);
 		pfn = page_to_pfn(omap_obj->pages[pgoff]);
 	} else {
 		BUG_ON(!(omap_obj->flags & OMAP_BO_DMA));
@@ -531,7 +549,6 @@ fail:
 /** We override mainly to fix up some of the vm mapping flags.. */
 int omap_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	struct omap_gem_object *omap_obj;
 	int ret;
 
 	ret = drm_gem_mmap(filp, vma);
@@ -540,8 +557,14 @@ int omap_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 		return ret;
 	}
 
-	/* after drm_gem_mmap(), it is safe to access the obj */
-	omap_obj = to_omap_bo(vma->vm_private_data);
+	return omap_gem_mmap_obj(vma->vm_private_data, vma);
+}
+
+
+int omap_gem_mmap_obj(struct drm_gem_object *obj,
+		struct vm_area_struct *vma)
+{
+	struct omap_gem_object *omap_obj = to_omap_bo(obj);
 
 	vma->vm_flags &= ~VM_PFNMAP;
 	vma->vm_flags |= VM_MIXEDMAP;
@@ -551,15 +574,37 @@ int omap_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	} else if (omap_obj->flags & OMAP_BO_UNCACHED) {
 		vma->vm_page_prot = pgprot_noncached(vm_get_page_prot(vma->vm_flags));
 	} else {
+		/*
+		 * We do have some private objects, at least for scanout buffers
+		 * on hardware without DMM/TILER.  But these are allocated write-
+		 * combine
+		 */
+		if (WARN_ON(!obj->filp))
+			return -EINVAL;
+
+		// TODO quick hack to avoid needing to re-invent my own vmops:
+		WARN_ON(obj->filp->private_data);
+		obj->filp->private_data = vma->vm_file->private_data;
+		fput(vma->vm_file);
+		get_file(obj->filp);
+
+		/*
+		 * Shunt off cached objs to shmem file so they have their own
+		 * address_space (so unmap_mapping_range does what we want)
+		 */
+		vma->vm_pgoff = 0;
+		vma->vm_file  = obj->filp;
+
 		vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
 	}
 
 	if (omap_obj->ops && omap_obj->ops->mmap) {
-		omap_obj->ops->mmap(filp, vma);
+		omap_obj->ops->mmap(obj->filp, vma);
 	}
 
-	return ret;
+	return 0;
 }
+
 
 /**
  * omap_gem_dumb_create	-	create a dumb buffer
@@ -670,6 +715,50 @@ fail:
 	return ret;
 }
 
+/* Sync the buffer for CPU access.. note pages should already be
+ * attached, ie. omap_gem_get_pages()
+ */
+void omap_gem_cpu_sync(struct drm_gem_object *obj, int pgoff)
+{
+	struct drm_device *dev = obj->dev;
+	struct omap_gem_object *omap_obj = to_omap_bo(obj);
+
+	if (is_cached_coherent(obj) && omap_obj->addrs[pgoff]) {
+		dma_unmap_page(dev->dev, omap_obj->addrs[pgoff],
+				PAGE_SIZE, DMA_BIDIRECTIONAL);
+		omap_obj->addrs[pgoff] = 0;
+	}
+}
+
+/* sync the buffer for DMA access */
+void omap_gem_dma_sync(struct drm_gem_object *obj,
+		enum dma_data_direction dir)
+{
+	struct drm_device *dev = obj->dev;
+	struct omap_gem_object *omap_obj = to_omap_bo(obj);
+
+	if (is_cached_coherent(obj)) {
+		int i, npages = obj->size >> PAGE_SHIFT;
+		struct page **pages = omap_obj->pages;
+		bool dirty = false;
+
+		for (i = 0; i < npages; i++) {
+			if (!omap_obj->addrs[i]) {
+				// TODO using BIDIRECTIONAL for now because in the
+				// fault handler we don't really know the direction..
+				omap_obj->addrs[i] = dma_map_page(dev->dev, pages[i], 0,
+						PAGE_SIZE, DMA_BIDIRECTIONAL);
+				dirty = true;
+			}
+		}
+
+		if (dirty) {
+			unmap_mapping_range(obj->filp->f_mapping, 0,
+					omap_gem_mmap_size(obj), 1);
+		}
+	}
+}
+
 /* Get physical address for DMA.. if 'remap' is true, and the buffer is not
  * already contiguous, remap it to pin in physically contiguous memory.. (ie.
  * map in TILER)
@@ -734,6 +823,7 @@ int omap_gem_get_paddr(struct drm_gem_object *obj,
 		*paddr = omap_obj->paddr;
 	} else {
 		ret = -EINVAL;
+		goto fail;
 	}
 
 fail:
