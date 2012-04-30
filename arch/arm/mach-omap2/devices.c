@@ -25,6 +25,7 @@
 
 #include "iomap.h"
 #include <plat/dma.h>
+#include <plat/gpu.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 #include "omap4-keypad.h"
@@ -756,6 +757,7 @@ static int __init omap2_init_devices(void)
 #endif
 	omap_init_aes();
 	omap_init_vout();
+	omap_init_gpu();
 
 	return 0;
 }
