@@ -244,11 +244,12 @@ static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
 
 	hpd = gpio_get_value(ip_data->hpd_gpio);
 
-	pr_err("hdmi_check_hpd_state says %d\n", hpd);
+	pr_debug("hdmi_check_hpd_state says %d vs phy_tx_enabled=%d\n", hpd, ip_data->phy_tx_enabled);
+	// WARN_ON(!hpd);
 
-	if (hpd == ip_data->phy_tx_enabled) {
+	if (hpd == (2 | ip_data->phy_tx_enabled)) {
 		spin_unlock_irqrestore(&phy_tx_lock, flags);
-		return 0;
+		return hpd;
 	}
 
 	if (hpd)
@@ -266,12 +267,12 @@ static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
 		goto err;
 	}
 #endif
-	ip_data->phy_tx_enabled = hpd;
+	ip_data->phy_tx_enabled = 2 | hpd;
 #if 0
 err:
 #endif
 	spin_unlock_irqrestore(&phy_tx_lock, flags);
-	return r;
+	return hpd;
 }
 
 static irqreturn_t hpd_irq_handler(int irq, void *data)
@@ -334,21 +335,26 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	/* Write to phy address 3 to change the polarity control */
 	REG_FLD_MOD(phy_base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
 
+	r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
+
 	r = request_threaded_irq(gpio_to_irq(ip_data->hpd_gpio),
 			NULL, hpd_irq_handler,
 			IRQF_DISABLED | IRQF_TRIGGER_RISING |
 			IRQF_TRIGGER_FALLING, "hpd", ip_data);
 	if (r) {
 		DSSERR("HPD IRQ request failed\n");
-		hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
-		return r;
+//		hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
+//		return r;
 	}
 
+	msleep(1000);
+
 	r = hdmi_check_hpd_state(ip_data);
-	if (r) {
+	if (!r) {
+		pr_info("ti_hdmi_4xxx_phy_enable: hotplug absent after delay\n");
 		free_irq(gpio_to_irq(ip_data->hpd_gpio), ip_data);
 		hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
-		return r;
+		return -ENODEV;
 	}
 
 	/* enable divby2 */
@@ -360,10 +366,11 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 
 void ti_hdmi_4xxx_phy_disable(struct hdmi_ip_data *ip_data)
 {
+	pr_err("ti_hdmi_4xxx_phy_disable\n");
 	free_irq(gpio_to_irq(ip_data->hpd_gpio), ip_data);
 
 	hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
-	ip_data->phy_tx_enabled = false;
+	ip_data->phy_tx_enabled = 0;
 }
 
 static int hdmi_core_ddc_init(struct hdmi_ip_data *ip_data)
