@@ -15,6 +15,7 @@
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/irqdomain.h>
+#include <linux/platform_data/remoteproc-omap.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach/arch.h>
@@ -145,8 +146,14 @@ static const char *omap5_boards_compat[] __initdata = {
 	NULL,
 };
 
+static void __init omap5_reserve(void)
+{
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
+	omap_reserve();
+}
+
 DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
-	.reserve	= omap_reserve,
+	.reserve	= omap5_reserve,
 	.smp		= smp_ops(omap4_smp_ops),
 	.map_io		= omap5_map_io,
 	.init_early	= omap5_init_early,
