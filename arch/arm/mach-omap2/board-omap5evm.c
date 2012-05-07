@@ -1533,11 +1533,10 @@ static void __init omap54xx_common_init(void)
                                   ARRAY_SIZE(omap5evm_fixup_mac_device_paths));
 
 	omap5evm_touch_init();
-	omap_5430evm_i2c_init();
 	omap5evm_sensor_init();
 	omap_serial_board_init(NULL, 2);
 	omap_serial_board_init(NULL, 4);
-	omap_serial_init();
+//	omap_serial_init();
 	omap_sdrc_init(NULL, NULL);
 	omap_hsmmc_init(mmc);
 	i2c_register_board_info(0, hdmi_i2c_eeprom, ARRAY_SIZE(hdmi_i2c_eeprom));
