@@ -253,7 +253,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
 	clk->irq = twd_ppi;
 
 	this_cpu_clk = __this_cpu_ptr(twd_evt);
-	clockevents_register_device(clk);
+//	clockevents_register_device(clk);
 	*this_cpu_clk = clk;
 
 	clockevents_config_and_register(clk, twd_timer_rate,
