@@ -60,7 +60,7 @@ static struct platform_device *omap3_iommu_pdev[NR_OMAP3_IOMMU_DEVICES];
 #define omap3_iommu_pdev	NULL
 #endif
 
-#ifdef CONFIG_ARCH_OMAP4
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
 static struct iommu_device omap4_devices[] = {
 	{
 		.base = OMAP4_MMU1_BASE,
@@ -109,7 +109,7 @@ static int __init omap_iommu_init(void)
 		devices = omap3_devices;
 		omap_iommu_pdev = omap3_iommu_pdev;
 		num_iommu_devices = NR_OMAP3_IOMMU_DEVICES;
-	} else if (cpu_is_omap44xx()) {
+	} else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		devices = omap4_devices;
 		omap_iommu_pdev = omap4_iommu_pdev;
 		num_iommu_devices = NR_OMAP4_IOMMU_DEVICES;
