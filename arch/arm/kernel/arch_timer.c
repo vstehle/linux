@@ -339,6 +339,15 @@ static cycle_t arch_counter_read_cc(const struct cyclecounter *cc)
 	return arch_counter_get_cntpct();
 }
 
+static cycle_t arch_counter_read_cc(const struct cyclecounter *cc)
+{
+	/*
+	 * Always use the physical counter for the clocksource.
+	 * CNTHCTL.PL1PCTEN must be set to 1.
+	 */
+	return arch_counter_get_cntpct();
+}
+
 static struct clocksource clocksource_counter = {
 	.name	= "arch_sys_counter",
 	.rating	= 400,
