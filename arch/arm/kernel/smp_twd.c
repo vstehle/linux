@@ -23,6 +23,7 @@
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
 #include <linux/interrupt.h>
+#include <linux/cpu.h>
 
 #include <asm/smp_twd.h>
 #include <asm/localtimer.h>
