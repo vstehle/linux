@@ -1469,6 +1469,7 @@ static void __init omap_4430sdp_init(void)
 		if (status)
 			pr_err("TPS62361 initialization failed: %d\n", status);
 	}
+	omap_enable_smartreflex_on_init();
 }
 
 MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
