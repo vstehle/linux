@@ -64,3 +64,4 @@ obj-$(CONFIG_NET_VENDOR_SILICOM)	+= silicom/
 obj-$(CONFIG_CED1401)		+= ced1401/
 obj-$(CONFIG_DRM_IMX)		+= imx-drm/
 obj-$(CONFIG_DGRP)		+= dgrp/
+obj-$(CONFIG_DRM_OMAP_DCE)	+= omapdce/
