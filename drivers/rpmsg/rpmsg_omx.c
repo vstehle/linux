@@ -111,6 +111,9 @@ static void rpmsg_omx_cb(struct rpmsg_channel *rpdev, void *data, int len,
 	struct sk_buff *skb;
 	char *skbdata;
 
+	if (omx->state == OMX_FAIL)
+		return;
+
 	if (len < sizeof(*hdr) || hdr->len < len - sizeof(*hdr)) {
 		dev_warn(&rpdev->dev, "%s: truncated message\n", __func__);
 		return;
@@ -298,6 +301,7 @@ static int rpmsg_omx_release(struct inode *inode, struct file *filp)
 	 * If state == fail, remote processor crashed, so don't send it
 	 * any message.
 	 */
+	mutex_lock(&omxserv->lock);
 	if (omx->state == OMX_FAIL)
 		goto out;
 
@@ -319,13 +323,11 @@ static int rpmsg_omx_release(struct inode *inode, struct file *filp)
 					    omxserv->rpdev->dst, kbuf, use);
 		if (ret) {
 			dev_err(omxserv->dev, "rpmsg_send failed: %d\n", ret);
-			return ret;
+			goto out;
 		}
 	}
 
 	rpmsg_destroy_ept(omx->ept);
-out:
-	mutex_lock(&omxserv->lock);
 	list_del(&omx->next);
 	mutex_unlock(&omxserv->lock);
 	kfree(omx);
@@ -559,6 +561,7 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 	struct rpmsg_omx_service *omxserv = dev_get_drvdata(&rpdev->dev);
 	int major = MAJOR(rpmsg_omx_dev);
 	struct rpmsg_omx_instance *omx;
+	struct rproc *rproc = vdev_to_rproc(rpdev->vrp->vdev);
 
 	dev_info(omxserv->dev, "rpmsg omx driver is removed\n");
 
@@ -567,11 +570,7 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 	spin_unlock(&rpmsg_omx_services_lock);
 
 	mutex_lock(&omxserv->lock);
-	/*
-	 * If there is omx instrances that means it is a revovery.
-	 * TODO: make sure it is a recovery.
-	 */
-	if (list_empty(&omxserv->list)) {
+	if (rproc->state != RPROC_CRASHED) {
 		device_destroy(rpmsg_omx_class, MKDEV(major, omxserv->minor));
 		cdev_del(&omxserv->cdev);
 		list_del(&omxserv->next);
@@ -588,6 +587,7 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 		/* unblock any pending omx thread*/
 		complete_all(&omx->reply_arrived);
 		wake_up_interruptible(&omx->readq);
+		rpmsg_destroy_ept(omx->ept);
 	}
 	mutex_unlock(&omxserv->lock);
 }
