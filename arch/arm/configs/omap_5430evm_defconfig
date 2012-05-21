@@ -44,7 +44,7 @@ CONFIG_PREEMPT=y
 CONFIG_HIGHMEM=y
 CONFIG_ZBOOT_ROM_TEXT=0x0
 CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_CMDLINE="console=ttyO2,115200n8 root=/dev/mmcblk1p2 rw rootwait earlyprintk drm.debug=14 log_buf_len=16M debug profile=2 --no-log"
+CONFIG_CMDLINE="console=ttyO2,115200n8 root=/dev/mmcblk1p2 mem=1500m rw rootwait earlyprintk drm.debug=14 log_buf_len=16M debug profile=2 --no-log"
 CONFIG_CMDLINE_FORCE=y
 CONFIG_CPU_FREQ=y
 CONFIG_CPU_FREQ_GOV_USERSPACE=y
