@@ -97,6 +97,17 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
 	if (!IS_ALIGNED(pa, SZ_16K))
 		return -EINVAL;
 
+	/* Horrible hack to take Benelli "uncore" out of reset before we access anything. */
+	if (cpu_is_omap54xx()) {
+		printk("Hack! Take Benelli uncore out of reset");
+		omap_writel(0x3, 0x4ae06910);
+
+		/* We need some ugly wait here as reread or mb() are not
+		 * sufficient... Note that we cannot use msleep() here. */
+		timeout = jiffies + msecs_to_jiffies(500);
+		while (!time_after(jiffies, timeout));
+	}
+
 	iommu_write_reg(obj, MMU_SYS_SOFTRESET, MMU_SYSCONFIG);
 
 	timeout = jiffies + msecs_to_jiffies(20);
