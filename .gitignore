@@ -84,3 +84,7 @@ GTAGS
 *.orig
 *~
 \#*#
+
+# gator
+/drivers/gator/gator_events.h
+samples/hidraw/hid-example
