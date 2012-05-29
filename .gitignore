@@ -84,3 +84,6 @@ GTAGS
 *.orig
 *~
 \#*#
+
+# gator
+/drivers/gator/gator_events.h
