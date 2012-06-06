@@ -1726,10 +1726,10 @@ static void __init omap_54xx_init(void)
 
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 
-	if (!strcmp(dt_selected_model, "TI OMAP5 uEVM"))
+	//if (!strcmp(dt_selected_model, "TI OMAP5 uEVM"))
 		omap_5432_uevm_init();
-	else
-		omap_5430_sevm_init();
+	//else
+	//	omap_5430_sevm_init();
 }
 
 static void __init omap_5430evm_map_io(void)
