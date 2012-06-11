@@ -1507,6 +1507,13 @@ static int _reset(struct omap_hwmod *oh)
 static void _omap_update_context_lost(struct omap_hwmod *oh)
 {
 	if (oh->prcm.omap4.context_offs) {
+#if 1
+		if (omap4_prminst_read_inst_reg(
+			oh->clkdm->pwrdm.ptr->prcm_partition,
+			oh->clkdm->pwrdm.ptr->prcm_offs,
+			oh->prcm.omap4.context_offs))
+				oh->prcm.omap4.context_lost_counter++;
+#else
 		u32 r;
 
 		r = omap4_prminst_read_inst_reg(oh->clkdm->pwrdm.ptr->prcm_partition,
@@ -1521,6 +1528,7 @@ static void _omap_update_context_lost(struct omap_hwmod *oh)
 		omap4_prminst_write_inst_reg(r, oh->clkdm->pwrdm.ptr->prcm_partition,
 				oh->clkdm->pwrdm.ptr->prcm_offs,
 				oh->prcm.omap4.context_offs);
+#endif
 	}
 }
 
