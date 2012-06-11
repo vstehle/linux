@@ -39,8 +39,8 @@
 #include "omap_remoteproc.h"
 #include "remoteproc_internal.h"
 
-/* 1 sec is fair enough time for suspending an OMAP device */
-#define DEF_SUSPEND_TIMEOUT 1000
+/* Hack! */
+#define DEF_SUSPEND_TIMEOUT 99999999
 
 /**
  * struct omap_rproc - omap remote processor state
