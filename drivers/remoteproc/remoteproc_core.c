@@ -46,7 +46,8 @@
 
 #include "remoteproc_internal.h"
 
-#define DEFAULT_AUTOSUSPEND_TIMEOUT 5000
+// Hack!
+#define DEFAULT_AUTOSUSPEND_TIMEOUT 99999999
 
 #define dev_to_rproc(dev) container_of(dev, struct rproc, dev)
 
