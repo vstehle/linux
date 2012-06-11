@@ -1704,12 +1704,15 @@ static int _enable(struct omap_hwmod *oh)
 			_enable_sysc(oh);
 		}
 	} else {
-		_disable_clocks(oh);
+		//_disable_clocks(oh);
+		printk("omap_hwmod: %s: Hack! NOT disabling clock.\n", oh->name);
+
 		pr_err("omap_hwmod: %s: _wait_target_ready error: %d\n",
 			 oh->name, r);
 
-		if (oh->clkdm)
-			clkdm_hwmod_disable(oh->clkdm, oh);
+		//if (oh->clkdm)
+		//	clkdm_hwmod_disable(oh->clkdm, oh);
+		printk("omap_hwmod: %s: Hack! NOT disabling clkdm.\n", oh->name);
 	}
 
 	return r;
