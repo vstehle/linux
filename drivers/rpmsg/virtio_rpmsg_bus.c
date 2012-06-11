@@ -768,7 +768,9 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	struct device *dev = &rvq->vdev->dev;
 	int err;
 
+	mutex_lock(&vrp->rx_lock);
 	msg = virtqueue_get_buf(rvq, &len);
+	mutex_unlock(&vrp->rx_lock);
 	if (!msg) {
 		dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
 		return;
@@ -822,14 +824,17 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	sg_init_one(&sg, msg, RPMSG_BUF_SIZE);
 
 	/* add the buffer back to the remote processor's virtqueue */
+	mutex_lock(&vrp->rx_lock);
 	err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
 	if (err < 0) {
+		mutex_unlock(&vrp->rx_lock);
 		dev_err(dev, "failed to add a virtqueue buffer: %d\n", err);
 		return;
 	}
 
 	/* tell the remote processor we added another available rx buffer */
 	virtqueue_kick(vrp->rvq);
+	mutex_unlock(&vrp->rx_lock);
 }
 
 /*
@@ -922,6 +927,7 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	idr_init(&vrp->endpoints);
 	mutex_init(&vrp->endpoints_lock);
 	mutex_init(&vrp->tx_lock);
+	mutex_init(&vrp->rx_lock);
 	init_waitqueue_head(&vrp->sendq);
 
 	/* We expect two virtqueues, rx and tx (and in this order) */
