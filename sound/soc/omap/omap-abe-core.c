@@ -375,7 +375,7 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_PM
 	abe->get_context_lost_count = omap_pm_get_dev_context_loss_count;
-	abe->device_scale = omap_device_scale;
+	abe->device_scale = NULL; // omap_device_scale;
 #endif
 	abe->dev = &pdev->dev;
 	mutex_init(&abe->mutex);
