@@ -61,11 +61,8 @@
  * DMA API in place.
  */
 
-#define OMAP5_RPROC_CMA_BASE_IPU	(0x95800000)
-#define OMAP5_RPROC_CMA_BASE_DSP	(0x95000000)
-
-#define OMAP4_RPROC_CMA_BASE_IPU	(0x99000000)
-#define OMAP4_RPROC_CMA_BASE_DSP	(0x98800000)
+#define OMAP_RPROC_CMA_BASE_IPU	(0x99000000)
+#define OMAP_RPROC_CMA_BASE_DSP	(0x98800000)
 
 #ifdef CONFIG_OMAP_REMOTEPROC_DSP
 static struct omap_rproc_timers_info dsp_timers[] = {
@@ -188,12 +185,8 @@ void __init omap_rproc_reserve_cma(int platform_type)
 	unsigned long cma_size = 0;
 
 #ifdef CONFIG_OMAP_REMOTEPROC_DSP
-
 	cma_size = CONFIG_OMAP_DSP_CMA_SIZE;
-	if (platform_type == RPROC_CMA_OMAP4)
-		cma_addr = OMAP4_RPROC_CMA_BASE_DSP;
-	else if (platform_type == RPROC_CMA_OMAP5)
-		cma_addr = OMAP5_RPROC_CMA_BASE_DSP;
+	cma_addr = OMAP_RPROC_CMA_BASE_DSP;
 
 	/* reserve CMA memory for OMAP4's dsp "tesla" remote processor */
 	ret = dma_declare_contiguous(&omap4_tesla.dev,
@@ -202,13 +195,8 @@ void __init omap_rproc_reserve_cma(int platform_type)
 		pr_err("dma_declare_contiguous failed for dsp %d\n", ret);
 #endif
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
-	if (platform_type == RPROC_CMA_OMAP4) {
-		cma_size = CONFIG_OMAP4_IPU_CMA_SIZE;
-		cma_addr = OMAP4_RPROC_CMA_BASE_IPU;
-	} else if (platform_type == RPROC_CMA_OMAP5) {
-		cma_size = CONFIG_OMAP5_IPU_CMA_SIZE;
-		cma_addr = OMAP5_RPROC_CMA_BASE_IPU;
-	}
+	cma_size = CONFIG_OMAP_IPU_CMA_SIZE;
+	cma_addr = OMAP_RPROC_CMA_BASE_IPU;
 
 	/* reserve CMA memory for OMAP4's M3 "ducati" remote processor */
 	ret = dma_declare_contiguous(&omap4_ducati.dev,
