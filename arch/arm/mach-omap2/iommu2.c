@@ -77,7 +77,6 @@ static void __iommu_set_twl(struct omap_iommu *obj, bool on)
 	iommu_write_reg(obj, l, MMU_CNTL);
 }
 
-
 static int omap2_iommu_enable(struct omap_iommu *obj)
 {
 	u32 l, pa;
@@ -88,8 +87,9 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
 	 */
 
 	if (cpu_is_omap54xx()) {
-		pr_info("omap2_iommu_enable: doing Benelli reset HACK\n");
-		__raw_writel(3, OMAP2_L4_IO_ADDRESS(0x4AE06910));
+		pr_info("omap2_iommu_enable: doing Benelli & Tesla reset HACKs\n");
+		__raw_writel((__raw_readl(OMAP2_L4_IO_ADDRESS(0x4AE06910)) & ~4), OMAP2_L4_IO_ADDRESS(0x4AE06910));	// RM_IPU_RSTCTRL
+		__raw_writel((__raw_readl(OMAP2_L4_IO_ADDRESS(0x4AE06410)) & ~2), OMAP2_L4_IO_ADDRESS(0x4AE06410));	// RM_DSP_RSTCTRL
 
 		/* We need some ugly wait here as reread or mb() are not
 		 * sufficient... */
