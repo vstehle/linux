@@ -14,6 +14,8 @@
 #error "iommu for this processor not implemented yet"
 #endif
 
+#include <linux/platform_device.h>
+
 struct iotlb_entry {
 	u32 da;
 	u32 pa;
