@@ -47,7 +47,8 @@ struct omap_sr {
 	int				ip_type;
 	int				nvalue_count;
 	int				lvt_nvalue_count;
-	bool				autocomp_active;
+	bool				autocomp_active; /* current state  */
+	bool				autocomp_state;  /*for suspend/resume*/
 	bool				lvt_sensor;
 	u32				clk_length;
 	u32				err_weight;
@@ -1355,11 +1356,37 @@ static void __devexit omap_sr_shutdown(struct platform_device *pdev)
 	return;
 }
 
+static int sr_suspend(struct device *dev)
+{
+	struct omap_sr *sr_info = dev_get_drvdata(dev);
+
+	/* save autocomp state and disable autocomp */
+	sr_info->autocomp_state = sr_info->autocomp_active;
+	if (sr_info->autocomp_active)
+		sr_stop_vddautocomp(sr_info, true, 1);
+
+	return 0;
+}
+
+static int sr_resume(struct device *dev)
+{
+	struct omap_sr *sr_info = dev_get_drvdata(dev);
+
+	/* enable autocomp if it was enabled before suspend */
+	if (sr_info->autocomp_state)
+		sr_start_vddautocomp(sr_info, true);
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(sr_pm_ops, sr_suspend, sr_resume);
+
 static struct platform_driver smartreflex_driver = {
 	.remove         = __devexit_p(omap_sr_remove),
 	.shutdown	= __devexit_p(omap_sr_shutdown),
 	.driver		= {
 		.name	= "smartreflex",
+		.pm	= &sr_pm_ops,
 	},
 };
 
