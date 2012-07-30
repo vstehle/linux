@@ -48,14 +48,26 @@ struct omx_pvr_data {
 	void *handles[2];
 };
 
+/**
+ * struct omx_fd_data - metadata passed to/from userspace for fd register
+ * @fd:		a file descriptor representing a buffer
+ * @id:		opaque id pointing to buffer
+ */
+struct omx_fd_data {
+	int fd;
+	int id;
+};
+
 #define OMX_IOC_MAGIC	'X'
 
 #define OMX_IOCCONNECT		_IOW(OMX_IOC_MAGIC, 1, char *)
 #define OMX_IOCIONREGISTER	_IOWR(OMX_IOC_MAGIC, 2, struct ion_fd_data)
 #define OMX_IOCIONUNREGISTER	_IOWR(OMX_IOC_MAGIC, 3, struct ion_fd_data)
 #define OMX_IOCPVRREGISTER	_IOWR(OMX_IOC_MAGIC, 4, struct omx_pvr_data)
+#define OMX_IOCBUFREGISTER	_IOW(OMX_IOC_MAGIC, 5, struct omx_fd_data)
+#define OMX_IOCBUFUNREGISTER	_IOW(OMX_IOC_MAGIC, 6, struct omx_fd_data)
 
-#define OMX_IOC_MAXNR	(4)
+#define OMX_IOC_MAXNR	(6)
 
 #ifdef __KERNEL__
 
