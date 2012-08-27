@@ -39,12 +39,6 @@
 /* maximum OMX devices this driver can handle */
 #define MAX_OMX_DEVICES		8
 
-
-enum {
-	OMX_SERVICE_DOWN,
-	OMX_SERVICE_UP
-};
-
 struct rpmsg_omx_service {
 	struct cdev cdev;
 	struct device *dev;
@@ -53,7 +47,6 @@ struct rpmsg_omx_service {
 	struct list_head list;
 	struct mutex lock;
 	struct completion comp;
-	int state;
 };
 
 struct rpmsg_omx_instance {
@@ -248,7 +241,7 @@ static int rpmsg_omx_open(struct inode *inode, struct file *filp)
 
 	omxserv = container_of(inode->i_cdev, struct rpmsg_omx_service, cdev);
 
-	if (omxserv->state == OMX_SERVICE_DOWN)
+	if (!omxserv->rpdev)
 		if (filp->f_flags & O_NONBLOCK ||
 			      wait_for_completion_interruptible(&omxserv->comp))
 			return -EBUSY;
@@ -535,7 +528,6 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 	omxserv->minor = minor;
 serv_up:
 	omxserv->rpdev = rpdev;
-	omxserv->state = OMX_SERVICE_UP;
 	dev_set_drvdata(&rpdev->dev, omxserv);
 	complete_all(&omxserv->comp);
 
@@ -576,7 +568,6 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 	}
 	/* If it is a recovery, don't clean the omxserv */
 	init_completion(&omxserv->comp);
-	omxserv->state = OMX_SERVICE_DOWN;
 	list_for_each_entry(omx, &omxserv->list, next) {
 		/* set omx instance to fail state */
 		omx->state = OMX_FAIL;
@@ -585,6 +576,7 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 		wake_up_interruptible(&omx->readq);
 		rpmsg_destroy_ept(omx->ept);
 	}
+	omxserv->rpdev = NULL;
 	mutex_unlock(&omxserv->lock);
 }
 
