@@ -18,6 +18,38 @@
 		reg = <0x80000000 0x80000000>; /* 2 GB */
 	};
 
+	sound {
+		compatible = "ti,abe-twl6040";
+		ti,model = "PandaBoard5";
+
+		ti,jack-detection = <1>;
+		ti,mclk-freq = <19200000>;
+
+		ti,mcpdm = <&mcpdm>;
+		ti,mcbsp1 = <&mcbsp1>;
+		ti,mcbsp2 = <&mcbsp2>;
+		ti,aess = <&aess>;
+
+		ti,twl6040 = <&twl6040>;
+
+		/* Audio routing */
+		ti,audio-routing =
+			"Headset Stereophone", "HSOL",
+			"Headset Stereophone", "HSOR",
+			"Line Out", "AUXL",
+			"Line Out", "AUXR",
+			"HSMIC", "Headset Mic",
+			"Headset Mic", "Headset Mic Bias",
+			"AFML", "Line In",
+			"AFMR", "Line In",
+			"Headset Playback", "PDM_DL1",
+			"PDM_UL1", "Capture",
+			"omap-mcbsp.1 Playback", "BT_VX_DL",
+			"BT_VX_UL", "omap-mcbsp.1 Capture",
+			"omap-mcbsp.2 Playback", "MM_EXT_DL",
+			"MM_EXT_UL", "omap-mcbsp.2 Capture";
+	};
+
 	vmmcsd_fixed: fixedregulator-mmcsd {
 		compatible = "regulator-fixed";
 		regulator-name = "vmmcsd_fixed";
@@ -235,3 +267,4 @@
 };
 
 /include/ "palmas.dtsi"
+/include/ "twl6040.dtsi"
