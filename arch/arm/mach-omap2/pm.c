@@ -339,12 +339,15 @@ static int __init omap2_set_init_voltage(char *vdd_name, char *clk_name,
 		}
 	}
 
-	ret = clk_set_rate(clk, freq_valid);
-	if (ret) {
-		pr_err("%s: Fail set clk-%s(f=%ld v=%ld)on vdd%s\n",
-			__func__, clk_name, freq_valid,
-			bootup_volt, vdd_name);
-		goto exit_ck;
+	/* Set freq only if there is a difference in freq */
+	if (freq_valid != freq_cur) {
+		ret = clk_set_rate(clk, freq_valid);
+		if (ret) {
+			pr_err("%s: Fail set clk-%s(f=%ld v=%ld)on vdd%s\n",
+				__func__, clk_name, freq_valid,
+				bootup_volt, vdd_name);
+			goto exit_ck;
+		}
 	}
 
 	if (freq_cur >= freq_valid) {
@@ -438,8 +441,8 @@ static void __init omap4_init_voltages(void)
 		omap2_set_init_voltage("mpu", "virt_dpll_mpu_ck", "mpu");
 	else
 		omap2_set_init_voltage("mpu", "dpll_mpu_ck", "mpu");
-	omap2_set_init_voltage("core", "virt_l3_ck", "l3_main_1");
-	omap2_set_init_voltage("iva", "virt_iva_ck", "iva");
+	omap2_set_init_voltage("core", "l3_div_ck", "l3_main_1");
+	omap2_set_init_voltage("iva", "dpll_iva_m5x2_ck", "iva");
 }
 
 /* Interface to the per-device PM QoS framework */
