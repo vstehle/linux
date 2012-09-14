@@ -401,6 +401,7 @@ enum rproc_crash_type {
  * @crash_comp: completion used to sync crash handler and the rproc reload
  * @recovery_disabled: flag that state if recovery was disabled
  * @max_notifyid: largest allocated notify id.
+ * @fw_version: human readable version information extracted from f/w
  */
 struct rproc {
 	struct klist_node node;
@@ -429,6 +430,7 @@ struct rproc {
 	struct completion crash_comp;
 	bool recovery_disabled;
 	int max_notifyid;
+	char *fw_version;
 };
 
 /* we currently support only two vrings per rvdev */
