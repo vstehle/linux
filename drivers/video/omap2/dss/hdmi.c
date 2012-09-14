@@ -530,8 +530,15 @@ static int hdmi_power_on_core(struct omap_dss_device *dssdev)
 {
 	int r;
 
-	gpio_set_value(hdmi.ct_cp_hpd_gpio, 1);
-	gpio_set_value(hdmi.ls_oe_gpio, 1);
+	if (gpio_cansleep(hdmi.ct_cp_hpd_gpio))
+		gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, 1);
+	else
+		gpio_set_value(hdmi.ct_cp_hpd_gpio, 1);
+
+	if (gpio_cansleep(hdmi.ls_oe_gpio))
+		gpio_set_value_cansleep(hdmi.ls_oe_gpio, 1);
+	else
+		gpio_set_value(hdmi.ls_oe_gpio, 1);
 
 	/* wait 300us after CT_CP_HPD for the 5V power output to reach 90% */
 	udelay(300);
@@ -560,8 +567,15 @@ static int hdmi_power_on_core(struct omap_dss_device *dssdev)
 err_runtime_get:
 	regulator_disable(hdmi.vdda_hdmi_dac_reg);
 err_vdac_enable:
-	gpio_set_value(hdmi.ct_cp_hpd_gpio, 0);
-	gpio_set_value(hdmi.ls_oe_gpio, 0);
+	if (gpio_cansleep(hdmi.ct_cp_hpd_gpio))
+		gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, 0);
+	else
+		gpio_set_value(hdmi.ct_cp_hpd_gpio, 0);
+
+	if (gpio_cansleep(hdmi.ls_oe_gpio))
+		gpio_set_value_cansleep(hdmi.ls_oe_gpio, 0);
+	else
+		gpio_set_value(hdmi.ls_oe_gpio, 0);
 	return r;
 }
 
@@ -569,8 +583,15 @@ static void hdmi_power_off_core(struct omap_dss_device *dssdev)
 {
 	hdmi_runtime_put();
 	regulator_disable(hdmi.vdda_hdmi_dac_reg);
-	gpio_set_value(hdmi.ct_cp_hpd_gpio, 0);
-	gpio_set_value(hdmi.ls_oe_gpio, 0);
+	if (gpio_cansleep(hdmi.ct_cp_hpd_gpio))
+		gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, 0);
+	else
+		gpio_set_value(hdmi.ct_cp_hpd_gpio, 0);
+
+	if (gpio_cansleep(hdmi.ls_oe_gpio))
+		gpio_set_value_cansleep(hdmi.ls_oe_gpio, 0);
+	else
+		gpio_set_value(hdmi.ls_oe_gpio, 0);
 }
 
 static int hdmi_power_on_full(struct omap_dss_device *dssdev)
