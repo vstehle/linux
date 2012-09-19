@@ -25,6 +25,13 @@
 		regulator-max-microvolt = <3000000>;
 	};
 
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-audio";
+		ti,model = "OMAP5HDMI";
+
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
+	};
 };
 
 &omap5_pmx_core {
@@ -198,7 +205,7 @@
 };
 
 &hdmi {
-	tpd12s015 {
+	tpd12s015: tpd12s015 {
 		compatible = "ti,tpd12s015";
 
 		gpios = <&tca 0 0>,	/* TCA6424A P01, CT_CP_HDP */
