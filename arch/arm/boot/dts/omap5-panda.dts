@@ -18,6 +18,14 @@
 		reg = <0x80000000 0x80000000>; /* 2 GB */
 	};
 
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-audio";
+		ti,model = "OMAP5HDMI";
+
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
+	};
+
 	vmmcsd_fixed: fixedregulator-mmcsd {
 		compatible = "regulator-fixed";
 		regulator-name = "vmmcsd_fixed";
@@ -142,6 +150,7 @@
 			&mcbsp1_pins
 			&mcbsp2_pins
 			&i2c5_pins
+			&dss_hdmi_pins
 			&usbhost_pins
 	>;
 
@@ -195,6 +204,12 @@
 		>;
 	};
 
+	dss_hdmi_pins: pinmux_dss_hdmi_pins {
+		pinctrl-single,pins = <
+			0x0fe 0x116	/* hdmi_cec.gpio7_193 INPUT PULLUP | MODE6 */
+		>;
+	};
+
 	usbhost_pins: pinmux_usbhost_pins {
 		pinctrl-single,pins = <
 			0x84 0x100	/* usbb2_hsic_strobe INPUT | MODE 0 */
@@ -234,4 +249,20 @@
 	};
 };
 
+&hdmi {
+	tpd12s015: tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&tca 0 0>,	/* TCA6424A P01, CT_CP_HDP */
+			<&tca 1 0>,	/* TCA6424A P00, LS_OE*/
+			<&gpio7 1 0>;	/* 193, HPD */
+
+		hdmi-monitor {
+			compatible = "ti,hdmi_panel";
+		};
+
+	};
+};
+
 /include/ "palmas.dtsi"
+/include/ "tca6424a.dtsi"
