@@ -22,6 +22,9 @@
 #define _TI_HDMI_H
 
 struct hdmi_ip_data;
+struct snd_aes_iec958;
+struct snd_cea_861_aud_if;
+struct hdmi_audio_dma;
 
 enum hdmi_pll_pwr {
 	HDMI_PLLPWRCMD_ALLOFF = 0,
@@ -40,6 +43,17 @@ enum hdmi_clk_refsel {
 	HDMI_REFSEL_REF1 = 1,
 	HDMI_REFSEL_REF2 = 2,
 	HDMI_REFSEL_SYSCLK = 3
+};
+
+enum hdmi_deep_color_mode {
+	HDMI_DEEP_COLOR_24BIT = 0,
+	HDMI_DEEP_COLOR_30BIT = 1,
+	HDMI_DEEP_COLOR_36BIT = 2,
+};
+
+enum hdmi_range {
+	HDMI_LIMITED_RANGE = 0,
+	HDMI_FULL_RANGE,
 };
 
 /* HDMI timing structure */
@@ -67,6 +81,8 @@ struct hdmi_cm {
 struct hdmi_config {
 	struct hdmi_video_timings timings;
 	struct hdmi_cm cm;
+	enum hdmi_deep_color_mode deep_color;
+	enum hdmi_range range;
 };
 
 /* HDMI PLL structure */
@@ -121,6 +137,7 @@ struct ti_hdmi_ip_ops {
 		struct omap_dss_audio *audio);
 #endif
 
+	int (*configure_range)(struct hdmi_ip_data *ip_data);
 };
 
 /*
@@ -174,6 +191,9 @@ struct hdmi_ip_data {
 	struct hdmi_config cfg;
 	struct hdmi_pll_info pll_data;
 	struct hdmi_core_infoframe_avi avi_cfg;
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
+	struct omap_hwmod *oh;
+#endif
 
 	/* ti_hdmi_4xxx_ip private data. These should be in a separate struct */
 	int hpd_gpio;
@@ -192,13 +212,39 @@ void ti_hdmi_4xxx_wp_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 void ti_hdmi_4xxx_pll_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 void ti_hdmi_4xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 void ti_hdmi_4xxx_phy_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
-#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
+	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 int hdmi_compute_acr(u32 sample_freq, u32 *n, u32 *cts);
 int ti_hdmi_4xxx_wp_audio_enable(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_wp_audio_disable(struct hdmi_ip_data *ip_data);
 int ti_hdmi_4xxx_audio_start(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_audio_stop(struct hdmi_ip_data *ip_data);
+void ti_hdmi_4xxx_wp_audio_config_dma(struct hdmi_ip_data *ip_data,
+					struct hdmi_audio_dma *aud_dma);
 int ti_hdmi_4xxx_audio_config(struct hdmi_ip_data *ip_data,
 		struct omap_dss_audio *audio);
 #endif
+#if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
+int ti_hdmi_5xxx_wp_audio_enable(struct hdmi_ip_data *ip_data);
+void ti_hdmi_5xxx_wp_audio_disable(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_audio_start(struct hdmi_ip_data *ip_data);
+void ti_hdmi_5xxx_audio_stop(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_audio_config(struct hdmi_ip_data *ip_data,
+		struct omap_dss_audio *audio);
+#endif
+void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data);
+void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
+int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
+				u8 *edid, int len);
+bool ti_hdmi_5xxx_detect(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_configure_range(struct hdmi_ip_data *ip_data);
+
+/* Ideally PIO driver(tca6424) should be a generic driver in gpio path as a
+additional device in pca953x family devices but currently it is used only by
+HDMI and added here  */
+
+int pio_a_init(void);
+void pio_a_exit(void);
+int pio_a_read_byte(int reg);
+int pio_a_i2c_write(u8 reg, u8 value);
 #endif
