@@ -228,7 +228,9 @@ static struct notifier_block omap_dss_pm_notif_block = {
 
 static int __init omap_dss_probe(struct platform_device *pdev)
 {
+#ifdef CONFIG_OMAP2_DSS_HL
 	struct omap_dss_board_info *pdata = pdev->dev.platform_data;
+#endif
 	int r;
 
 	core.pdev = pdev;
@@ -255,7 +257,9 @@ static int __init omap_dss_probe(struct platform_device *pdev)
 
 	return 0;
 
+#ifdef CONFIG_OMAP2_DSS_HL
 err_debugfs:
+#endif
 
 	return r;
 }
@@ -280,9 +284,35 @@ static void omap_dss_shutdown(struct platform_device *pdev)
 	dss_disable_all_devices();
 }
 
+static int omap_dss_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	DSSDBG("suspend %d\n", state.event);
+
+	return dss_suspend_all_devices();
+}
+
+#if defined(CONFIG_PM) && defined(CONFIG_DRM_OMAP)
+extern int omap_dmm_resume(void);
+#else
+static inline int omap_dmm_resume(void)
+{
+	return 0;
+}
+#endif
+
+static int omap_dss_resume(struct platform_device *pdev)
+{
+	DSSDBG("resume\n");
+
+	omap_dmm_resume();
+	return dss_resume_all_devices();
+}
+
 static struct platform_driver omap_dss_driver = {
 	.remove         = omap_dss_remove,
 	.shutdown	= omap_dss_shutdown,
+	.suspend	= omap_dss_suspend,
+	.resume		= omap_dss_resume,
 	.driver         = {
 		.name   = "omapdss",
 		.owner  = THIS_MODULE,

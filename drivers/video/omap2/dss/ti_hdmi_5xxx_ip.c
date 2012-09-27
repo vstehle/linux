@@ -386,42 +386,6 @@ static void hdmi_core_init(struct hdmi_core_vid_config *video_cfg,
 
 }
 
-static void hdmi_core_infoframe_vsi_config(struct hdmi_ip_data *ip_data,
-				struct hdmi_s3d_info info_s3d)
-{
-	int length;
-	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
-
-	/* For side-by-side(HALF) we need to specify subsampling
-	 * in 3D_ext_data
-	 */
-	length = info_s3d.frame_struct == HDMI_S3D_SIDE_BY_SIDE_HALF ? 6 : 5;
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_DATAUTO0, 0, 3, 3);
-	/* LSB 24bit IEEE Registration Identifier */
-	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDIEEEID0, 0x03);
-	/* Mid 24bit IEEE Registration Identifier */
-	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDIEEEID1, 0x0c);
-	/* MSB 24bit IEEE Registration Identifier */
-	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDIEEEID2, 0x00);
-
-	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDSIZE, length);
-
-	/* HDMI Video Format => 3D Format indication present
-	 * 3d structure and potentially 3D_Ext_Data
-	 */
-	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDPAYLOAD(0), 0x40);
-	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDPAYLOAD(1),
-						info_s3d.frame_struct << 4);
-	if (info_s3d.frame_struct == HDMI_S3D_SIDE_BY_SIDE_HALF)
-		hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDPAYLOAD(2),
-						info_s3d.subsamp_pos << 4);
-
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_DATAUTO0, 1, 3, 3);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_DATAUTO1, 0, 3, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_DATAUTO2, 1, 7, 4);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_DATAUTO2, 0, 3, 0);
-}
-
 /* DSS_HDMI_CORE_VIDEO_CONFIG */
 static void hdmi_core_video_config(struct hdmi_ip_data *ip_data,
 				struct hdmi_core_vid_config *cfg)
@@ -773,11 +737,10 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	struct hdmi_core_vid_config v_core_cfg;
 	struct hdmi_core_infoframe_avi *avi_cfg = &ip_data->avi_cfg;
 	struct hdmi_config *cfg = &ip_data->cfg;
-	struct hdmi_irq_vector irq_enable;
 
 	hdmi_core_mask_interrupts(ip_data);
 
-	hdmi_wp_init(&video_timing, &video_format, &irq_enable);
+	hdmi_wp_init(&video_timing, &video_format);
 
 	hdmi_core_init(&v_core_cfg, avi_cfg, cfg);
 
@@ -810,22 +773,6 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 		ti_hdmi_5xxx_configure_range(ip_data);
 	}
 
-	/* Enable pll and core interrupts */
-	irq_enable.pll_recal = 1;
-	irq_enable.pll_unlock = 1;
-	irq_enable.pll_lock = 1;
-	irq_enable.phy_disconnect = 1;
-	irq_enable.phy_connect = 1;
-	irq_enable.phy_short_5v = 1;
-	irq_enable.video_end_fr = 1;
-	/* irq_enable.video_vsync = 1; */
-	irq_enable.fifo_sample_req = 1;
-	irq_enable.fifo_overflow = 1;
-	irq_enable.fifo_underflow = 1;
-	irq_enable.ocp_timeout = 1;
-
-	/* enable IRQ */
-	hdmi_wp_irq_enable(ip_data, &irq_enable);
 	/*
 	 * configure core video part
 	 * set software reset in the core
@@ -862,9 +809,6 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	avi_cfg->db12_13_pixel_sofright = 0;
 
 	hdmi_core_aux_infoframe_avi_config(ip_data);
-
-	if (ip_data->cfg.s3d_info.vsi_enabled)
-		hdmi_core_infoframe_vsi_config(ip_data, ip_data->cfg.s3d_info);
 
 	hdmi_enable_video_path(ip_data);
 
