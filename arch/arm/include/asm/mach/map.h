@@ -49,7 +49,6 @@ static inline void debug_ll_io_init(void) {}
 
 struct mem_type;
 extern const struct mem_type *get_mem_type(unsigned int type);
-extern pteval_t get_mem_type_prot_pte(unsigned int type);
 /*
  * external interface to remap single page with appropriate type
  */
