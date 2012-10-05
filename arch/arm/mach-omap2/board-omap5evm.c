@@ -1375,7 +1375,7 @@ struct omap_mux_setting omap5432_common_mux[] __initdata = {
  */
 static const char * const omap5evm_fixup_mac_device_paths[] = {                    
        "1-3:1.0",
-       "mmc2:0001:2",
+       "wl12xx",
 };
 
 static struct panel_lg4591_data dsi_panel;
