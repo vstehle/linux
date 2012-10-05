@@ -213,68 +213,11 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 	.clock_rate = 19200000,
 };
 
-/*
- * hub_nreset also enables the ULPI PHY
- * 	ULPI PHY is always powered
- * hub_power enables a 3.3V regulator for (hub + eth) chip
- *	however there's no point having ULPI PHY in use alone
- *	since it's only connected to the (hub + eth) chip
- */
-
-static struct regulator_init_data panda_hub = {
-	.constraints = {
-		.name = "vhub",
-		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-	},
+static struct gpio panda_ehci_gpios[] __initdata = {
+	{ GPIO_HUB_POWER,	GPIOF_OUT_INIT_LOW,  "hub_power"  },
+	{ GPIO_HUB_NRESET,	GPIOF_OUT_INIT_LOW,  "hub_nreset" },
 };
 
-static struct fixed_voltage_config panda_vhub = {
-	.supply_name = "vhub",
-	.microvolts = 3300000,
-	.gpio = GPIO_HUB_POWER,
-	.startup_delay = 70000, /* 70msec */
-	.enable_high = 1,
-	.enabled_at_boot = 0,
-	.init_data = &panda_hub,
-};
-
-static struct platform_device omap_vhub_device = {
-	.name		= "reg-fixed-voltage",
-	.id		= 2,
-	.dev = {
-		.platform_data = &panda_vhub,
-	},
-};
-
-static struct regulator_init_data panda_ulpireset = {
-	/*
-	 * idea is that when operating ulpireset, regulator api will make
-	 * sure that the hub+eth chip is powered, since it's the "parent"
-	 */
-	.supply_regulator = "vhub", /* we are a child of vhub */
-	.constraints = {
-		.name = "hsusb0",
-		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-	},
-};
-
-static struct fixed_voltage_config panda_vulpireset = {
-	.supply_name = "hsusb0",  /* this name is magic for hsusb driver */
-	.microvolts = 3300000,
-	.gpio = GPIO_HUB_NRESET,
-	.startup_delay = 70000, /* 70msec */
-	.enable_high = 1,
-	.enabled_at_boot = 0,
-	.init_data = &panda_ulpireset,
-};
-
-static struct platform_device omap_vulpireset_device = {
-	.name		= "reg-fixed-voltage",
-	.id		= 3,
-	.dev = {
-		.platform_data = &panda_vulpireset,
-	},
-};
 
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type		= MUSB_INTERFACE_UTMI,
@@ -803,8 +746,6 @@ static void __init omap4_panda_init(void)
 	panda_init_non_configured_gpio();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 	platform_device_register(&omap_vwlan_device);
-	platform_device_register(&omap_vhub_device);
-	platform_device_register(&omap_vulpireset_device);
 	omap_serial_init();
 	omap_sdrc_init(NULL, NULL);
 	omap4_twl6030_hsmmc_init(mmc);
