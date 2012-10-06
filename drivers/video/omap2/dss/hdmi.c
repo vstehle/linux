@@ -59,6 +59,7 @@ static struct {
 	struct mutex lock;
 	struct platform_device *pdev;
 	struct platform_device *audio_pdev;
+
 	struct hdmi_ip_data ip_data;
 	int hdmi_irq;
 
@@ -1331,6 +1332,7 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 	hdmi.audio_pdev = ERR_PTR(-EINVAL);
 
 	mutex_init(&hdmi.lock);
+	mutex_init(&hdmi.ip_data.lock);
 
 	/* TODO: implement error handling sequence */
 	/* HDMI wrapper memory remap */
@@ -1432,9 +1434,11 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 		return PTR_ERR(hdmi.audio_pdev);
 	}
 
-	mutex_init(&hdmi.ip_data.lock);
-
-	hdmi_panel_init();
+	r = hdmi_panel_init();
+	if (r) {
+		DSSERR("can't init panel\n");
+		goto err_panel_init;
+	}
 
 	dss_debugfs_create_file("hdmi", hdmi_dump_regs);
 
@@ -1446,6 +1450,10 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 		hdmi_probe_pdata(pdev);
 
 	return 0;
+
+err_panel_init:
+	hdmi_put_clocks();
+	return r;
 }
 
 static int __exit hdmi_remove_child(struct device *dev, void *data)
