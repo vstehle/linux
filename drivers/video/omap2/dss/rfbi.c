@@ -310,6 +310,7 @@ static void rfbi_transfer_area(struct omap_dss_device *dssdev, u16 width,
 		u16 height, void (*callback)(void *data), void *data)
 {
 	u32 l;
+#ifdef CONFIG_OMAP2_DSS_HL
 	struct omap_video_timings timings = {
 		.hsw		= 1,
 		.hfp		= 1,
@@ -320,15 +321,18 @@ static void rfbi_transfer_area(struct omap_dss_device *dssdev, u16 width,
 		.x_res		= width,
 		.y_res		= height,
 	};
+#endif
 
 	/*BUG_ON(callback == 0);*/
 	BUG_ON(rfbi.framedone_callback != NULL);
 
 	DSSDBG("rfbi_transfer_area %dx%d\n", width, height);
 
+#ifdef CONFIG_OMAP2_DSS_HL
 	dss_mgr_set_timings(dssdev->manager, &timings);
 
 	dispc_mgr_enable(dssdev->manager->id, true);
+#endif
 
 	rfbi.framedone_callback = callback;
 	rfbi.framedone_callback_data = data;
@@ -782,6 +786,7 @@ int omap_rfbi_prepare_update(struct omap_dss_device *dssdev,
 		u16 *x, u16 *y, u16 *w, u16 *h)
 {
 	u16 dw, dh;
+#ifdef CONFIG_OMAP2_DSS_HL
 	struct omap_video_timings timings = {
 		.hsw		= 1,
 		.hfp		= 1,
@@ -792,6 +797,7 @@ int omap_rfbi_prepare_update(struct omap_dss_device *dssdev,
 		.x_res		= *w,
 		.y_res		= *h,
 	};
+#endif
 
 	dssdev->driver->get_resolution(dssdev, &dw, &dh);
 
@@ -810,7 +816,9 @@ int omap_rfbi_prepare_update(struct omap_dss_device *dssdev,
 	if (*w == 0 || *h == 0)
 		return -EINVAL;
 
+#ifdef CONFIG_OMAP2_DSS_HL
 	dss_mgr_set_timings(dssdev->manager, &timings);
+#endif
 
 	return 0;
 }
@@ -869,10 +877,12 @@ int omapdss_rfbi_display_enable(struct omap_dss_device *dssdev)
 {
 	int r;
 
+#ifdef CONFIG_OMAP2_DSS_HL
 	if (dssdev->manager == NULL) {
 		DSSERR("failed to enable display: no manager\n");
 		return -ENODEV;
 	}
+#endif
 
 	r = rfbi_runtime_get();
 	if (r)
@@ -891,13 +901,16 @@ int omapdss_rfbi_display_enable(struct omap_dss_device *dssdev)
 		goto err1;
 	}
 
+#ifdef CONFIG_OMAP2_DSS_HL
 	dispc_mgr_set_lcd_display_type(dssdev->manager->id,
 			OMAP_DSS_LCD_DISPLAY_TFT);
-
+#endif
 	dispc_mgr_set_io_pad_mode(DSS_IO_PAD_MODE_RFBI);
+#ifdef CONFIG_OMAP2_DSS_HL
 	dispc_mgr_enable_stallmode(dssdev->manager->id, true);
 
 	dispc_mgr_set_tft_data_lines(dssdev->manager->id, dssdev->ctrl.pixel_size);
+#endif
 
 	rfbi_configure(dssdev->phy.rfbi.channel,
 			       dssdev->ctrl.pixel_size,

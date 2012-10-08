@@ -113,8 +113,10 @@ static int dpi_set_dsi_clk(struct omap_dss_device *dssdev, bool is_tft,
 	if (r)
 		return r;
 
+#ifdef CONFIG_OMAP2_DSS_HL
 	dss_select_lcd_clk_source(dssdev->manager->id,
 			dssdev->clocks.dispc.channel.lcd_clk_src);
+#endif
 	dss_select_dispc_clk_source(dssdev->clocks.dispc.dispc_fclk_src);
 
 	r = dispc_mgr_set_clock_div(omap_dss_device_channel(dssdev), &dispc_cinfo);
@@ -312,8 +314,10 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 		if (WARN_ON(!dsidev))
 			return;
 
+#ifdef CONFIG_OMAP2_DSS_HL
 		dss_select_lcd_clk_source(dssdev->manager->id,
 				OMAP_DSS_CLK_SRC_FCK);
+#endif
 		dss_select_dispc_clk_source(OMAP_DSS_CLK_SRC_FCK);
 		dsi_pll_uninit(dsidev, true);
 		dsi_runtime_put(dsidev);

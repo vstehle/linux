@@ -206,7 +206,9 @@ int dss_debugfs_create_file(const char *name, void (*write)(struct seq_file *))
 /* PLATFORM DEVICE */
 static int __init omap_dss_probe(struct platform_device *pdev)
 {
+#ifdef CONFIG_OMAP2_DSS_HL
 	struct omap_dss_board_info *pdata = pdev->dev.platform_data;
+#endif
 	int r;
 
 	core.pdev = pdev;
@@ -231,7 +233,9 @@ static int __init omap_dss_probe(struct platform_device *pdev)
 
 	return 0;
 
+#ifdef CONFIG_OMAP2_DSS_HL
 err_debugfs:
+#endif
 
 	return r;
 }

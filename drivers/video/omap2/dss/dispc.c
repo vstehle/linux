@@ -2275,11 +2275,13 @@ int dispc_ovl_enable(enum omap_plane plane, bool enable)
 	return 0;
 }
 
+#ifdef CONFIG_OMAP2_DSS_HL
 static void dispc_disable_isr(void *data, u32 mask)
 {
 	struct completion *compl = data;
 	complete(compl);
 }
+#endif
 EXPORT_SYMBOL_GPL(dispc_ovl_enable);
 
 static void _enable_lcd_out(enum omap_channel channel, bool enable)

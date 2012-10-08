@@ -447,7 +447,9 @@ static int venc_power_on(struct omap_dss_device *dssdev)
 
 	venc_write_reg(VENC_OUTPUT_CONTROL, l);
 
+#ifdef CONFIG_OMAP2_DSS_HL
 	dss_mgr_set_timings(dssdev->manager, &dssdev->panel.timings);
+#endif
 
 	r = regulator_enable(venc.vdda_dac_reg);
 	if (r)
@@ -456,9 +458,11 @@ static int venc_power_on(struct omap_dss_device *dssdev)
 	if (dssdev->platform_enable)
 		dssdev->platform_enable(dssdev);
 
+#ifdef CONFIG_OMAP2_DSS_HL
 	r = dss_mgr_enable(dssdev->manager);
 	if (r)
 		goto err;
+#endif
 
 	return 0;
 
@@ -479,7 +483,9 @@ static void venc_power_off(struct omap_dss_device *dssdev)
 	venc_write_reg(VENC_OUTPUT_CONTROL, 0);
 	dss_set_dac_pwrdn_bgz(0);
 
+#ifdef CONFIG_OMAP2_DSS_HL
 	dss_mgr_disable(dssdev->manager);
+#endif
 
 	if (dssdev->platform_disable)
 		dssdev->platform_disable(dssdev);
@@ -652,7 +658,9 @@ static void venc_set_timings(struct omap_dss_device *dssdev,
 		venc_panel_disable(dssdev);
 		venc_panel_enable(dssdev);
 	} else {
+#ifdef CONFIG_OMAP2_DSS_HL
 		dss_mgr_set_timings(dssdev->manager, timings);
+#endif
 	}
 }
 
