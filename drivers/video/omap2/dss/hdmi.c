@@ -786,19 +786,11 @@ void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev)
 
 static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 {
-	DSSDBG("Received HDMI IRQ\n");
+	int r = 0;
 
-	if (hdmi_runtime_get())
-		return IRQ_HANDLED;
-
-	if (hdmi.ip_data.ops->irq_handler)
-		hdmi.ip_data.ops->irq_handler(&hdmi.ip_data);
-
-	if (hdmi.ip_data.ops->irq_process)
-		hdmi.ip_data.ops->irq_process(&hdmi.ip_data);
-
-	hdmi_runtime_put();
-
+	r = hdmi.ip_data.ops->irq_handler(&hdmi.ip_data);
+	DSSDBG("Received HDMI IRQ = %08x\n", r);
+	r = hdmi.ip_data.ops->irq_process(&hdmi.ip_data);
 	return IRQ_HANDLED;
 }
 
