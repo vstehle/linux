@@ -638,8 +638,6 @@ struct omap_dss_device {
 
 	void *data;
 
-	void *user_data;
-
 	struct omap_dss_driver *driver;
 
 	/* helper variable for driver suspend/resume */
