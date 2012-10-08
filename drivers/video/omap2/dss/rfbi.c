@@ -894,13 +894,6 @@ int omapdss_rfbi_display_enable(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
-	r = omap_dispc_register_isr(framedone_callback, NULL,
-			DISPC_IRQ_FRAMEDONE);
-	if (r) {
-		DSSERR("can't get FRAMEDONE irq\n");
-		goto err1;
-	}
-
 #ifdef CONFIG_OMAP2_DSS_HL
 	dispc_mgr_set_lcd_display_type(dssdev->manager->id,
 			OMAP_DSS_LCD_DISPLAY_TFT);
@@ -931,8 +924,6 @@ EXPORT_SYMBOL(omapdss_rfbi_display_enable);
 
 void omapdss_rfbi_display_disable(struct omap_dss_device *dssdev)
 {
-	omap_dispc_unregister_isr(framedone_callback, NULL,
-			DISPC_IRQ_FRAMEDONE);
 	omap_dss_stop_device(dssdev);
 
 	rfbi_runtime_put();
