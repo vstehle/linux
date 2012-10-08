@@ -281,8 +281,15 @@ err:
 static irqreturn_t hpd_irq_handler(int irq, void *data)
 {
 	struct hdmi_ip_data *ip_data = data;
+#ifdef CONFIG_DRM_OMAP
+	extern void omapdrm_hpd_change(void);
+#endif
 
 	hdmi_check_hpd_state(ip_data);
+
+#ifdef CONFIG_DRM_OMAP
+	omapdrm_hpd_change();
+#endif
 
 	return IRQ_HANDLED;
 }
