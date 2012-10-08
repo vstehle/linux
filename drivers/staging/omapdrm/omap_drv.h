@@ -63,6 +63,7 @@ void dispc_dump_clocks(struct seq_file *s);
 void dss_dump_clocks(struct seq_file *s);
 void dss_dump_regs(struct seq_file *s);
 void hdmi_dump_regs(struct seq_file *s);
+void dsi_dump_clocks(struct seq_file *s);
 
 
 #define DBG(fmt, ...) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
