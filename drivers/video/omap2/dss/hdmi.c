@@ -1167,31 +1167,9 @@ static int hdmi_runtime_resume(struct device *dev)
 	return 0;
 }
 
-static int hdmi_suspend(struct device *dev)
-{
-	DSSDBG("%s\n", __func__);
-	if (gpio_is_valid(hdmi.hpd_gpio))
-		disable_irq(gpio_to_irq(hdmi.hpd_gpio));
-
-	disable_irq(hdmi.hdmi_irq);
-	return 0;
-}
-
-static int hdmi_resume(struct device *dev)
-{
-	DSSDBG("%s\n", __func__);
-	if (gpio_is_valid(hdmi.hpd_gpio))
-		enable_irq(gpio_to_irq(hdmi.hpd_gpio));
-
-	enable_irq(hdmi.hdmi_irq);
-	return 0;
-}
-
 static const struct dev_pm_ops hdmi_pm_ops = {
 	.runtime_suspend = hdmi_runtime_suspend,
 	.runtime_resume = hdmi_runtime_resume,
-	.suspend = hdmi_suspend,
-	.resume = hdmi_resume,
 };
 
 static struct platform_driver omapdss_hdmihw_driver = {
