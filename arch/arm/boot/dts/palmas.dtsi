@@ -239,7 +239,7 @@
 				regulator-name = "ldo9";
 				regulator-compatible = "ldo9";
 				regulator-min-microvolt = <1800000>;
-				regulator-max-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
 				regulator-boot-on;
 				ti,warm_sleep = <0>;
