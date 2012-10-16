@@ -2625,6 +2625,40 @@ static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
 	},
 };
 
+/* ocp2scp3 */
+static struct omap_hwmod omap54xx_ocp2scp3_hwmod;
+static struct omap_hwmod_addr_space omap54xx_ocp2scp3_addrs[] = {
+	{
+		.name		= "ocp2scp3",
+		.pa_start	= 0x4a090000,
+		.pa_end		= 0x4a09001f,
+		.flags		= ADDR_TYPE_RT
+	},
+	{ }
+};
+
+static struct omap_hwmod omap54xx_ocp2scp3_hwmod = {
+	.name		= "ocp2scp3",
+	.class		= &omap54xx_ocp2scp_hwmod_class,
+	.clkdm_name	= "l3init_clkdm",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP3_CLKCTRL_OFFSET,
+			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+};
+
+/* l4_cfg -> ocp2scp3 */
+static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp3 = {
+	.master		= &omap54xx_l4_cfg_hwmod,
+	.slave		= &omap54xx_ocp2scp3_hwmod,
+	.clk		= "l4_root_clk_div",
+	.addr		= omap54xx_ocp2scp3_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
 /*
  * 'sata' class
  * sata:  serial ata interface  gen2 compliant   ( 1 rx/ 1 tx)
@@ -3753,6 +3787,14 @@ static struct omap_hwmod_addr_space omap54xx_l3_main_3_addrs[] = {
 		.pa_end		= 0x45003fff,
 	},
 	{ }
+};
+
+/* sata -> l3_main_2 */
+static struct omap_hwmod_ocp_if omap54xx_sata__l3_main_2 = {
+	.master		= &omap54xx_sata_hwmod,
+	.slave		= &omap54xx_l3_main_2_hwmod,
+	.clk		= "l3_iclk_div",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
 /* l3_main_1 -> l3_main_3 */
@@ -5028,6 +5070,21 @@ static struct omap_hwmod_addr_space omap54xx_sata_addrs[] = {
 		.pa_end		= 0x4a141107,
 		.flags		= ADDR_TYPE_RT
 	},
+	{
+		.name		= "pll",
+		.pa_start	= 0x4A096800,
+		.pa_end		= 0x4A096840,
+	},
+	{
+		.name		= "rx",
+		.pa_start	= 0x4A096000,
+		.pa_end		= 0x4A096080,
+	},
+	{
+		.name		= "tx",
+		.pa_start	= 0x4A096400,
+		.pa_end		= 0x4A096464,
+	},
 	{ }
 };
 
@@ -5035,7 +5092,7 @@ static struct omap_hwmod_addr_space omap54xx_sata_addrs[] = {
 static struct omap_hwmod_ocp_if omap54xx_l4_cfg__sata = {
 	.master		= &omap54xx_l4_cfg_hwmod,
 	.slave		= &omap54xx_sata_hwmod,
-	.clk		= "l3_iclk_div",
+	.clk		= "l4_root_clk_div",
 	.addr		= omap54xx_sata_addrs,
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
@@ -5583,6 +5640,8 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
 	&omap54xx_mpu__l3_main_1,
 	&omap54xx_l3_main_1__l3_main_2,
 	&omap54xx_l4_cfg__l3_main_2,
+	&omap54xx_l4_cfg__ocp2scp3,
+	&omap54xx_sata__l3_main_2,
 	&omap54xx_l3_main_1__l3_main_3,
 	&omap54xx_l3_main_2__l3_main_3,
 	&omap54xx_l4_cfg__l3_main_3,
