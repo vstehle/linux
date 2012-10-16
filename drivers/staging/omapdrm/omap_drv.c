@@ -647,6 +647,9 @@ static int dev_load(struct drm_device *dev, unsigned long flags)
 		ret = plugin->load(dev, flags);
 	}
 
+	/* store off drm_device for use in pm ops */
+	dev_set_drvdata(dev->dev, dev);
+
 	return 0;
 }
 
@@ -676,6 +679,8 @@ static int dev_unload(struct drm_device *dev)
 	dev->dev_private = NULL;
 
 	loaded = false;
+
+	dev_set_drvdata(dev->dev, NULL);
 
 	return 0;
 }
@@ -1008,10 +1013,17 @@ static int pdev_remove(struct platform_device *device)
 	return 0;
 }
 
+static const struct dev_pm_ops omapdrm_pm_ops = {
+	.resume = omap_gem_resume,
+};
+
 struct platform_driver pdev = {
 		.driver = {
 			.name = DRIVER_NAME,
 			.owner = THIS_MODULE,
+#ifdef CONFIG_PM
+			.pm = &omapdrm_pm_ops,
+#endif
 		},
 		.probe = pdev_probe,
 		.remove = pdev_remove,
