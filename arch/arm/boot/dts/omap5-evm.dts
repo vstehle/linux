@@ -143,12 +143,14 @@
 };
 
 &i2c5 {
-	tca: tca@22 {
+	tca6424a: tca6424a@22 {
+		compatible = "ti,tca6424a";
+		gpio-controller;
+		#gpio-cells = <2>;
 		reg = <0x22>;
 	};
-};
 
-/include/ "tca6424a.dtsi"
+};
 
 &keypad {
 	keypad,num-rows = <8>;
