@@ -21,11 +21,15 @@
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
-#include <plat/omap_device.h>
+#include "omap_device.h"
 #include <linux/dma-mapping.h>
 #include <linux/ahci_platform.h>
 #include <linux/clk.h>
 #include <plat/sata.h>
+#include "soc.h"
+
+#include "iomap.h"
+#include "cm2_54xx.h"
 
 #if defined(CONFIG_SATA_AHCI_PLATFORM) || \
 	defined(CONFIG_SATA_AHCI_PLATFORM_MODULE)
@@ -156,6 +160,7 @@ static int __init sata_phy_init(struct device *dev)
 {
 	void __iomem		*pll;
 	void __iomem		*ocp2scp3;
+	void __iomem		*sysc;
 	struct resource		*res;
 	struct platform_device	*pdev;
 	u32			reg;
@@ -176,6 +181,21 @@ static int __init sata_phy_init(struct device *dev)
 #ifdef OMAP_SATA_PHY_PWR
 	sata_phy_pwr_on();
 #endif
+
+	res =  platform_get_resource_byname(pdev, IORESOURCE_MEM, "sysc");
+	if (!res) {
+		dev_err(dev, "sysc get resource failed\n");
+		goto end;
+	}
+
+	sysc = ioremap(res->start, resource_size(res));
+	if (!sysc) {
+		dev_err(dev, "can't map sysc 0x%X\n", res->start);
+		return -ENOMEM;
+	}
+
+	omap_sata_writel(sysc, 0, 0x00000014);
+
 	res =  platform_get_resource_byname(pdev, IORESOURCE_MEM, "ocp2scp3");
 	if (!res) {
 		dev_err(dev, "ocp2scp3 get resource failed\n");
@@ -312,7 +332,7 @@ void __init omap_sata_init(void)
 	int			oh_cnt = 1;
 
 	/* For now sata init works only for omap5 */
-	if (!cpu_is_omap54xx())
+	if (!soc_is_omap54xx())
 		return;
 
 	sata_pdata.init		= omap_ahci_plat_init;
