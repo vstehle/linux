@@ -798,7 +798,6 @@ MODULE_DEVICE_TABLE(of, pca953x_dt_ids);
 static struct i2c_driver pca953x_driver = {
 	.driver = {
 		.name	= "pca953x",
-		.of_match_table = pca953x_dt_ids,
 	},
 	.probe		= pca953x_probe,
 	.remove		= pca953x_remove,
