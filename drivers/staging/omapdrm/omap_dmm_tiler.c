@@ -559,6 +559,10 @@ static int omap_dmm_probe(struct platform_device *dev)
 	u32 hwinfo, pat_geom, lut_table_size;
 	struct resource *mem;
 
+	// Hack! No dmm for now...
+	dev_err(&dev->dev, "Hack! No DMM for now...\n");
+	goto fail;
+
 	omap_dmm = kzalloc(sizeof(*omap_dmm), GFP_KERNEL);
 	if (!omap_dmm) {
 		dev_err(&dev->dev, "failed to allocate driver data section\n");
