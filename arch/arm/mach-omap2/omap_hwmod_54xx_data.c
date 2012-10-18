@@ -4654,7 +4654,7 @@ static struct omap_hwmod_ocp_if omap54xx_l3_main_2__gpmc = {
 };
 
 static struct omap_hwmod_addr_space omap54xx_gpu_addrs[] = {
-	{
+/*	{
 		.name		= "klio",
 		.pa_start	= 0x56000000,
 		.pa_end		= 0x56001fff,
@@ -4677,6 +4677,12 @@ static struct omap_hwmod_addr_space omap54xx_gpu_addrs[] = {
 	{
 		.name		= "klio_hl",
 		.pa_start	= 0x5600fe00,
+		.pa_end		= 0x5600ffff,
+		.flags		= ADDR_TYPE_RT
+	},*/
+	// Hack! We should fix the out of tree DDK driver instead.
+	{
+		.pa_start	= 0x56000000,
 		.pa_end		= 0x5600ffff,
 		.flags		= ADDR_TYPE_RT
 	},
