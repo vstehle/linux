@@ -1408,8 +1408,8 @@ static struct omap_hwmod omap54xx_gpmc_hwmod = {
  */
 
 static struct omap_hwmod_class_sysconfig omap54xx_gpu_sysc = {
-	.rev_offs	= 0x0000,
-	.sysc_offs	= 0x0010,
+	.rev_offs	= 0xfe00,
+	.sysc_offs	= 0xfe10,
 	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
 			   SIDLE_SMART_WKUP),
