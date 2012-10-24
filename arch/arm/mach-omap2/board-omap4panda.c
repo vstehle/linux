@@ -126,6 +126,11 @@ static struct platform_device panda_hdmi_audio_codec = {
 	.id	= -1,
 };
 
+static struct platform_device panda_hdmi_tpd12s015_audio = {
+	.name	= "omap-hdmi-tpd12s015-audio",
+	.id	= -1,
+};
+
 static struct platform_device btwilink_device = {
 	.name	= "btwilink",
 	.id	= -1,
@@ -136,6 +141,7 @@ static struct platform_device *panda_devices[] __initdata = {
 	&wl1271_device,
 	&panda_abe_audio,
 	&panda_hdmi_audio_codec,
+	&panda_hdmi_tpd12s015_audio,
 	&btwilink_device,
 };
 
