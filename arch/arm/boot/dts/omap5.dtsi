@@ -300,7 +300,7 @@
 				video-source = <2>;
 			};
 
-			dsi1: dsi@1 {
+/*			dsi1: dsi@1 {
 				compatible = "ti,omap4-dsi";
 				ti,hwmods = "dss_dsi1_a";
 				reg = <0>;
@@ -314,7 +314,7 @@
 				reg = <1>;
 				vdds_dsi-supply = <&ldo7_reg>;
 				video-source = <2>;
-			};
+			};*/
 
 			hdmi: hdmi {
 				compatible = "ti,omap4-hdmi";
