@@ -1371,6 +1371,8 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 	}
 
 	mutex_init(&hdmi.ip_data.lock);
+ 	hdmi.ip_data.cfg.cm.code = 0x23;
+ 	hdmi.ip_data.cfg.cm.mode = HDMI_DVI;
 
 	hdmi_panel_init();
 

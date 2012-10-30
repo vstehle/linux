@@ -110,6 +110,7 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 {
 	/* Initialize default timings to VGA in DVI mode */
 	const struct omap_video_timings default_timings = {
+#if 0
 		.x_res		= 640,
 		.y_res		= 480,
 		.pixel_clock	= 25175,
@@ -119,7 +120,17 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 		.vsw		= 2,
 		.vfp		= 11,
 		.vbp		= 31,
-
+#else
+		.x_res		= 1920,
+		.y_res		= 1080,
+		.pixel_clock	= 148500,
+		.hsw		= 44,
+		.hfp		= 88,
+		.hbp		= 148,
+		.vsw		= 5,
+		.vfp		= 4,
+		.vbp		= 36,
+#endif
 		.vsync_level	= OMAPDSS_SIG_ACTIVE_LOW,
 		.hsync_level	= OMAPDSS_SIG_ACTIVE_LOW,
 
