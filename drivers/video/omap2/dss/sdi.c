@@ -28,6 +28,7 @@
 
 #include <video/omapdss.h>
 #include "dss.h"
+#include <linux/string.h>
 
 static struct {
 	bool update_enabled;
