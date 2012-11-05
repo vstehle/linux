@@ -43,6 +43,9 @@ struct usbhs_omap_board_data {
 	 * Each PHY can have a separate regulator.
 	 */
 	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
+
+	const char			*clk[OMAP3_HS_USB_PORTS];
+	unsigned long int		clkrate[OMAP3_HS_USB_PORTS];
 };
 
 #ifdef CONFIG_ARCH_OMAP2PLUS
@@ -65,6 +68,9 @@ struct usbhs_omap_platform_data {
 
 	struct ehci_hcd_omap_platform_data	*ehci_data;
 	struct ohci_hcd_omap_platform_data	*ohci_data;
+
+	const char			*clk[OMAP3_HS_USB_PORTS];
+	unsigned long int		clkrate[OMAP3_HS_USB_PORTS];
 };
 
 struct usbtll_omap_platform_data {
