@@ -443,5 +443,10 @@
 				video-source = <1>;
 			};
 		};
+
+		usbhost: usb-host {
+			compatible = "ti,usb-host";
+			num_ports = <3>;
+		};
 	};
 };
