@@ -10,7 +10,7 @@
 /include/ "omap5.dtsi"
 
 / {
-	model = "TI OMAP5 EVM board";
+	model = "TI OMAP5 Pandaboard";
 	compatible = "ti,omap5-panda", "ti,omap5";
 
 	memory {
@@ -249,5 +249,18 @@
 
 	};
 };
+
+&usbhost {
+	port@0 {
+		mode = <0>;
+	};
+	port@1 {
+		mode = <3>;	/* HSIC */
+	};
+	port@2 {
+		mode = <3>;	/* HSIC */
+	};
+};
+
 /include/ "palmas.dtsi"
 /include/ "twl6040.dtsi"
