@@ -497,5 +497,10 @@
 			ranges;
 			ti,hwmods = "ocp2scp_usb_phy";
 		};
+
+		usbhost: usb-host {
+			compatible = "ti,usb-host";
+			num_ports = <2>;
+		};
 	};
 };
