@@ -3469,6 +3469,10 @@ static struct omap_hwmod omap54xx_usb_host_hs_hwmod = {
 	},
 	.opt_clks	= usb_host_hs_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(usb_host_hs_opt_clks),
+
+	/* use similar flags as OMAP4 to cover related erratas */
+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
+				HWMOD_INIT_NO_RESET,
 };
 
 /*
