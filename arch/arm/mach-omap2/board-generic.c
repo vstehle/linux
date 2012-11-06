@@ -42,6 +42,7 @@ static void __init omap_generic_init(void)
 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 
 	omapdss_init_of();
+	usbhost_init_of();
 }
 
 #ifdef CONFIG_SOC_OMAP2420
