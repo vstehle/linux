@@ -3437,8 +3437,8 @@ static struct omap_hwmod_class omap54xx_usb_host_hs_hwmod_class = {
 
 /* usb_host_hs */
 static struct omap_hwmod_irq_info omap54xx_usb_host_hs_irqs[] = {
-	{ .name = "ohci", .irq = 76 + OMAP54XX_IRQ_GIC_START },
-	{ .name = "ehci", .irq = 77 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "ohci-irq", .irq = 76 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "ehci-irq", .irq = 77 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -5837,7 +5837,7 @@ static struct omap_hwmod_ocp_if omap54xx_l4_per__uart6 = {
 
 static struct omap_hwmod_addr_space omap54xx_usb_host_hs_addrs[] = {
 	{
-		.name		= "uhh_config",
+		.name		= "uhh",
 		.pa_start	= 0x4a064000,
 		.pa_end		= 0x4a0647ff,
 		.flags		= ADDR_TYPE_RT
