@@ -384,5 +384,10 @@
 			ti,buffer-size = <128>;
 			ti,hwmods = "mcbsp3";
 		};
+
+		usbhost: usb-host {
+			compatible = "ti,usb-host";
+			num_ports = <3>;
+		};
 	};
 };
