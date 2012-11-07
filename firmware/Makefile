@@ -251,3 +251,6 @@ targets := $(fw-shipped-) $(patsubst $(obj)/%,%, \
 obj-n := dummy
 
 hostprogs-y := ihex2fw
+
+firmware/omap4_abe: firmware/omap4_abe.firmware
+	@cp -v $< $@
