@@ -1215,7 +1215,7 @@ int omap_gem_op_sync(struct drm_gem_object *obj, enum omap_gem_op op)
 		if (!waiter)
 			return -ENOMEM;
 
-		waiter->sync = false;
+		waiter->sync = true;
 		waiter->omap_obj = omap_obj;
 		waiter->op = op;
 		waiter->read_target = omap_obj->sync->read_pending;
@@ -1271,7 +1271,7 @@ int omap_gem_op_async(struct drm_gem_object *obj, enum omap_gem_op op,
 		if (!waiter)
 			return -ENOMEM;
 
-		waiter->sync = true;
+		waiter->sync = false;
 		waiter->omap_obj = omap_obj;
 		waiter->op = op;
 		waiter->read_target = omap_obj->sync->read_pending;
