@@ -20,6 +20,7 @@
 #include <linux/pinctrl/machine.h>
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/platform_data/omap_ocp2scp.h>
+#include <linux/pm_runtime.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/map.h>
@@ -617,6 +618,48 @@ static inline void omap_init_aes(void) { }
 
 /*-------------------------------------------------------------------------*/
 
+static __init void omap_init_dev(char *name)
+{
+	struct platform_device *pd;
+	struct omap_hwmod *oh;
+
+	oh = omap_hwmod_lookup(name);
+	if (!oh) {
+		pr_err("Could not look up %s hwmod\n", name);
+		return;
+	}
+
+	pd = omap_device_build(name, -1, oh, NULL, 0, NULL, 0, 0);
+	if (IS_ERR(pd))
+		pr_err("Can't build omap_device for %s.\n", name);
+	else
+		pm_runtime_enable(&pd->dev);
+}
+
+static void __init omap_init_fdif(void)
+{
+	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
+		return;
+
+	omap_init_dev("fdif");
+}
+
+static void __init omap_init_sl2if(void)
+{
+	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
+		return;
+
+	omap_init_dev("sl2if");
+}
+
+static void __init omap_init_iss(void)
+{
+	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
+		return;
+
+	omap_init_dev("iss");
+}
+
 #if defined(CONFIG_VIDEO_OMAP2_VOUT) || \
 	defined(CONFIG_VIDEO_OMAP2_VOUT_MODULE)
 #if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
@@ -838,6 +881,9 @@ static int __init omap2_init_devices(void)
 	omap_init_vout();
 	omap_init_ocp2scp();
 	omap_init_gpu();
+	omap_init_fdif();
+	omap_init_sl2if();
+	omap_init_iss();
 
 	return 0;
 }
