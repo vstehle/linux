@@ -1326,22 +1326,16 @@ static const struct clksel utmi_p1_gfclk_sel[] = {
 	{ .parent = NULL },
 };
 
-static struct clk utmi_p1_gfclk = {
-	.name		= "utmi_p1_gfclk",
+/* Merged utmi_p1_gfclk into usb_host_hs_utmi_p1_clk */
+static struct clk usb_host_hs_utmi_p1_clk = {
+	.name		= "usb_host_hs_utmi_p1_clk",
 	.parent		= &l3init_60m_fclk,
 	.clksel		= utmi_p1_gfclk_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
 	.clksel_mask	= OMAP54XX_CLKSEL_UTMI_P1_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &omap2_clksel_recalc,
-};
-
-static struct clk usb_host_hs_utmi_p1_clk = {
-	.name		= "usb_host_hs_utmi_p1_clk",
-	.parent		= &utmi_p1_gfclk,
 	.ops		= &clkops_omap2_dflt,
-	.recalc		= &followparent_recalc,
+	.recalc		= &omap2_clksel_recalc,
 	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
 	.enable_bit	= OMAP54XX_OPTFCLKEN_UTMI_P1_CLK_SHIFT,
 	.clkdm_name	= "l3init_clkdm",
@@ -1353,22 +1347,16 @@ static const struct clksel utmi_p2_gfclk_sel[] = {
 	{ .parent = NULL },
 };
 
-static struct clk utmi_p2_gfclk = {
-	.name		= "utmi_p2_gfclk",
+/* Merged utmi_p2_gfclk into usb_host_hs_utmi_p2_clk */
+static struct clk usb_host_hs_utmi_p2_clk = {
+	.name		= "usb_host_hs_utmi_p2_clk",
 	.parent		= &l3init_60m_fclk,
 	.clksel		= utmi_p2_gfclk_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
 	.clksel_mask	= OMAP54XX_CLKSEL_UTMI_P2_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &omap2_clksel_recalc,
-};
-
-static struct clk usb_host_hs_utmi_p2_clk = {
-	.name		= "usb_host_hs_utmi_p2_clk",
-	.parent		= &utmi_p2_gfclk,
 	.ops		= &clkops_omap2_dflt,
-	.recalc		= &followparent_recalc,
+	.recalc		= &omap2_clksel_recalc,
 	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
 	.enable_bit	= OMAP54XX_OPTFCLKEN_UTMI_P2_CLK_SHIFT,
 	.clkdm_name	= "l3init_clkdm",
@@ -2462,9 +2450,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"ocp2scp3_ick",			&ocp2scp3_ick,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_hsic60m_p2_clk",	&usb_host_hs_hsic60m_p2_clk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_hsic60m_p3_clk",	&usb_host_hs_hsic60m_p3_clk,	CK_54XX),
-	CLK(NULL,	"utmi_p1_gfclk",		&utmi_p1_gfclk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_utmi_p1_clk",	&usb_host_hs_utmi_p1_clk,	CK_54XX),
-	CLK(NULL,	"utmi_p2_gfclk",		&utmi_p2_gfclk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_utmi_p2_clk",	&usb_host_hs_utmi_p2_clk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_utmi_p3_clk",	&usb_host_hs_utmi_p3_clk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_hsic480m_p1_clk",	&usb_host_hs_hsic480m_p1_clk,	CK_54XX),
