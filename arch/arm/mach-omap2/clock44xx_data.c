@@ -2462,25 +2462,19 @@ static const struct clksel utmi_p1_gfclk_sel[] = {
 	{ .parent = NULL },
 };
 
-static struct clk utmi_p1_gfclk = {
-	.name		= "utmi_p1_gfclk",
+/* Merged utmi_p1_gfclk into usb_host_hs_utmi_p1_clk */
+static struct clk usb_host_hs_utmi_p1_clk = {
+	.name		= "usb_host_hs_utmi_p1_clk",
 	.parent		= &init_60m_fclk,
 	.clksel		= utmi_p1_gfclk_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_L3INIT_USB_HOST_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_UTMI_P1_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &omap2_clksel_recalc,
-};
-
-static struct clk usb_host_hs_utmi_p1_clk = {
-	.name		= "usb_host_hs_utmi_p1_clk",
 	.ops		= &clkops_omap2_dflt,
 	.enable_reg	= OMAP4430_CM_L3INIT_USB_HOST_CLKCTRL,
 	.enable_bit	= OMAP4430_OPTFCLKEN_UTMI_P1_CLK_SHIFT,
 	.clkdm_name	= "l3_init_clkdm",
-	.parent		= &utmi_p1_gfclk,
-	.recalc		= &followparent_recalc,
+	.recalc		= &omap2_clksel_recalc,
 };
 
 static const struct clksel utmi_p2_gfclk_sel[] = {
@@ -2489,25 +2483,19 @@ static const struct clksel utmi_p2_gfclk_sel[] = {
 	{ .parent = NULL },
 };
 
-static struct clk utmi_p2_gfclk = {
-	.name		= "utmi_p2_gfclk",
+/* Merged utmi_p2_gfclk into usb_host_hs_utmi_p2_clk */
+static struct clk usb_host_hs_utmi_p2_clk = {
+	.name		= "usb_host_hs_utmi_p2_clk",
 	.parent		= &init_60m_fclk,
 	.clksel		= utmi_p2_gfclk_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_L3INIT_USB_HOST_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_UTMI_P2_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &omap2_clksel_recalc,
-};
-
-static struct clk usb_host_hs_utmi_p2_clk = {
-	.name		= "usb_host_hs_utmi_p2_clk",
 	.ops		= &clkops_omap2_dflt,
 	.enable_reg	= OMAP4430_CM_L3INIT_USB_HOST_CLKCTRL,
 	.enable_bit	= OMAP4430_OPTFCLKEN_UTMI_P2_CLK_SHIFT,
 	.clkdm_name	= "l3_init_clkdm",
-	.parent		= &utmi_p2_gfclk,
-	.recalc		= &followparent_recalc,
+	.recalc		= &omap2_clksel_recalc,
 };
 
 static struct clk usb_host_hs_utmi_p3_clk = {
@@ -3246,9 +3234,7 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"uart4_fck",			&uart4_fck,	CK_443X),
 	CLK("usbhs_omap",	"fs_fck",		&usb_host_fs_fck,	CK_443X),
 	CLK(NULL,	"usb_host_fs_fck",		&usb_host_fs_fck,	CK_443X),
-	CLK(NULL,	"utmi_p1_gfclk",		&utmi_p1_gfclk,	CK_443X),
 	CLK(NULL,	"usb_host_hs_utmi_p1_clk",	&usb_host_hs_utmi_p1_clk,	CK_443X),
-	CLK(NULL,	"utmi_p2_gfclk",		&utmi_p2_gfclk,	CK_443X),
 	CLK(NULL,	"usb_host_hs_utmi_p2_clk",	&usb_host_hs_utmi_p2_clk,	CK_443X),
 	CLK(NULL,	"usb_host_hs_utmi_p3_clk",	&usb_host_hs_utmi_p3_clk,	CK_443X),
 	CLK(NULL,	"usb_host_hs_hsic480m_p1_clk",	&usb_host_hs_hsic480m_p1_clk,	CK_443X),
