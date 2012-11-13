@@ -35,11 +35,27 @@
 
 #include <linux/ioctl.h>
 
+/**
+ * struct omx_pvr_data - metadata passed to/from userspace for a pvr register
+ * @fd:           a file descriptor representing a pvr handle
+ * @num_handles:  field filled by driver. userspace uses this to determine
+ *                number of handles associated with fd
+ * @handles:      opaque pointers pointing to buffers
+ */
+struct omx_pvr_data {
+	int fd;
+	unsigned int num_handles;
+	void *handles[2];
+};
+
 #define OMX_IOC_MAGIC	'X'
 
-#define OMX_IOCCONNECT	_IOW(OMX_IOC_MAGIC, 1, char *)
+#define OMX_IOCCONNECT		_IOW(OMX_IOC_MAGIC, 1, char *)
+#define OMX_IOCIONREGISTER	_IOWR(OMX_IOC_MAGIC, 2, struct ion_fd_data)
+#define OMX_IOCIONUNREGISTER	_IOWR(OMX_IOC_MAGIC, 3, struct ion_fd_data)
+#define OMX_IOCPVRREGISTER	_IOWR(OMX_IOC_MAGIC, 4, struct omx_pvr_data)
 
-#define OMX_IOC_MAXNR	(1)
+#define OMX_IOC_MAXNR	(4)
 
 #ifdef __KERNEL__
 
@@ -126,5 +142,17 @@ struct omx_disc_req {
 struct omx_conn_req {
 	char name[48];
 } __packed;
+
+/* the packet structure (actual message sent to omx service) */
+struct omx_packet {
+	uint16_t      desc;	/* descriptor, and omx service status */
+	uint16_t      msg_id;	/* message id */
+	uint32_t      flags;	/* Set to a fixed value for now. */
+	uint32_t      fxn_idx;	/* Index into OMX service's function table.*/
+	int32_t       result;	/* The OMX function status. */
+	uint32_t      data_size;/* Size of in/out data to/from the function. */
+	uint32_t      data[0];	/* Payload of data_size char's passed to
+				   function. */
+};
 
 #endif /* RPMSG_OMX_H */

@@ -35,9 +35,26 @@
 #include <linux/rpmsg.h>
 #include <linux/rpmsg_omx.h>
 #include <linux/completion.h>
+#include <linux/remoteproc.h>
+#include <linux/fdtable.h>
+
+#ifdef CONFIG_ION_OMAP
+#include <linux/ion.h>
+#include <linux/omap_ion.h>
+
+extern struct ion_device *omap_ion_device;
+#endif
 
 /* maximum OMX devices this driver can handle */
 #define MAX_OMX_DEVICES		8
+
+enum rpc_omx_map_info_type {
+	RPC_OMX_MAP_INFO_NONE          = 0,
+	RPC_OMX_MAP_INFO_ONE_BUF       = 1,
+	RPC_OMX_MAP_INFO_TWO_BUF       = 2,
+	RPC_OMX_MAP_INFO_THREE_BUF     = 3,
+	RPC_OMX_MAP_INFO_MAX           = 0x7FFFFFFF
+};
 
 struct rpmsg_omx_service {
 	struct cdev cdev;
@@ -47,6 +64,9 @@ struct rpmsg_omx_service {
 	struct list_head list;
 	struct mutex lock;
 	struct completion comp;
+#ifdef CONFIG_ION_OMAP
+	struct ion_client *ion_client;
+#endif
 };
 
 struct rpmsg_omx_instance {
@@ -59,6 +79,9 @@ struct rpmsg_omx_instance {
 	struct rpmsg_endpoint *ept;
 	u32 dst;
 	int state;
+#ifdef CONFIG_ION_OMAP
+	struct ion_client *ion_client;
+#endif
 };
 
 static struct class *rpmsg_omx_class;
@@ -94,6 +117,85 @@ static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
 	return ret;
 }
 #endif
+
+static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
+					long buffer, u32 *va)
+{
+	int ret = -EIO;
+
+	*va = 0;
+
+#ifdef CONFIG_ION_OMAP
+	{
+		struct ion_handle *handle;
+		ion_phys_addr_t paddr;
+		size_t unused;
+
+		handle = (struct ion_handle *)buffer;
+		if (!ion_phys(omx->ion_client, handle, &paddr, &unused)) {
+			ret = _rpmsg_pa_to_da(omx, (phys_addr_t)paddr, va);
+			goto exit;
+		}
+	}
+exit:
+#endif
+
+	if (ret)
+		pr_err("%s: buffer lookup failed %x\n", __func__, ret);
+
+	return ret;
+}
+
+static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
+{
+	int ret = -EINVAL, offset = 0;
+	long *buffer;
+	char *data;
+	enum rpc_omx_map_info_type maptype;
+	u32 da = 0;
+
+	data = (char *)((struct omx_packet *)packet)->data;
+	maptype = *((enum rpc_omx_map_info_type *)data);
+
+	/* Nothing to map */
+	if (maptype == RPC_OMX_MAP_INFO_NONE)
+		return 0;
+
+	if ((maptype < RPC_OMX_MAP_INFO_ONE_BUF) ||
+			(maptype > RPC_OMX_MAP_INFO_THREE_BUF))
+		return ret;
+
+	offset = *(int *)((int)data + sizeof(maptype));
+	buffer = (long *)((int)data + offset);
+
+	/* Lookup for the da of 1st buffer */
+	ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+	if (!ret)
+		*buffer = da;
+
+	/* If 2 buffers, get the 2nd buffers da */
+	if (!ret && (maptype >= RPC_OMX_MAP_INFO_TWO_BUF)) {
+		buffer = (long *)((int)data + offset + sizeof(*buffer));
+		if (*buffer != 0) {
+			/* Lookup the da for 2nd buffer */
+			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+			if (!ret)
+				*buffer = da;
+		}
+	}
+
+	/* Get the da for the 3rd buffer if maptype is ..THREE_BUF */
+	if (!ret && maptype >= RPC_OMX_MAP_INFO_THREE_BUF) {
+		buffer = (long *)((int)data + offset + 2*sizeof(*buffer));
+		if (*buffer != 0) {
+			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+			if (!ret)
+				*buffer = da;
+		}
+	}
+
+	return ret;
+}
 
 static void rpmsg_omx_cb(struct rpmsg_channel *rpdev, void *data, int len,
 							void *priv, u32 src)
@@ -227,7 +329,9 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case OMX_IOCCONNECT:
 		ret = copy_from_user(buf, (char __user *) arg, sizeof(buf));
 		if (ret) {
-			dev_err(omxserv->dev, "copy_from_user fail: %d\n", ret);
+			dev_err(omxserv->dev,
+				"%s: %d: copy_from_user fail: %d\n", __func__,
+				_IOC_NR(cmd), ret);
 			ret = -EFAULT;
 			break;
 		}
@@ -235,6 +339,92 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		buf[sizeof(buf) - 1] = '\0';
 		ret = rpmsg_omx_connect(omx, buf);
 		break;
+#ifdef CONFIG_ION_OMAP
+	case OMX_IOCIONREGISTER:
+	{
+		struct ion_fd_data data;
+
+		if (copy_from_user(&data, (char __user *) arg, sizeof(data))) {
+			dev_err(omxserv->dev,
+				"%s: %d: copy_from_user fail: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EFAULT;
+		}
+		data.handle = ion_import_fd(omx->ion_client, data.fd);
+		if (IS_ERR_OR_NULL(data.handle))
+			data.handle = NULL;
+		if (copy_to_user((char __user *) arg, &data, sizeof(data))) {
+			dev_err(omxserv->dev,
+				"%s: %d: copy_to_user fail: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EFAULT;
+		}
+		break;
+	}
+	case OMX_IOCPVRREGISTER:
+	{
+		struct omx_pvr_data data;
+		struct ion_buffer *ion_bufs[2] = { NULL, NULL };
+		int num_handles = 2, i = 0;
+
+		if (copy_from_user(&data, (char __user *)arg, sizeof(data))) {
+			dev_err(omxserv->dev,
+				"%s: %d: copy_from_user fail: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EFAULT;
+		}
+
+		if (!fcheck(data.fd)) {
+			dev_err(omxserv->dev,
+				"%s: %d: invalid fd: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EBADF;
+		}
+
+		data.handles[0] = data.handles[1] = NULL;
+		if (!omap_ion_share_fd_to_buffers(data.fd, ion_bufs,
+						  &num_handles)) {
+			unsigned int size = ARRAY_SIZE(data.handles);
+			for (i = 0; (i < num_handles) && (i < size); i++) {
+				struct ion_handle *handle = NULL;
+
+				if (!IS_ERR_OR_NULL(ion_bufs[i]))
+					handle = ion_import(omx->ion_client,
+							   ion_bufs[i]);
+				if (!IS_ERR_OR_NULL(handle))
+					data.handles[i] = handle;
+			}
+		}
+		data.num_handles = i;
+
+		if (copy_to_user((char __user *)arg, &data, sizeof(data))) {
+			dev_err(omxserv->dev,
+				"%s: %d: copy_to_user fail: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EFAULT;
+		}
+		break;
+	}
+	case OMX_IOCIONUNREGISTER:
+	{
+		struct ion_fd_data data;
+
+		if (copy_from_user(&data, (char __user *) arg, sizeof(data))) {
+			dev_err(omxserv->dev,
+				"%s: %d: copy_from_user fail: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EFAULT;
+		}
+		ion_free(omx->ion_client, data.handle);
+		if (copy_to_user((char __user *) arg, &data, sizeof(data))) {
+			dev_err(omxserv->dev,
+				"%s: %d: copy_to_user fail: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EFAULT;
+		}
+		break;
+	}
+#endif
 	default:
 		dev_warn(omxserv->dev, "unhandled ioctl cmd: %d\n", cmd);
 		break;
@@ -292,6 +482,14 @@ static int rpmsg_omx_open(struct inode *inode, struct file *filp)
 	list_add(&omx->next, &omxserv->list);
 	mutex_unlock(&omxserv->lock);
 
+#ifdef CONFIG_ION_OMAP
+	omx->ion_client = ion_client_create(omap_ion_device,
+					    (1 << ION_HEAP_TYPE_CARVEOUT) |
+					    (1 << OMAP_ION_HEAP_TYPE_TILER) |
+					    (1 << ION_HEAP_TYPE_SYSTEM),
+					    "rpmsg-omx");
+#endif
+
 	init_completion(&omx->reply_arrived);
 
 	/* associate filp with the new omx instance */
@@ -343,6 +541,9 @@ static int rpmsg_omx_release(struct inode *inode, struct file *filp)
 			dev_err(omxserv->dev, "rpmsg_send failed: %d\n", ret);
 	}
 
+#ifdef CONFIG_ION_OMAP
+	ion_client_destroy(omx->ion_client);
+#endif
 	mutex_lock(&omxserv->lock);
 	list_del(&omx->next);
 	/*
@@ -392,13 +593,15 @@ static ssize_t rpmsg_omx_read(struct file *filp, char __user *buf,
 	mutex_unlock(&omx->lock);
 	if (!skb) {
 		dev_err(omx->omxserv->dev, "err is rmpsg_omx racy ?\n");
-		return -EFAULT;
+		return -EIO;
 	}
 
 	use = min(len, skb->len);
 
-	if (copy_to_user(buf, skb->data, use))
+	if (copy_to_user(buf, skb->data, use)) {
+		dev_err(omx->omxserv->dev, "%s: copy_to_user fail\n", __func__);
 		use = -EFAULT;
+	}
 
 	kfree_skb(skb);
 	return use;
@@ -428,6 +631,10 @@ static ssize_t rpmsg_omx_write(struct file *filp, const char __user *ubuf,
 	 */
 	if (copy_from_user(hdr->data, ubuf, use))
 		return -EFAULT;
+
+	ret = _rpmsg_omx_map_buf(omx, hdr->data);
+	if (ret < 0)
+		return ret;
 
 	hdr->type = OMX_RAW_MSG;
 	hdr->flags = 0;
