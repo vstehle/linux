@@ -77,6 +77,31 @@ static DEFINE_IDR(rpmsg_omx_services);
 static DEFINE_SPINLOCK(rpmsg_omx_services_lock);
 static LIST_HEAD(rpmsg_omx_services_list);
 
+#ifdef CONFIG_ION_OMAP
+static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
+{
+	int ret;
+	struct rproc *rproc;
+	u64 temp_da;
+
+	if (mutex_lock_interruptible(&omx->omxserv->lock))
+		return -EINTR;
+
+	rproc = vdev_to_rproc(omx->omxserv->rpdev->vrp->vdev);
+
+	ret = rproc_pa_to_da(rproc, (phys_addr_t) pa, &temp_da);
+	if (ret)
+		pr_err("error with pa to da from rproc %d\n", ret);
+	else
+		/* we know it is a 32 bit address */
+		*da = (u32)temp_da;
+
+	mutex_unlock(&omx->omxserv->lock);
+
+	return ret;
+}
+#endif
+
 static void rpmsg_omx_cb(struct rpmsg_channel *rpdev, void *data, int len,
 							void *priv, u32 src)
 {
