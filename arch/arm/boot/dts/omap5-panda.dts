@@ -159,6 +159,20 @@
 	};
 };
 
+&omap5_pmx_wkup {
+	pinctrl-names = "default";
+	pinctrl-0 = <
+			&gpiowkup_pins
+	>;
+
+	gpiowkup_pins: gpio_wkup_pins {
+		pinctrl-single,pins = <
+			0x02 0x6	/* gpio1_wk15 OUTPUT | MODE 6 for ETH_NRESET */
+			0x1A 0x0	/* fref_clk1_out OUTPUT | MODE 7 for USB hub clk */
+		>;
+	};
+};
+
 &omap5_pmx_core {
 	pinctrl-names = "default";
 	pinctrl-0 = <
@@ -168,6 +182,7 @@
 			&mcbsp1_pins
 			&mcbsp2_pins
 			&dss_hdmi_pins
+			&usbhost_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -224,6 +239,18 @@
 
 		>;
 	};
+
+	usbhost_pins: pinmux_usbhost_pins {
+		pinctrl-single,pins = <
+			0x84 0x100	/* usbb2_hsic_strobe INPUT | MODE 0 */
+			0x86 0x100	/* usbb2_hsic_data INPUT | MODE 0 */
+
+			0x19e 0x100	/* usbb3_hsic_strobe INPUT | MODE 0 */
+			0x1a0 0x100	/* usbb3_hsic_data INPUT | MODE 0 */
+
+			0x70 0x6	/* gpio3_80 OUTPUT | MODE 6 for HUB_NRESET */
+		>;
+	};
 };
 
 &i2c5 {
@@ -251,14 +278,19 @@
 };
 
 &usbhost {
+	phy_reset;
 	port@0 {
 		mode = <0>;
 	};
 	port@1 {
 		mode = <3>;	/* HSIC */
+		reset_gpio = <&gpio3 16 0>; /* gpio3_80 HUB_NRESET */
+		clk = "auxclk1_ck";	/* Hub clock on FREF_CLK1 */
+		clkrate = <19200000>;
 	};
 	port@2 {
 		mode = <3>;	/* HSIC */
+		reset_gpio = <&gpio1 15 0>; /* gpio1_wk15 ETH_NRESET */
 	};
 };
 
