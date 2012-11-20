@@ -1424,16 +1424,6 @@ static struct clk usb_host_hs_hsic480m_p2_clk = {
 	.clkdm_name	= "l3init_clkdm",
 };
 
-static struct clk usb_host_hs_fck = {
-	.name		= "usb_host_hs_fck",
-	.ops		= &clkops_omap2_dflt,
-	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
-	.enable_bit	= OMAP54XX_MODULEMODE_SWCTRL,
-	.clkdm_name	= "l3init_clkdm",
-	.parent		= &l3init_60m_fclk,
-	.recalc		= &followparent_recalc,
-};
-
 static struct clk dss_32khz_clk = {
 	.name		= "dss_32khz_clk",
 	.parent		= &sys_32k_ck,
@@ -2481,7 +2471,6 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"usb_host_hs_hsic60m_p1_clk",	&usb_host_hs_hsic60m_p1_clk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_hsic480m_p3_clk",	&usb_host_hs_hsic480m_p3_clk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_hsic480m_p2_clk",	&usb_host_hs_hsic480m_p2_clk,	CK_54XX),
-	CLK("usbhs_omap",	"hs_fck",		&usb_host_hs_fck,	CK_54XX),
 	CLK(NULL,	"dss_32khz_clk",		&dss_32khz_clk,	CK_54XX),
 	CLK(NULL,	"dss_48mhz_clk",		&dss_48mhz_clk,	CK_54XX),
 	CLK(NULL,	"dss_dss_clk",			&dss_dss_clk,	CK_54XX),
