@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/rpmsg.h>
+#include <plat/cpu.h>
 
 #include "../omapdrm/omap_drm.h"
 #include "../omapdrm/omap_drv.h"
