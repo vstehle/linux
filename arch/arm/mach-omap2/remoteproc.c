@@ -34,11 +34,8 @@
  * This will go away as soon as we have the IOMMU-based generic
  * DMA API in place.
  */
-#define OMAP5_RPROC_CMA_BASE_IPU	(0x95800000)
-#define OMAP5_RPROC_CMA_BASE_DSP	(0x95000000)
-
-#define OMAP4_RPROC_CMA_BASE_IPU	(0x99000000)
-#define OMAP4_RPROC_CMA_BASE_DSP	(0x98800000)
+#define OMAP_RPROC_CMA_BASE_IPU	(0x99000000)
+#define OMAP_RPROC_CMA_BASE_DSP	(0x98800000)
 
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
 static const char * const ipu_rst_names[] = {
@@ -146,9 +143,7 @@ void __init omap_rproc_reserve_cma(int type)
 	/* reserve CMA memory for OMAP4's dsp "tesla" remote processor */
 	int ret = dma_declare_contiguous(&omap4_tesla.dev,
 					CONFIG_OMAP_DSP_CMA_SIZE,
-					type == RPROC_CMA_OMAP4 ?
-					OMAP4_RPROC_CMA_BASE_DSP :
-					OMAP5_RPROC_CMA_BASE_DSP, 0);
+					OMAP_RPROC_CMA_BASE_DSP, 0);
 	if (ret)
 		pr_err("dma_declare_contiguous failed for dsp %d\n", ret);
 	}
@@ -157,12 +152,8 @@ void __init omap_rproc_reserve_cma(int type)
 	{
 	/* reserve CMA memory for OMAP4's M3 "ducati" remote processor */
 	int ret = dma_declare_contiguous(&omap4_ducati.dev,
-					type == RPROC_CMA_OMAP4 ?
-					CONFIG_OMAP4_IPU_CMA_SIZE :
-					CONFIG_OMAP5_IPU_CMA_SIZE,
-					type == RPROC_CMA_OMAP4 ?
-					OMAP4_RPROC_CMA_BASE_IPU :
-					OMAP5_RPROC_CMA_BASE_IPU, 0);
+					CONFIG_OMAP_IPU_CMA_SIZE,
+					OMAP_RPROC_CMA_BASE_IPU, 0);
 	if (ret)
 		pr_err("dma_declare_contiguous failed for ipu %d\n", ret);
 	}
