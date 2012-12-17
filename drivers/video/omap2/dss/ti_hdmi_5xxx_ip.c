@@ -253,8 +253,16 @@ static void hdmi_core_init(struct hdmi_core_vid_config *video_cfg,
 	video_cfg->v_fc_config.timings.hsw = cfg->timings.hsw;
 	video_cfg->v_fc_config.timings.hbp = cfg->timings.hbp;
 	video_cfg->v_fc_config.timings.hfp = cfg->timings.hfp;
-	video_cfg->hblank = cfg->timings.hfp +
-				cfg->timings.hbp + cfg->timings.hsw;
+
+	if ((omap_rev() == OMAP5430_REV_ES2_0) ||
+		(omap_rev() == OMAP5432_REV_ES2_0)) {
+		video_cfg->hblank = cfg->timings.hfp +
+					cfg->timings.hbp + cfg->timings.hsw - 1;
+	} else {
+		video_cfg->hblank = cfg->timings.hfp +
+					cfg->timings.hbp + cfg->timings.hsw;
+	}
+
 	video_cfg->v_fc_config.timings.vsync_level = cfg->timings.vsync_level;
 	video_cfg->v_fc_config.timings.y_res = cfg->timings.y_res;
 	video_cfg->v_fc_config.timings.vsw = cfg->timings.vsw;
@@ -344,8 +352,15 @@ static void hdmi_core_video_config(struct hdmi_ip_data *ip_data,
 	/* set horizontal sync pulse width */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH1,
 			(cfg->v_fc_config.timings.hsw >> 8), 1, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH0,
-			(cfg->v_fc_config.timings.hsw & 0xFF), 7, 0);
+
+	if ((omap_rev() == OMAP5430_REV_ES2_0) ||
+		(omap_rev() == OMAP5432_REV_ES2_0)) {
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH0,
+				((cfg->v_fc_config.timings.hsw - 1) & 0xFF), 7, 0);
+	} else {
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH0,
+				(cfg->v_fc_config.timings.hsw & 0xFF), 7, 0);
+	}
 
 	/*  set vertical sync pulse width */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_VSYNCINWIDTH,
