@@ -18,29 +18,6 @@
 		reg = <0x80000000 0x80000000>; /* 2 GB */
 	};
 
-	sound {
-		compatible = "ti,abe-twl6040";
-		ti,model = "PandaBoard5";
-
-		ti,jack-detection = <1>;
-		ti,mclk-freq = <19200000>;
-
-		ti,mcpdm = <&mcpdm>;
-
-		ti,twl6040 = <&twl6040>;
-
-		/* Audio routing */
-		ti,audio-routing =
-			"Headset Stereophone", "HSOL",
-			"Headset Stereophone", "HSOR",
-			"Line Out", "AUXL",
-			"Line Out", "AUXR",
-			"HSMIC", "Headset Mic",
-			"Headset Mic", "Headset Mic Bias",
-			"AFML", "Line In",
-			"AFMR", "Line In";
-	};
-
 	vmmcsd_fixed: fixedregulator-mmcsd {
 		compatible = "regulator-fixed";
 		regulator-name = "vmmcsd_fixed";
@@ -90,6 +67,38 @@
 			gpios = <&tca6424a 19 0>;	/* TCA6424A P23, TC_LED_BLUE */
 			default-state = "off";
 		};
+	};
+
+	sound {
+		compatible = "ti,abe-twl6040";
+		ti,model = "PandaBoard5";
+
+		ti,jack-detection = <1>;
+		ti,mclk-freq = <19200000>;
+
+		ti,mcpdm = <&mcpdm>;
+		ti,mcbsp1 = <&mcbsp1>;
+		ti,mcbsp2 = <&mcbsp2>;
+		ti,aess = <&aess>;
+
+		ti,twl6040 = <&twl6040>;
+
+		/* Audio routing */
+		ti,audio-routing =
+			"Headset Stereophone", "HSOL",
+			"Headset Stereophone", "HSOR",
+			"Line Out", "AUXL",
+			"Line Out", "AUXR",
+			"HSMIC", "Headset Mic",
+			"Headset Mic", "Headset Mic Bias",
+			"AFML", "Line In",
+			"AFMR", "Line In",
+			"Headset Playback", "PDM_DL1",
+			"PDM_UL1", "Capture",
+			"40122000.mcbsp Playback", "BT_VX_DL",
+			"BT_VX_UL", "40122000.mcbsp Capture",
+			"40124000.mcbsp Playback", "MM_EXT_DL",
+			"MM_EXT_UL", "40124000.mcbsp Capture";
 	};
 };
 
@@ -254,15 +263,6 @@
 	port@2 {
 		mode = <3>;	/* HSIC */
 		reset_gpio = <&gpio1 15 0>; /* gpio1_wk15 ETH_NRESET */
-	};
-};
-
-&i2c5 {
-	tca6424a: tca6424a@22 {
-		compatible = "ti,tca6424a";
-		gpio-controller;
-		#gpio-cells = <2>;
-		reg = <0x22>;
 	};
 };
 
