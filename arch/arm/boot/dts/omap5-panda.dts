@@ -68,29 +68,6 @@
 			default-state = "off";
 		};
 	};
-
-	sound {
-		compatible = "ti,abe-twl6040";
-		ti,model = "PandaBoard5";
-
-		ti,jack-detection = <1>;
-		ti,mclk-freq = <19200000>;
-
-		ti,mcpdm = <&mcpdm>;
-
-		ti,twl6040 = <&twl6040>;
-
-		/* Audio routing */
-		ti,audio-routing =
-			"Headset Stereophone", "HSOL",
-			"Headset Stereophone", "HSOR",
-			"Line Out", "AUXL",
-			"Line Out", "AUXR",
-			"HSMIC", "Headset Mic",
-			"Headset Mic", "Headset Mic Bias",
-			"AFML", "Line In",
-			"AFMR", "Line In";
-	};
 };
 
 &mmc1 {
@@ -250,4 +227,3 @@
 };
 
 /include/ "palmas.dtsi"
-/include/ "twl6040.dtsi"
