@@ -86,6 +86,7 @@ fw-shipped-$(CONFIG_INFINIBAND_QIB) += qlogic/sd7220.fw
 fw-shipped-$(CONFIG_SND_KORG1212) += korg/k1212.dsp
 fw-shipped-$(CONFIG_SND_MAESTRO3) += ess/maestro3_assp_kernel.fw \
 				     ess/maestro3_assp_minisrc.fw
+fw-shipped-$(CONFIG_SND_OMAP_SOC_ABE) += omap4_abe
 fw-shipped-$(CONFIG_SND_SB16_CSP) += sb16/mulaw_main.csp sb16/alaw_main.csp \
 				     sb16/ima_adpcm_init.csp \
 				     sb16/ima_adpcm_playback.csp \
@@ -250,3 +251,6 @@ targets := $(fw-shipped-) $(patsubst $(obj)/%,%, \
 obj-n := dummy
 
 hostprogs-y := ihex2fw
+
+firmware/omap4_abe: firmware/omap4_abe.firmware
+	@cp -v $< $@
