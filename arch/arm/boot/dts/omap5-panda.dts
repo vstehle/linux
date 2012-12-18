@@ -141,6 +141,7 @@
 			&dmic_pins
 			&mcbsp1_pins
 			&mcbsp2_pins
+			&i2c5_pins
 			&usbhost_pins
 	>;
 
@@ -184,6 +185,13 @@
 			0x156 0x8	/* abemcbsp2_dx.abemcbsp2_dx OUTPUT PULLDOWN | MODE0 */
 			0x158 0x100	/* abemcbsp2_fsx.abemcbsp2_fsx INPUT | MODE0 */
 			0x15a 0x100	/* abemcbsp2_clkx.abemcbsp2_clkx INPUT | MODE0 */
+		>;
+	};
+
+	i2c5_pins: pinmux_i2c5_pins {
+		pinctrl-single,pins = <
+			0x186 0x100	/* i2c5_scl.i2c5_scl INPUT | MODE0 */
+			0x188 0x100	/* i2c5_sda.i2c5_sda INPUT | MODE0 */
 		>;
 	};
 
