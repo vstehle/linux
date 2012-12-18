@@ -990,7 +990,7 @@ static int init_hyp_mode(void)
 	 */
 	err = kvm_mmu_init();
 	if (err)
-		return err;
+		goto out_err;
 
 	/*
 	 * It is probably enough to obtain the default on one
@@ -1089,6 +1089,7 @@ static int init_hyp_mode(void)
 	if (err)
 		goto out_free_mappings;
 
+	kvm_info("Hyp mode initialized successfully\n");
 	return 0;
 out_free_vfp:
 	free_percpu(kvm_host_vfp_state);
@@ -1097,6 +1098,8 @@ out_free_mappings:
 out_free_stack_pages:
 	for_each_possible_cpu(cpu)
 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
+out_err:
+	kvm_err("error initializing Hyp mode: %d\n", err);
 	return err;
 }
 
