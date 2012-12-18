@@ -21,6 +21,17 @@ struct rproc_ops;
 struct platform_device;
 
 /*
+ * struct omap_rproc_timers_info - timers for the omap rproc
+ *
+ * @id: timer id to use by the remoteproc
+ * @odt: timer pointer
+ */
+struct omap_rproc_timers_info {
+	int id;
+	struct omap_dm_timer *odt;
+};
+
+/*
  * struct omap_rproc_pdata - omap remoteproc's platform data
  * @name: the remoteproc's name
  * @oh_name: omap hwmod device
@@ -28,9 +39,13 @@ struct platform_device;
  * @firmware: name of firmware file to load
  * @mbox_name: name of omap mailbox device to use with this rproc
  * @ops: start/stop rproc handlers
+ * @omap_rproc_timers_info: timer(s) info rproc needs
  * @device_enable: omap-specific handler for enabling a device
  * @device_shutdown: omap-specific handler for shutting down a device
  * @set_bootaddr: omap-specific handler for setting the rproc boot address
+ * @timers_cnt: number of rproc timer(s)
+ * @rst_names: names of the rproc reset lines
+ * @rst_cnt: number of rproc reset lines
  */
 struct omap_rproc_pdata {
 	const char *name;
@@ -39,21 +54,27 @@ struct omap_rproc_pdata {
 	const char *firmware;
 	const char *mbox_name;
 	const struct rproc_ops *ops;
+	struct omap_rproc_timers_info *timers;
 	int (*device_enable) (struct platform_device *pdev);
 	int (*device_shutdown) (struct platform_device *pdev);
 	void(*set_bootaddr)(u32);
+	int (*assert_reset)(struct platform_device *pdev, const char *name);
+	int (*deassert_reset)(struct platform_device *pdev, const char *name);
+	u8 timers_cnt;
+	const char * const *rst_names;
+	u8 rst_cnt;
 };
 
 #if defined(CONFIG_OMAP_REMOTEPROC) || defined(CONFIG_OMAP_REMOTEPROC_MODULE)
-
-void __init omap_rproc_reserve_cma(void);
-
+void __init omap_rproc_reserve_cma(int type);
 #else
-
-void __init omap_rproc_reserve_cma(void)
+static void __init omap_rproc_reserve_cma(int type)
 {
 }
-
 #endif
+
+/* Defines to identify CMA memory size and location based on platform type */
+#define RPROC_CMA_OMAP4		1
+#define RPROC_CMA_OMAP5		2
 
 #endif /* _PLAT_REMOTEPROC_H */

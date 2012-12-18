@@ -28,6 +28,7 @@
 #define MAILBOX_IRQSTATUS(u)		(0x100 + 8 * (u))
 #define MAILBOX_IRQENABLE(u)		(0x104 + 8 * (u))
 
+/* These are valid for OMAP4 and OMAP5 as well */
 #define OMAP4_MAILBOX_IRQSTATUS(u)	(0x104 + 0x10 * (u))
 #define OMAP4_MAILBOX_IRQENABLE(u)	(0x108 + 0x10 * (u))
 #define OMAP4_MAILBOX_IRQENABLE_CLR(u)	(0x10c + 0x10 * (u))
@@ -141,7 +142,7 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
 	struct omap_mbox2_priv *p = mbox->priv;
 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
 
-	if (!cpu_is_omap44xx())
+	if (!(cpu_is_omap44xx() || soc_is_omap54xx()))
 		bit = mbox_read_reg(p->irqdisable) & ~bit;
 
 	mbox_write_reg(bit, p->irqdisable);
@@ -175,7 +176,7 @@ static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
 	int i;
 	struct omap_mbox2_priv *p = mbox->priv;
 	int nr_regs;
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap44xx() || soc_is_omap54xx())
 		nr_regs = OMAP4_MBOX_NR_REGS;
 	else
 		nr_regs = MBOX_NR_REGS;
@@ -192,7 +193,7 @@ static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
 	int i;
 	struct omap_mbox2_priv *p = mbox->priv;
 	int nr_regs;
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap44xx() || soc_is_omap54xx())
 		nr_regs = OMAP4_MBOX_NR_REGS;
 	else
 		nr_regs = MBOX_NR_REGS;
@@ -247,7 +248,7 @@ static struct omap_mbox2_priv omap2_mbox_dsp_priv = {
 	.irqdisable	= MAILBOX_IRQENABLE(0),
 };
 
-struct omap_mbox mbox_dsp_info = {
+static struct omap_mbox mbox_dsp_info = {
 	.name	= "dsp",
 	.ops	= &omap2_mbox_ops,
 	.priv	= &omap2_mbox_dsp_priv,
@@ -255,7 +256,7 @@ struct omap_mbox mbox_dsp_info = {
 #endif
 
 #if defined(CONFIG_ARCH_OMAP3)
-struct omap_mbox *omap3_mboxes[] = { &mbox_dsp_info, NULL };
+static struct omap_mbox *omap3_mboxes[] = { &mbox_dsp_info, NULL };
 #endif
 
 #if defined(CONFIG_SOC_OMAP2420)
@@ -284,7 +285,7 @@ static struct omap_mbox mbox_iva_info = {
 #endif
 
 #ifdef CONFIG_ARCH_OMAP2
-struct omap_mbox *omap2_mboxes[] = {
+static struct omap_mbox *omap2_mboxes[] = {
 	&mbox_dsp_info,
 #ifdef CONFIG_SOC_OMAP2420
 	&mbox_iva_info,
@@ -293,7 +294,7 @@ struct omap_mbox *omap2_mboxes[] = {
 };
 #endif
 
-#if defined(CONFIG_ARCH_OMAP4)
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
 /* OMAP4 */
 static struct omap_mbox2_priv omap2_mbox_1_priv = {
 	.tx_fifo = {
@@ -311,7 +312,7 @@ static struct omap_mbox2_priv omap2_mbox_1_priv = {
 	.irqdisable	= OMAP4_MAILBOX_IRQENABLE_CLR(0),
 };
 
-struct omap_mbox mbox_1_info = {
+static struct omap_mbox mbox_1_info = {
 	.name	= "mailbox-1",
 	.ops	= &omap2_mbox_ops,
 	.priv	= &omap2_mbox_1_priv,
@@ -333,13 +334,13 @@ static struct omap_mbox2_priv omap2_mbox_2_priv = {
 	.irqdisable     = OMAP4_MAILBOX_IRQENABLE_CLR(0),
 };
 
-struct omap_mbox mbox_2_info = {
+static struct omap_mbox mbox_2_info = {
 	.name	= "mailbox-2",
 	.ops	= &omap2_mbox_ops,
 	.priv	= &omap2_mbox_2_priv,
 };
 
-struct omap_mbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
+static struct omap_mbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
 #endif
 
 static int __devinit omap2_mbox_probe(struct platform_device *pdev)
@@ -369,8 +370,8 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
 		list[1]->irq = platform_get_irq_byname(pdev, "iva");
 	}
 #endif
-#if defined(CONFIG_ARCH_OMAP4)
-	else if (cpu_is_omap44xx()) {
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
+	else if (cpu_is_omap44xx() || soc_is_omap54xx()) {
 		list = omap4_mboxes;
 
 		list[0]->irq = list[1]->irq = platform_get_irq(pdev, 0);
@@ -382,6 +383,9 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
 	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!mem)
+		return -ENODEV;
+
 	mbox_base = ioremap(mem->start, resource_size(mem));
 	if (!mbox_base)
 		return -ENOMEM;

@@ -253,6 +253,8 @@ void omap_ctrl_write_dsp_boot_addr(u32 bootaddr)
 	u32 offset = cpu_is_omap243x() ? OMAP243X_CONTROL_IVA2_BOOTADDR :
 		     cpu_is_omap34xx() ? OMAP343X_CONTROL_IVA2_BOOTADDR :
 		     cpu_is_omap44xx() ? OMAP4_CTRL_MODULE_CORE_DSP_BOOTADDR :
+			/* FIXME: use OMAP5 define when available */
+		     soc_is_omap54xx() ? OMAP4_CTRL_MODULE_CORE_DSP_BOOTADDR :
 		     0;
 
 	if (!offset) {

@@ -254,8 +254,11 @@ int __init dma_declare_contiguous(struct device *dev, unsigned long size,
 
 	/* Reserve memory */
 	if (base) {
-		if (memblock_is_region_reserved(base, size) ||
+		if (/*memblock_is_region_reserved(base, size) ||*/
 		    memblock_reserve(base, size) < 0) {
+			pr_err("error reserving the memory\n");
+			if (memblock_is_region_reserved(base, size))
+				pr_err("memory already reserved!!!!!\n");
 			base = -EBUSY;
 			goto err;
 		}
