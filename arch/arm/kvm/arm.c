@@ -199,7 +199,7 @@ int kvm_dev_ioctl_check_extension(long ext)
 	case KVM_CAP_COALESCED_MMIO:
 		r = KVM_COALESCED_MMIO_PAGE_OFFSET;
 		break;
-	case KVM_CAP_SET_DEVICE_ADDR:
+	case KVM_CAP_ARM_SET_DEVICE_ADDR:
 		r = 1;
 		break;
 	case KVM_CAP_NR_VCPUS:
@@ -898,8 +898,8 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 	return -EINVAL;
 }
 
-static int kvm_vm_ioctl_set_device_address(struct kvm *kvm,
-					   struct kvm_device_address *dev_addr)
+static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
+					struct kvm_arm_device_addr *dev_addr)
 {
 	unsigned long dev_id, type;
 
@@ -931,12 +931,12 @@ long kvm_arch_vm_ioctl(struct file *filp,
 			return -ENXIO;
 	}
 #endif
-	case KVM_SET_DEVICE_ADDRESS: {
-		struct kvm_device_address dev_addr;
+	case KVM_ARM_SET_DEVICE_ADDR: {
+		struct kvm_arm_device_addr dev_addr;
 
 		if (copy_from_user(&dev_addr, argp, sizeof(dev_addr)))
 			return -EFAULT;
-		return kvm_vm_ioctl_set_device_address(kvm, &dev_addr);
+		return kvm_vm_ioctl_set_device_addr(kvm, &dev_addr);
 	}
 	default:
 		return -EINVAL;
