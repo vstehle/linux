@@ -234,6 +234,16 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
 			  vcpu->arch.vgic_cpu.pending_shared);
 }
 
+static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
+{
+	return *((u32 *)mmio->data) & mask;
+}
+
+static void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
+{
+	*((u32 *)mmio->data) = value & mask;
+}
+
 /**
  * vgic_reg_access - access vgic register
  * @mmio:   pointer to the data describing the mmio access
@@ -248,8 +258,8 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
 static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
 			    phys_addr_t offset, int mode)
 {
-	int shift = (offset & 3) * 8;
-	u32 mask;
+	int word_offset = (offset & 3) * 8;
+	u32 mask = (1UL << (mmio->len * 8)) - 1;
 	u32 regval;
 
 	/*
@@ -257,7 +267,6 @@ static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
 	 * directly (ARM ARM B3.12.7 "Prioritization of aborts").
 	 */
 
-	mask = (~0U) >> shift;
 	if (reg) {
 		regval = *reg;
 	} else {
@@ -266,7 +275,7 @@ static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
 	}
 
 	if (mmio->is_write) {
-		u32 data = (*((u32 *)mmio->data) & mask) << shift;
+		u32 data = mmio_data_read(mmio, mask) << word_offset;
 		switch (ACCESS_WRITE_MASK(mode)) {
 		case ACCESS_WRITE_IGNORED:
 			return;
@@ -280,7 +289,7 @@ static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
 			break;
 
 		case ACCESS_WRITE_VALUE:
-			regval = (regval & ~(mask << shift)) | data;
+			regval = (regval & ~(mask << word_offset)) | data;
 			break;
 		}
 		*reg = regval;
@@ -291,7 +300,7 @@ static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
 			/* fall through */
 
 		case ACCESS_READ_VALUE:
-			*((u32 *)mmio->data) = (regval >> shift) & mask;
+			mmio_data_write(mmio, mask, regval >> word_offset);
 		}
 	}
 }
@@ -699,6 +708,12 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
 	    mmio->phys_addr < base ||
 	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
 		return false;
+
+	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
+	if (mmio->len > 4) {
+		kvm_inject_dabt(vcpu, mmio->phys_addr);
+		return true;
+	}
 
 	range = find_matching_range(vgic_ranges, mmio, base);
 	if (unlikely(!range || !range->handle_mmio)) {
@@ -1342,9 +1357,7 @@ int kvm_vgic_hyp_init(void)
 	}
 
 	vgic_nr_lr = readl_relaxed(vgic_vctrl_base + GICH_VTR);
-	vgic_nr_lr = (vgic_nr_lr & 0x1f) + 1;
-	if (vgic_nr_lr > VGIC_MAX_LRS)
-		vgic_nr_lr = VGIC_MAX_LRS; /* TODO: Clear remaining LRs */
+	vgic_nr_lr = (vgic_nr_lr & 0x3f) + 1;
 
 	ret = create_hyp_io_mappings(vgic_vctrl_base,
 				     vgic_vctrl_base + resource_size(&vctrl_res),
