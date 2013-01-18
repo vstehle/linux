@@ -35,7 +35,11 @@
 			compatible = "arm,cortex-a15";
 			timer {
 				compatible = "arm,armv7-timer";
-				/* 14th PPI IRQ, active low level-sensitive */
+				/*
+				 * PPI secure/nonsecure IRQ,
+				 * active low level-sensitive
+				 */
+				interrupts = <1 13 0x308>;
 				interrupts = <1 14 0x308>;
 				clock-frequency = <6144000>;
 			};
@@ -44,7 +48,11 @@
 			compatible = "arm,cortex-a15";
 			timer {
 				compatible = "arm,armv7-timer";
-				/* 14th PPI IRQ, active low level-sensitive */
+				/*
+				 * PPI secure/nonsecure IRQ,
+				 * active low level-sensitive
+				 */
+				interrupts = <1 13 0x308>;
 				interrupts = <1 14 0x308>;
 				clock-frequency = <6144000>;
 			};
