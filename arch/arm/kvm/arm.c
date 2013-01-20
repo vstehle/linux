@@ -920,8 +920,10 @@ static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
 {
 	unsigned long dev_id, type;
 
-	dev_id = (dev_addr->id & KVM_DEVICE_ID_MASK) >> KVM_DEVICE_ID_SHIFT;
-	type = (dev_addr->id & KVM_DEVICE_TYPE_MASK) >> KVM_DEVICE_TYPE_SHIFT;
+	dev_id = (dev_addr->id & KVM_ARM_DEVICE_ID_MASK) >>
+		KVM_ARM_DEVICE_ID_SHIFT;
+	type = (dev_addr->id & KVM_ARM_DEVICE_TYPE_MASK) >>
+		KVM_ARM_DEVICE_TYPE_SHIFT;
 
 	switch (dev_id) {
 	case KVM_ARM_DEVICE_VGIC_V2:

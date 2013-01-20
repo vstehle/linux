@@ -65,11 +65,11 @@ struct kvm_regs {
 #define KVM_ARM_TARGET_CORTEX_A15	0
 #define KVM_ARM_NUM_TARGETS		1
 
-/* KVM_SET_DEVICE_ADDRESS ioctl id encoding */
-#define KVM_DEVICE_TYPE_SHIFT		0
-#define KVM_DEVICE_TYPE_MASK		(0xffff << KVM_DEVICE_TYPE_SHIFT)
-#define KVM_DEVICE_ID_SHIFT		16
-#define KVM_DEVICE_ID_MASK		(0xffff << KVM_DEVICE_ID_SHIFT)
+/* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+#define KVM_ARM_DEVICE_TYPE_SHIFT	0
+#define KVM_ARM_DEVICE_TYPE_MASK	(0xffff << KVM_ARM_DEVICE_TYPE_SHIFT)
+#define KVM_ARM_DEVICE_ID_SHIFT		16
+#define KVM_ARM_DEVICE_ID_MASK		(0xffff << KVM_ARM_DEVICE_ID_SHIFT)
 
 /* Supported device IDs */
 #define KVM_ARM_DEVICE_VGIC_V2		0
