@@ -83,7 +83,7 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
 	} while (pgd++, addr = next, addr != end);
 }
 
-#ifdef CONFIG_ARM_VIRT_EXT
+#if defined(CONFIG_ARM_VIRT_EXT) && defined(CONFIG_ARM_LPAE)
 pgd_t *hyp_pgd;
 
 extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
