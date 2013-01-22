@@ -553,7 +553,6 @@ static int hdmi_power_on_core(struct omap_dss_device *dssdev)
 
 	/* Make selection of HDMI in DSS */
 	dss_select_hdmi_venc_clk_source(DSS_HDMI_M_PCLK);
-
 	return 0;
 
 err_runtime_get:
@@ -1206,6 +1205,9 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 
 	mutex_init(&hdmi.lock);
 	mutex_init(&hdmi.ip_data.lock);
+
+	hdmi.ip_data.cfg.cm.code = 16;
+	hdmi.ip_data.cfg.cm.mode = HDMI_HDMI;
 
 	dss_init_hdmi_ip_ops(&hdmi.ip_data, omapdss_get_version());
 
