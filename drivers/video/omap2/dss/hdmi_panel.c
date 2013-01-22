@@ -64,6 +64,8 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 
 	dssdev->panel.timings = default_timings;
 
+	dssdev->panel.timings = (struct omap_video_timings){1920, 1080, 148500, 44, 88, 148, 5, 4, 36};
+
 	DSSDBG("hdmi_panel_probe x_res= %d y_res = %d\n",
 		dssdev->panel.timings.x_res,
 		dssdev->panel.timings.y_res);
