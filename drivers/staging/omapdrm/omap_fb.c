@@ -276,7 +276,7 @@ int omap_framebuffer_replace(struct drm_framebuffer *a,
 		}
 	}
 
-	if (ret) {
+	if (ret && a) {
 		/* something went wrong.. unpin what has been pinned */
 		for (i = 0; i < nb; i++) {
 			if (pinned_mask & (1 << i)) {
