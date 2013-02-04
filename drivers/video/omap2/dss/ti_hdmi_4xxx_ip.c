@@ -37,6 +37,7 @@
 #include "ti_hdmi_4xxx_ip.h"
 #include "dss.h"
 #include "dss_features.h"
+#include "../arch/arm/mach-omap2/soc.h"
 
 /* define here the required offset inside the core address space */
 #define HDMI_CORE_SYS 0
