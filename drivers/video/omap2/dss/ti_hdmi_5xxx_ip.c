@@ -30,6 +30,7 @@
 
 #include "ti_hdmi_5xxx_ip.h"
 #include "dss.h"
+#include "../arch/arm/mach-omap2/soc.h"
 
 static inline void hdmi_write_reg(void __iomem *base_addr,
 		const unsigned long idx, u32 val)
@@ -84,7 +85,7 @@ static void hdmi_core_ddc_init(struct hdmi_ip_data *ip_data)
 	/* SDA vs SCL delay*/
 	if ((omap_rev() == OMAP5430_REV_ES2_0) ||
 		(omap_rev() == OMAP5432_REV_ES2_0))
-		REG_FLD_MOD(core_i2cm_base, HDMI_CORE_SDA_HOLD_ADDR, 0x19, 7, 0);
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_SDA_HOLD_ADDR, 0x19, 7, 0);
 
 	/*Mask the interrupts*/
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x0, 2, 2);
