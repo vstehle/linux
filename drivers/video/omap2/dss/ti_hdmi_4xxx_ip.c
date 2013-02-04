@@ -264,7 +264,8 @@ static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
 
 	mutex_lock(&ip_data->lock);
 
-	hpd = gpio_get_value(ip_data->hpd_gpio);
+//	hpd = gpio_get_value(ip_data->hpd_gpio);
+	hpd = true;
 
 	if (hpd)
 		r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_TXON);
