@@ -149,11 +149,11 @@ static int omap_rproc_start(struct rproc *rproc)
 	}
 
 	for (i = 0; i < pdata->timers_cnt; i++) {
-		timers[i].odt = omap_dm_timer_request_specific(timers[i].id);
+		timers[i].odt = omap_dm_timer_request_by_name(timers[i].name);
 		if (!timers[i].odt) {
 			ret = -EBUSY;
-			dev_err(dev, "request for timer %d failed: %d\n",
-							timers[i].id, ret);
+			dev_err(dev, "request for timer '%s' failed: %d\n",
+							timers[i].name, ret);
 			goto err_timers;
 		}
 		omap_dm_timer_set_source(timers[i].odt, OMAP_TIMER_SRC_SYS_CLK);

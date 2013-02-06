@@ -27,7 +27,7 @@ struct platform_device;
  * @odt: timer pointer
  */
 struct omap_rproc_timers_info {
-	int id;
+	const char *name;
 	struct omap_dm_timer *odt;
 };
 
