@@ -26,6 +26,7 @@
 #include "omap_dce.h"
 
 #include "dce_rpc.h"
+#include "../arch/arm/mach-omap2/soc.h"
 
 /* TODO: split util stuff into other file..  maybe split out some of the
  * _process() munging stuff..
@@ -1232,7 +1233,7 @@ static int rpmsg_probe(struct rpmsg_channel *_rpdev)
 	return omap_drm_register_plugin(&plugin);
 }
 
-static void __devexit rpmsg_remove(struct rpmsg_channel *_rpdev)
+static void rpmsg_remove(struct rpmsg_channel *_rpdev)
 {
 	DBG("");
 	omap_drm_unregister_plugin(&plugin);
@@ -1265,7 +1266,7 @@ static struct rpmsg_driver rpmsg_driver = {
 		.id_table       = rpmsg_id_table,
 		.probe          = rpmsg_probe,
 		.callback       = rpmsg_cb,
-		.remove         = __devexit_p(rpmsg_remove),
+		.remove         = rpmsg_remove,
 };
 
 static int __init omap_dce_init(void)
