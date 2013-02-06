@@ -45,7 +45,7 @@ static const char * const ipu_rst_names[] = {
 };
 
 static struct omap_rproc_timers_info ipu_timers[] = {
-	{ .id = 3 },
+	{ .name = "48034000.timer" /* timer 3 */ },
 };
 #endif
 
@@ -55,7 +55,7 @@ static const char * const dsp_rst_names[] = {
 };
 
 static struct omap_rproc_timers_info dsp_timers[] = {
-	{ .id = 5 },
+	{ .name = "40138000.timer" /* timer 5 */ },
 };
 #endif
 
