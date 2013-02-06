@@ -22,8 +22,8 @@
 #include <linux/platform_data/iommu-omap.h>
 
 #include "omap-iommu.h"
-#include <plat/omap_hwmod.h>
-#include "clockdomain.h"
+#include "../arch/arm/mach-omap2/omap_hwmod.h"
+#include "../arch/arm/mach-omap2/clockdomain.h"
 
 /*
  * omap2 architecture specific register bit definitions
