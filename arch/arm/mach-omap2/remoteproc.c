@@ -21,12 +21,13 @@
 #include <linux/dma-contiguous.h>
 #include <linux/dma-mapping.h>
 
-#include <plat/omap_device.h>
-#include <plat/omap_hwmod.h>
+#include "omap_device.h"
+#include "omap_hwmod.h"
 #include <linux/platform_data/remoteproc-omap.h>
-#include <plat/iommu.h>
+#include <linux/platform_data/iommu-omap.h>
 
 #include "control.h"
+#include "soc.h"
 
 /*
  * Temporarily define the CMA base address explicitly.
