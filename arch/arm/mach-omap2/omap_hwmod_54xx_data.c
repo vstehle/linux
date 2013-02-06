@@ -2588,7 +2588,7 @@ static struct omap_hwmod_addr_space omap54xx_ipu_mmu_addrs[] = {
 static struct omap_hwmod_ocp_if omap54xx_l3_main_2__ipu_mmu = {
 	.master         = &omap54xx_l3_main_2_hwmod,
 	.slave          = &omap54xx_ipu_mmu_hwmod,
-	.clk            = "l3_div_ck",
+	.clk            = "l3_iclk_div",
 	.addr           = omap54xx_ipu_mmu_addrs,
 	.user           = OCP_USER_MPU | OCP_USER_SDMA,
 };
