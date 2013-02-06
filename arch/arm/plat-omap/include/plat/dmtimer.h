@@ -127,6 +127,7 @@ struct omap_dm_timer {
 int omap_dm_timer_reserve_systimer(int id);
 struct omap_dm_timer *omap_dm_timer_request(void);
 struct omap_dm_timer *omap_dm_timer_request_specific(int timer_id);
+struct omap_dm_timer *omap_dm_timer_request_by_name(const char *name);
 struct omap_dm_timer *omap_dm_timer_request_by_cap(u32 cap);
 int omap_dm_timer_free(struct omap_dm_timer *timer);
 void omap_dm_timer_enable(struct omap_dm_timer *timer);
