@@ -2644,7 +2644,7 @@ static struct omap_hwmod_addr_space omap54xx_dsp_mmu_addrs[] = {
 static struct omap_hwmod_ocp_if omap54xx_l4_cfg__dsp_mmu = {
 	.master         = &omap54xx_l4_cfg_hwmod,
 	.slave          = &omap54xx_dsp_mmu_hwmod,
-	.clk            = "l4_div_ck",
+	.clk            = "l4_root_clk_div",
 	.addr           = omap54xx_dsp_mmu_addrs,
 	.user           = OCP_USER_MPU | OCP_USER_SDMA,
 };
