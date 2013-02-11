@@ -746,7 +746,8 @@ bool omapdss_hdmi_detect(void)
 	hdmi_runtime_put();
 	mutex_unlock(&hdmi.lock);
 
-	return r == 1;
+//	return r == 1;
+	return 1;
 }
 
 int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev)

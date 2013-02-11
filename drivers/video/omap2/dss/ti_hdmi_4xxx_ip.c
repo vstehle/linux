@@ -554,7 +554,8 @@ again:
 
 bool ti_hdmi_4xxx_detect(struct hdmi_ip_data *ip_data)
 {
-	return gpio_get_value(ip_data->hpd_gpio);
+//	return gpio_get_value(ip_data->hpd_gpio);
+	return true;
 }
 
 static void hdmi_core_init(struct hdmi_core_video_config *video_cfg,
