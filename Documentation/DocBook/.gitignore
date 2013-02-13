@@ -12,3 +12,4 @@
 *.gif
 media-indices.tmpl
 media-entities.tmpl
+/media_api/
