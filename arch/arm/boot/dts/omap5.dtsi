@@ -106,6 +106,7 @@
 			#interrupt-cells = <3>;
 			reg = <0x48211000 0x1000>,
 			      <0x48212000 0x1000>;
+			interrupts = <1 9 0xf04>;
 		};
 
 		gpio1: gpio@4ae10000 {
