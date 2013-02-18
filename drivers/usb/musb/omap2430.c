@@ -488,7 +488,7 @@ static const struct musb_platform_ops omap2430_ops = {
 	.disable	= omap2430_musb_disable,
 };
 
-static u64 omap2430_dmamask = DMA_BIT_MASK(32);
+static u64 omap2430_dmamask = DMA_BIT_MASK(64);
 
 static int omap2430_probe(struct platform_device *pdev)
 {

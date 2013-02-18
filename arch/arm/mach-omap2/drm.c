@@ -35,7 +35,7 @@ static struct omap_drm_platform_data platform_data;
 
 static struct platform_device omap_drm_device = {
 	.dev = {
-		.coherent_dma_mask = DMA_BIT_MASK(32),
+		.coherent_dma_mask = DMA_BIT_MASK(64),
 		.platform_data = &platform_data,
 	},
 	.name = "omapdrm",

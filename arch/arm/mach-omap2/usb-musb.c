@@ -53,7 +53,7 @@ static struct musb_hdrc_platform_data musb_plat = {
 	.power		= 50,			/* up to 100 mA */
 };
 
-static u64 musb_dmamask = DMA_BIT_MASK(32);
+static u64 musb_dmamask = DMA_BIT_MASK(64);
 
 static struct omap_musb_board_data musb_default_board_data = {
 	.interface_type		= MUSB_INTERFACE_ULPI,

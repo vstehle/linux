@@ -113,7 +113,7 @@
 /* Enable Tx and Rx phys */
 #define SATA_PWRCTL_CLK_CMD			3
 
-static u64				sata_dmamask = DMA_BIT_MASK(32);
+static u64				sata_dmamask = DMA_BIT_MASK(64);
 static struct ahci_platform_data	sata_pdata;
 static struct clk			*sata_ref_clk;
 
@@ -363,7 +363,7 @@ void __init omap_sata_init(void)
 	dev = &pdev->dev;
 	get_device(dev);
 	dev->dma_mask = &sata_dmamask;
-	dev->coherent_dma_mask = DMA_BIT_MASK(32);
+	dev->coherent_dma_mask = DMA_BIT_MASK(64);
 	put_device(dev);
 }
 #else

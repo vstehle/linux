@@ -666,7 +666,7 @@ static struct platform_device *pdev;
 static const struct platform_device_info omap_dma_dev_info = {
 	.name = "omap-dma-engine",
 	.id = -1,
-	.dma_mask = DMA_BIT_MASK(32),
+	.dma_mask = DMA_BIT_MASK(64),
 };
 
 static int omap_dma_init(void)

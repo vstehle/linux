@@ -139,7 +139,7 @@ static struct platform_device tusb_device = {
 	.id		= -1,
 	.dev = {
 		.dma_mask		= &tusb_dmamask,
-		.coherent_dma_mask	= 0xffffffff,
+		.coherent_dma_mask	= DMA_BIT_MASK(64),
 	},
 	.num_resources	= ARRAY_SIZE(tusb_resources),
 	.resource	= tusb_resources,

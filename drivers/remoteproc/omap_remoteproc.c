@@ -186,7 +186,7 @@ static int omap_rproc_probe(struct platform_device *pdev)
 	struct rproc *rproc;
 	int ret;
 
-	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64));
 	if (ret) {
 		dev_err(&pdev->dev, "dma_set_coherent_mask: %d\n", ret);
 		return ret;
