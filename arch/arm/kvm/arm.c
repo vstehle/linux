@@ -284,6 +284,12 @@ out:
 	return ERR_PTR(err);
 }
 
+/* Hack! */
+int kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
+{
+	return 0;
+}
+
 void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
 {
 	kvm_mmu_free_memory_caches(vcpu);
@@ -306,11 +312,11 @@ int __attribute_const__ kvm_target_cpu(void)
 	unsigned long implementor = read_cpuid_implementor();
 	unsigned long part_number = read_cpuid_part_number();
 
-	if (implementor != IMPLEMENTOR_ARM)
+	if (implementor != ARM_CPU_IMP_ARM)
 		return -EINVAL;
 
 	switch (part_number) {
-	case PART_NUMBER_CORTEX_A15:
+	case ARM_CPU_PART_CORTEX_A15:
 		return KVM_ARM_TARGET_CORTEX_A15;
 	default:
 		return -EINVAL;
