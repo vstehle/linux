@@ -29,6 +29,7 @@
 #include "iomap.h"
 #include "omap_hwmod.h"
 #include "omap_device.h"
+#include <plat/gpu.h>
 #include "omap4-keypad.h"
 
 #include "soc.h"
@@ -370,36 +371,6 @@ static void __init omap_init_dmic(void)
 static inline void omap_init_dmic(void) {}
 #endif
 
-#if defined(CONFIG_SND_OMAP_SOC_OMAP_HDMI) || \
-		defined(CONFIG_SND_OMAP_SOC_OMAP_HDMI_MODULE)
-
-static struct platform_device omap_hdmi_audio = {
-	.name	= "omap-hdmi-audio",
-	.id	= -1,
-};
-
-static void __init omap_init_hdmi_audio(void)
-{
-	struct omap_hwmod *oh;
-	struct platform_device *pdev;
-
-	oh = omap_hwmod_lookup("dss_hdmi");
-	if (!oh) {
-		printk(KERN_ERR "Could not look up dss_hdmi hw_mod\n");
-		return;
-	}
-
-	pdev = omap_device_build("omap-hdmi-audio-dai",
-		-1, oh, NULL, 0, NULL, 0, 0);
-	WARN(IS_ERR(pdev),
-	     "Can't build omap_device for omap-hdmi-audio-dai.\n");
-
-	platform_device_register(&omap_hdmi_audio);
-}
-#else
-static inline void omap_init_hdmi_audio(void) {}
-#endif
-
 #if defined(CONFIG_SPI_OMAP24XX) || defined(CONFIG_SPI_OMAP24XX_MODULE)
 
 #include <linux/platform_data/spi-omap2-mcspi.h>
@@ -708,6 +679,91 @@ static void __init omap_init_ocp2scp(void)
 static inline void omap_init_ocp2scp(void) { }
 #endif
 
+static struct omap_device_pm_latency omap_drm_latency[] = {
+	[0] = {
+		.deactivate_func	= omap_device_idle_hwmods,
+		.activate_func		= omap_device_enable_hwmods,
+		.flags			= OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+/**
+ * change_clock_parent - try to change a clock's parent
+ * @dev: device pointer to change parent
+ * @name: string containing the new requested parent's name
+ */
+static int change_clock_parent(struct device *dev, char *name)
+{
+	int ret;
+	struct clk *fclk, *parent;
+
+	fclk = clk_get(dev, "fck");
+	if (IS_ERR_OR_NULL(fclk)) {
+		dev_err(dev, "%s: %d: clk_get() FAILED\n",
+				__func__, __LINE__);
+		return -EINVAL;
+	}
+
+	parent = clk_get(dev, name);
+	if (IS_ERR_OR_NULL(parent)) {
+		dev_err(dev, "%s: %d: clk_get() %s FAILED\n",
+			__func__, __LINE__, name);
+		clk_put(fclk);
+		return -EINVAL;
+	}
+
+	ret = clk_set_parent(fclk, parent);
+	if (IS_ERR_VALUE(ret)) {
+		dev_err(dev, "%s: clk_set_parent() to %s FAILED\n",
+			__func__, name);
+		ret = -EINVAL;
+	}
+
+	clk_put(parent);
+	clk_put(fclk);
+
+	return ret;
+}
+
+static void omap_init_gpu(void)
+{
+	struct omap_hwmod *oh;
+	struct platform_device *od;
+	struct gpu_platform_data *pdata;
+    const char *oh_name = "gpu";
+	char *name = "omapdrm_pvr";
+
+	oh = omap_hwmod_lookup(oh_name);
+	if (!oh) {
+		pr_err("omap_init_gpu: Could not look up %s\n", oh_name);
+		return;
+	}
+
+	pdata = kzalloc(sizeof(struct gpu_platform_data),
+					GFP_KERNEL);
+	if (!pdata) {
+		pr_err("omap_init_gpu: Platform data memory allocation failed\n");
+		return;
+	}
+
+	pdata->device_enable = omap_device_enable;
+	pdata->device_idle = omap_device_idle;
+	pdata->device_shutdown = omap_device_shutdown;
+
+	od = omap_device_build(name, 0, oh, pdata,
+			     sizeof(struct gpu_platform_data),
+			     omap_drm_latency, ARRAY_SIZE(omap_drm_latency), 0);
+	WARN(IS_ERR(od), "Could not build omap_device for %s %s\n",
+	     name, oh_name);
+
+	if (od && cpu_is_omap44xx()) {
+		change_clock_parent(&((*od).dev), "dpll_per_m7x2_ck");
+		pr_info("Updated GPU clock source to be dpll_per_m7x2_ck\n");
+	}
+
+	kfree(pdata);
+}
+
 /*-------------------------------------------------------------------------*/
 
 static int __init omap2_init_devices(void)
@@ -722,7 +778,6 @@ static int __init omap2_init_devices(void)
 	 */
 	omap_init_audio();
 	omap_init_camera();
-	omap_init_hdmi_audio();
 	omap_init_mbox();
 	/* If dtb is there, the devices will be created dynamically */
 	if (!of_have_populated_dt()) {
@@ -740,6 +795,7 @@ static int __init omap2_init_devices(void)
 	omap_init_aes();
 	omap_init_vout();
 	omap_init_ocp2scp();
+	omap_init_gpu();
 
 	return 0;
 }

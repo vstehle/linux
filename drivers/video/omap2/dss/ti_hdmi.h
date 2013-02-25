@@ -63,6 +63,22 @@ struct hdmi_pll_info {
 	enum hdmi_clk_refsel refsel;
 };
 
+struct hdmi_irq_vector {
+	u8      pll_recal;
+	u8      pll_unlock;
+	u8      pll_lock;
+	u8      phy_disconnect;
+	u8      phy_connect;
+	u8      phy_short_5v;
+	u8      video_end_fr;
+	u8      video_vsync;
+	u8      fifo_sample_req;
+	u8      fifo_overflow;
+	u8      fifo_underflow;
+	u8      ocp_timeout;
+	u8      core;
+};
+
 struct ti_hdmi_ip_ops {
 
 	void (*video_configure)(struct hdmi_ip_data *ip_data);
@@ -105,6 +121,10 @@ struct ti_hdmi_ip_ops {
 
 	int (*audio_get_dma_port)(u32 *offset, u32 *size);
 #endif
+
+	int (*irq_handler) (struct hdmi_ip_data *ip_data);
+
+	int (*irq_core_handler) (struct hdmi_ip_data *ip_data);
 
 };
 
@@ -151,10 +171,9 @@ struct hdmi_core_infoframe_avi {
 
 struct hdmi_ip_data {
 	void __iomem	*base_wp;	/* HDMI wrapper */
-	unsigned long	core_sys_offset;
-	unsigned long	core_av_offset;
-	unsigned long	pll_offset;
-	unsigned long	phy_offset;
+	void __iomem	*base_pllctrl;	/* HDMI DPLL */
+	void __iomem	*base_txphyctrl;/* HDMI TXPHY */
+	void __iomem	*base_core;	/* HDMI IP CORE */
 	const struct ti_hdmi_ip_ops *ops;
 	struct hdmi_config cfg;
 	struct hdmi_pll_info pll_data;
@@ -172,6 +191,8 @@ int ti_hdmi_4xxx_wp_video_start(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_wp_video_stop(struct hdmi_ip_data *ip_data);
 int ti_hdmi_4xxx_pll_enable(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_pll_disable(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_irq_handler(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_core_irq_handler(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_basic_configure(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_wp_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 void ti_hdmi_4xxx_pll_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
@@ -187,4 +208,9 @@ int ti_hdmi_4xxx_audio_config(struct hdmi_ip_data *ip_data,
 		struct omap_dss_audio *audio);
 int ti_hdmi_4xxx_audio_get_dma_port(u32 *offset, u32 *size);
 #endif
+void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data);
+void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
+int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
+				u8 *edid, int len);
+int ti_hdmi_5xxx_core_irq_handler(struct hdmi_ip_data *ip_data);
 #endif
