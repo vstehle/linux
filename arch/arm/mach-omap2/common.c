@@ -15,6 +15,9 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_data/dsp-omap.h>
+#include <linux/io.h>
+#include <linux/dma-mapping.h>
+#include <linux/platform_data/remoteproc-omap.h>
 
 #include "common.h"
 #include "omap-secure.h"

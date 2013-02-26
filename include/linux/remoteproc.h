@@ -41,6 +41,7 @@
 #include <linux/virtio.h>
 #include <linux/completion.h>
 #include <linux/idr.h>
+#include <linux/pm_qos.h>
 
 /**
  * struct resource_table - firmware resource table header
@@ -330,11 +331,29 @@ struct rproc;
  * @start:	power on the device and boot it
  * @stop:	power off the device
  * @kick:	kick a virtqueue (virtqueue id given as a parameter)
+ * @set_latency		set latency on remote processor
+ * @set_bandwidth	set bandwidth on remote processor
+ * @set_frequency	set frequency of remote processor
  */
 struct rproc_ops {
 	int (*start)(struct rproc *rproc);
 	int (*stop)(struct rproc *rproc);
 	void (*kick)(struct rproc *rproc, int vqid);
+	int (*set_latency)(struct device *dev, struct rproc *rproc, long v);
+	int (*set_bandwidth)(struct device *dev, struct rproc *rproc, long v);
+	int (*set_frequency)(struct device *dev, struct rproc *rproc, long v);
+};
+
+/**
+ * enum rproc_constrants - remote processor available constraints
+ * @RPROC_CONSTRAINT_LATENCY:	set latency on remote processor
+ * @RPROC_CONSTRAINT_BANDWIDTH:	set bandwidth on remote processor
+ * @RPROC_CONSTRAINT_FREQUENCY: set frequency of remote processor
+ */
+enum rproc_constraint {
+	RPROC_CONSTRAINT_LATENCY,
+	RPROC_CONSTRAINT_BANDWIDTH,
+	RPROC_CONSTRAINT_FREQUENCY,
 };
 
 /**
@@ -401,6 +420,7 @@ enum rproc_crash_type {
  * @crash_comp: completion used to sync crash handler and the rproc reload
  * @recovery_disabled: flag that state if recovery was disabled
  * @max_notifyid: largest allocated notify id.
+ * @fw_version: human readable version information extracted from f/w
  */
 struct rproc {
 	struct klist_node node;
@@ -429,6 +449,7 @@ struct rproc {
 	struct completion crash_comp;
 	bool recovery_disabled;
 	int max_notifyid;
+	char *fw_version;
 };
 
 /* we currently support only two vrings per rvdev */
@@ -474,6 +495,9 @@ struct rproc_vdev {
 	unsigned long gfeatures;
 };
 
+struct rproc *rproc_get_by_name(const char *name);
+void rproc_put(struct rproc *rproc);
+
 struct rproc *rproc_alloc(struct device *dev, const char *name,
 				const struct rproc_ops *ops,
 				const char *firmware, int len);
@@ -484,6 +508,9 @@ int rproc_del(struct rproc *rproc);
 int rproc_boot(struct rproc *rproc);
 void rproc_shutdown(struct rproc *rproc);
 void rproc_report_crash(struct rproc *rproc, enum rproc_crash_type type);
+int rproc_pa_to_da(struct rproc *rproc, phys_addr_t pa, u64 *da);
+int rproc_set_constraints(struct device *dev, struct rproc *rproc,
+			  enum rproc_constraint type, long v);
 
 static inline struct rproc_vdev *vdev_to_rvdev(struct virtio_device *vdev)
 {

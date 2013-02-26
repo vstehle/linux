@@ -14,6 +14,8 @@
 #error "iommu for this processor not implemented yet"
 #endif
 
+#include <linux/platform_device.h>
+
 struct iotlb_entry {
 	u32 da;
 	u32 pa;
@@ -130,6 +132,7 @@ static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
 #define MMU_READ_CAM		0x68
 #define MMU_READ_RAM		0x6c
 #define MMU_EMU_FAULT_AD	0x70
+#define MMU_GP_REG		0x88
 
 #define MMU_REG_SIZE		256
 
@@ -162,6 +165,8 @@ static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
 #define MMU_RAM_MIXED_SHIFT	6
 #define MMU_RAM_MIXED_MASK	(1 << MMU_RAM_MIXED_SHIFT)
 #define MMU_RAM_MIXED		MMU_RAM_MIXED_MASK
+
+#define MMU_BUS_ERR_BACK_EN	0x1
 
 /*
  * utilities for super page(16MB, 1MB, 64KB and 4KB)

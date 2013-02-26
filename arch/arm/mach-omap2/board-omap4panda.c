@@ -32,6 +32,7 @@
 #include <linux/usb/musb.h>
 #include <linux/wl12xx.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
+#include <linux/platform_data/remoteproc-omap.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
@@ -132,6 +133,11 @@ static struct platform_device panda_spdif_dit_codec = {
 	.id             = -1,
 };
 
+static struct platform_device panda_hdmi_tpd12s015_audio = {
+	.name	= "omap-hdmi-tpd12s015-audio",
+	.id	= -1,
+};
+
 static struct platform_device btwilink_device = {
 	.name	= "btwilink",
 	.id	= -1,
@@ -143,6 +149,7 @@ static struct platform_device *panda_devices[] __initdata = {
 	&panda_abe_audio,
 	&panda_hdmi_audio_codec,
 	&panda_spdif_dit_codec,
+	&panda_hdmi_tpd12s015_audio,
 	&btwilink_device,
 };
 
@@ -458,11 +465,17 @@ static void __init omap4_panda_init(void)
 	omap4_panda_display_init();
 }
 
+static void __init omap4_panda_reserve(void)
+{
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+	omap_reserve();
+}
+
 MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
 	/* Maintainer: David Anders - Texas Instruments Inc */
 	.atag_offset	= 0x100,
 	.smp		= smp_ops(omap4_smp_ops),
-	.reserve	= omap_reserve,
+	.reserve	= omap4_panda_reserve,
 	.map_io		= omap4_map_io,
 	.init_early	= omap4430_init_early,
 	.init_irq	= gic_init_irq,

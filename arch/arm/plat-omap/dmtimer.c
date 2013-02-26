@@ -248,6 +248,37 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_request_specific);
 
+struct omap_dm_timer *omap_dm_timer_request_by_name(const char *name)
+{
+	struct omap_dm_timer *timer = NULL, *t;
+	unsigned long flags;
+	int ret = 0;
+
+	spin_lock_irqsave(&dm_timer_lock, flags);
+	list_for_each_entry(t, &omap_timer_list, node) {
+		if (!strcmp(t->pdev->name, name) && !t->reserved) {
+			timer = t;
+			timer->reserved = 1;
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&dm_timer_lock, flags);
+
+	if (timer) {
+		ret = omap_dm_timer_prepare(timer);
+		if (ret) {
+			timer->reserved = 0;
+			timer = NULL;
+		}
+	}
+
+	if (!timer)
+		pr_debug("%s: request for timer '%s' failed!\n", __func__, name);
+
+	return timer;
+}
+EXPORT_SYMBOL_GPL(omap_dm_timer_request_by_name);
+
 /**
  * omap_dm_timer_request_by_cap - Request a timer by capability
  * @cap:	Bit mask of capabilities to match

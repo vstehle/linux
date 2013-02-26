@@ -23,6 +23,8 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/delay.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
 
 #include <video/omapdss.h>
 #include "omap_hwmod.h"
@@ -597,4 +599,83 @@ int omap_dss_reset(struct omap_hwmod *oh)
 	r = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
 
 	return r;
+}
+
+static int __init hdmi_init_of(void)
+{
+	if (cpu_is_omap44xx()) {
+		enum omap_hdmi_flags flags;
+
+		/*
+		 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
+		 * later have external pull up on the HDMI I2C lines.
+		 */
+		/* FIXME: Ideally we should know from the DT whether if there is a
+		 * resistor. This could work with PandaES, as it is the only Panda
+		 * with 4460. For SDP, however, there are no dedicated DT files for
+		 * each processor board to know whether the pull-up resistor is
+		 * present.
+		 */
+		if (cpu_is_omap446x() || omap_rev() > OMAP4430_REV_ES2_2)
+			flags = OMAP_HDMI_SDA_SCL_EXTERNAL_PULLUP;
+		else
+			flags = 0;
+
+		omap4_hdmi_mux_pads(flags);
+	}
+
+	return 0;
+}
+
+int __init omapdss_init_of(void)
+{
+	int r;
+	struct platform_device *pdev;
+	struct device_node *node;
+	enum omapdss_version ver;
+
+	static struct omap_dss_board_info board_data = {
+		.dsi_enable_pads = omap_dsi_enable_pads,
+		.dsi_disable_pads = omap_dsi_disable_pads,
+		.get_context_loss_count = omap_pm_get_dev_context_loss_count,
+		.set_min_bus_tput = omap_dss_set_min_bus_tput,
+	};
+
+	ver = omap_display_get_version();
+
+	if (ver == OMAPDSS_VER_UNKNOWN) {
+		pr_err("DSS not supported on this SoC\n");
+		return -ENODEV;
+	}
+
+	board_data.version = ver;
+
+	/* find the main dss node  */
+	node = of_find_node_by_name(NULL, "dss");
+	if (!node)
+		return 0;
+
+	pdev = of_find_device_by_node(node);
+	if (!pdev) {
+		pr_err("Cannot find dss platform device\n");
+		return -EINVAL;
+	}
+
+	r = of_platform_populate(node, NULL, NULL, &pdev->dev);
+	if (r) {
+		pr_err("Failed to populate dss devices\n");
+		return -EINVAL;
+	}
+
+	omap_display_device.dev.platform_data = &board_data;
+
+	r = platform_device_register(&omap_display_device);
+	if (r < 0) {
+		pr_err("Unable to register omapdss device\n");
+		return r;
+	}
+
+	hdmi_init_of();
+
+	return 0;
 }

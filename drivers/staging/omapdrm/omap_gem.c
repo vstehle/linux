@@ -112,10 +112,21 @@ struct omap_gem_object {
 	 */
 	struct {
 		uint32_t write_pending;
-		uint32_t write_complete;
+		volatile uint32_t write_complete;
 		uint32_t read_pending;
-		uint32_t read_complete;
+		volatile uint32_t read_complete;
 	} *sync;
+
+	struct omap_gem_vm_ops *ops;
+
+	/**
+	 * per-mapper private data..
+	 *
+	 * TODO maybe there can be a more flexible way to store per-mapper data..
+	 * for now I just keep it simple, and since this is only accessible
+	 * externally via omap_gem_priv()/omap_get_set_priv()
+	 */
+	void *priv[MAX_MAPPERS];
 };
 
 static int get_pages(struct drm_gem_object *obj, struct page ***pages);
@@ -535,7 +546,6 @@ int omap_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	else
 		ret = fault_1d(obj, vma, vmf);
 
-
 fail:
 	mutex_unlock(&dev->struct_mutex);
 	switch (ret) {
@@ -597,6 +607,9 @@ int omap_gem_mmap_obj(struct drm_gem_object *obj,
 		vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
 	}
 
+	if (omap_obj->ops && omap_obj->ops->mmap) {
+		omap_obj->ops->mmap(obj->filp, vma);
+	}
 	return 0;
 }
 
@@ -964,6 +977,34 @@ void *omap_gem_vaddr(struct drm_gem_object *obj)
 	return omap_obj->vaddr;
 }
 
+#ifdef CONFIG_PM
+/* re-pin objects in DMM in resume path: */
+int omap_gem_resume(struct device *dev)
+{
+	struct drm_device *drm_dev = dev_get_drvdata(dev);
+	struct omap_drm_private *priv = drm_dev->dev_private;
+	struct omap_gem_object *omap_obj;
+	int ret = 0;
+
+	list_for_each_entry(omap_obj, &priv->obj_list, mm_list) {
+		if (omap_obj->block) {
+			struct drm_gem_object *obj = &omap_obj->base;
+			uint32_t npages = obj->size >> PAGE_SHIFT;
+			WARN_ON(!omap_obj->pages);  /* this can't happen */
+			ret = tiler_pin(omap_obj->block,
+					omap_obj->pages, npages,
+					omap_obj->roll, true);
+			if (ret) {
+				dev_err(dev, "could not repin: %d\n", ret);
+				return ret;
+			}
+		}
+	}
+
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_DEBUG_FS
 void omap_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
 {
@@ -1018,6 +1059,7 @@ void omap_gem_describe_objects(struct list_head *list, struct seq_file *m)
  */
 
 struct omap_gem_sync_waiter {
+	bool sync;
 	struct list_head list;
 	struct omap_gem_object *omap_obj;
 	enum omap_gem_op op;
@@ -1037,10 +1079,10 @@ static LIST_HEAD(waiters);
 static inline bool is_waiting(struct omap_gem_sync_waiter *waiter)
 {
 	struct omap_gem_object *omap_obj = waiter->omap_obj;
-	if ((waiter->op & OMAP_GEM_READ) &&
+	if ((waiter->op & OMAP_GEM_WRITE) &&
 			(omap_obj->sync->read_complete < waiter->read_target))
 		return true;
-	if ((waiter->op & OMAP_GEM_WRITE) &&
+	if ((waiter->op & (OMAP_GEM_READ|OMAP_GEM_WRITE)) &&
 			(omap_obj->sync->write_complete < waiter->write_target))
 		return true;
 	return false;
@@ -1048,23 +1090,48 @@ static inline bool is_waiting(struct omap_gem_sync_waiter *waiter)
 
 /* macro for sync debug.. */
 #define SYNCDBG 0
-#define SYNC(fmt, ...) do { if (SYNCDBG) \
-		printk(KERN_ERR "%s:%d: "fmt"\n", \
-				__func__, __LINE__, ##__VA_ARGS__); \
+#define SYNC(str, waiter) do { if (SYNCDBG) \
+		printk(KERN_ERR "%s:%d: "str": %p (%d/%d/%d, %d/%d/%d)\n", \
+				__func__, __LINE__, (waiter)->omap_obj, \
+				(waiter)->omap_obj->sync->read_pending, \
+				(waiter)->omap_obj->sync->read_complete, \
+				(waiter)->read_target, \
+				(waiter)->omap_obj->sync->write_pending, \
+				(waiter)->omap_obj->sync->write_complete, \
+				(waiter)->write_target); \
 	} while (0)
 
 
 static void sync_op_update(void)
 {
 	struct omap_gem_sync_waiter *waiter, *n;
+	LIST_HEAD(notified);
 	list_for_each_entry_safe(waiter, n, &waiters, list) {
 		if (!is_waiting(waiter)) {
 			list_del(&waiter->list);
-			SYNC("notify: %p", waiter);
-			waiter->notify(waiter->arg);
-			kfree(waiter);
+			if (waiter->sync) {
+				/* ugg! we need to dispatch with lock held... otherwise
+				 * in case of interrupted wait the waiter could be removed
+				 * from it's current list, which happens to be now the
+				 * 'notified' list, once the sync_lock is released..
+				 * There *must* be a less ugly way to do this..
+				 */
+				SYNC("notify", waiter);
+				waiter->notify(waiter->arg);
+			} else {
+				list_add_tail(&waiter->list, &notified);
+			}
 		}
 	}
+	spin_unlock(&sync_lock);
+	list_for_each_entry_safe(waiter, n, &notified, list) {
+		list_del(&waiter->list);
+		SYNC("notify", waiter);
+		waiter->notify(waiter->arg);
+		drm_gem_object_unreference_unlocked(&waiter->omap_obj->base);
+		kfree(waiter);
+	}
+	spin_lock(&sync_lock);
 }
 
 static inline int sync_op(struct drm_gem_object *obj,
@@ -1148,6 +1215,7 @@ int omap_gem_op_sync(struct drm_gem_object *obj, enum omap_gem_op op)
 		if (!waiter)
 			return -ENOMEM;
 
+		waiter->sync = true;
 		waiter->omap_obj = omap_obj;
 		waiter->op = op;
 		waiter->read_target = omap_obj->sync->read_pending;
@@ -1157,26 +1225,28 @@ int omap_gem_op_sync(struct drm_gem_object *obj, enum omap_gem_op op)
 
 		spin_lock(&sync_lock);
 		if (is_waiting(waiter)) {
-			SYNC("waited: %p", waiter);
+			SYNC("waited", waiter);
 			list_add_tail(&waiter->list, &waiters);
 			spin_unlock(&sync_lock);
 			ret = wait_event_interruptible(sync_event,
 					(waiter_task == NULL));
 			spin_lock(&sync_lock);
 			if (waiter_task) {
-				SYNC("interrupted: %p", waiter);
 				/* we were interrupted */
 				list_del(&waiter->list);
 				waiter_task = NULL;
-			} else {
-				/* freed in sync_op_update() */
-				waiter = NULL;
+				/* but we might be finished anyways */
+				if (!is_waiting(waiter)) {
+					SYNC("interrupted, but finished", waiter);
+					ret = 0;
+				} else {
+					SYNC("interrupted", waiter);
+				}
 			}
 		}
 		spin_unlock(&sync_lock);
 
-		if (waiter)
-			kfree(waiter);
+		kfree(waiter);
 	}
 	return ret;
 }
@@ -1201,6 +1271,7 @@ int omap_gem_op_async(struct drm_gem_object *obj, enum omap_gem_op op,
 		if (!waiter)
 			return -ENOMEM;
 
+		waiter->sync = false;
 		waiter->omap_obj = omap_obj;
 		waiter->op = op;
 		waiter->read_target = omap_obj->sync->read_pending;
@@ -1210,13 +1281,14 @@ int omap_gem_op_async(struct drm_gem_object *obj, enum omap_gem_op op,
 
 		spin_lock(&sync_lock);
 		if (is_waiting(waiter)) {
-			SYNC("waited: %p", waiter);
+			drm_gem_object_reference(obj);
+			SYNC("waited", waiter);
 			list_add_tail(&waiter->list, &waiters);
 			spin_unlock(&sync_lock);
 			return 0;
 		}
-
 		spin_unlock(&sync_lock);
+		kfree(waiter);
 	}
 
 	/* no waiting.. */
@@ -1481,3 +1553,69 @@ void omap_gem_deinit(struct drm_device *dev)
 	 */
 	kfree(usergart);
 }
+
+/****** PLUGIN API specific ******/
+
+/* This constructor is mainly to give plugins a way to wrap their
+ * own allocations
+ */
+struct drm_gem_object * omap_gem_new_ext(struct drm_device *dev,
+		union omap_gem_size gsize, uint32_t flags,
+		dma_addr_t paddr, struct page **pages,
+		struct omap_gem_vm_ops *ops)
+{
+	struct drm_gem_object *obj;
+
+	BUG_ON((flags & OMAP_BO_TILED) && !pages);
+
+	if (paddr)
+		flags |= OMAP_BO_DMA;
+
+	obj = omap_gem_new(dev, gsize, flags | OMAP_BO_EXT_MEM);
+	if (obj) {
+		struct omap_gem_object *omap_obj = to_omap_bo(obj);
+		omap_obj->paddr = paddr;
+		omap_obj->pages = pages;
+		omap_obj->ops = ops;
+	}
+	return obj;
+}
+
+void omap_gem_vm_open(struct vm_area_struct *vma)
+{
+	struct drm_gem_object *obj = vma->vm_private_data;
+	struct omap_gem_object *omap_obj = to_omap_bo(obj);
+
+	if (omap_obj->ops && omap_obj->ops->open) {
+		omap_obj->ops->open(vma);
+	}
+
+	drm_gem_vm_open(vma);
+}
+
+void omap_gem_vm_close(struct vm_area_struct *vma)
+{
+	struct drm_gem_object *obj = vma->vm_private_data;
+	struct omap_gem_object *omap_obj = to_omap_bo(obj);
+
+	if (omap_obj->ops && omap_obj->ops->close) {
+		omap_obj->ops->close(vma);
+		/* don't rely on close function to not have munged things up */
+		vma->vm_private_data = obj;
+	}
+
+	drm_gem_vm_close(vma);
+}
+
+void * omap_gem_priv(struct drm_gem_object *obj, int mapper_id)
+{
+	BUG_ON((mapper_id >= MAX_MAPPERS) || (mapper_id < 0));
+	return to_omap_bo(obj)->priv[mapper_id];
+}
+
+void omap_gem_set_priv(struct drm_gem_object *obj, int mapper_id, void *priv)
+{
+	BUG_ON((mapper_id >= MAX_MAPPERS) || (mapper_id < 0));
+	to_omap_bo(obj)->priv[mapper_id] = priv;
+}
+/*********************************/

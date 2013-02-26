@@ -15,6 +15,7 @@
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/irqdomain.h>
+#include <linux/platform_data/remoteproc-omap.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach/arch.h>
@@ -42,14 +43,7 @@ static void __init omap_generic_init(void)
 
 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 
-	/*
-	 * HACK: call display setup code for selected boards to enable omapdss.
-	 * This will be removed when omapdss supports DT.
-	 */
-	if (of_machine_is_compatible("ti,omap4-panda"))
-		omap4_panda_display_init_of();
-	else if (of_machine_is_compatible("ti,omap4-sdp"))
-		omap_4430sdp_display_init_of();
+	omapdss_init_of();
 }
 
 #ifdef CONFIG_SOC_OMAP2420
@@ -171,8 +165,14 @@ static const char *omap5_boards_compat[] __initdata = {
 	NULL,
 };
 
+static void __init omap5_reserve(void)
+{
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
+	omap_reserve();
+}
+
 DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
-	.reserve	= omap_reserve,
+	.reserve	= omap5_reserve,
 	.smp		= smp_ops(omap4_smp_ops),
 	.map_io		= omap5_map_io,
 	.init_early	= omap5_init_early,

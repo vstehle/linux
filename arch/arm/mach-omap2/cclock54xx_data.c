@@ -743,6 +743,10 @@ DEFINE_STRUCT_CLK(l3_iclk_div, iva_dpll_hs_clk_div_parents, c2c_fclk_ops);
 DEFINE_CLK_FIXED_FACTOR(func_128m_clk, "dpll_per_h11x2_ck", &dpll_per_h11x2_ck,
 			0x0, 1, 2);
 
+DEFINE_CLK_GATE(dsp_fck, "dpll_iva_h11x2_ck", &dpll_iva_h11x2_ck, 0x0,
+		OMAP54XX_CM_DSP_DSP_CLKCTRL, 0, 0x0,
+		NULL);
+
 DEFINE_CLK_FIXED_FACTOR(func_12m_fclk, "dpll_per_m2x2_ck", &dpll_per_m2x2_ck,
 			0x0, 1, 16);
 
@@ -766,6 +770,10 @@ DEFINE_CLK_MUX(gpu_core_gclk_mux, gpu_core_gclk_mux_parents, NULL, 0x0,
 DEFINE_CLK_MUX(gpu_hyd_gclk_mux, gpu_core_gclk_mux_parents, NULL, 0x0,
 	       OMAP54XX_CM_GPU_GPU_CLKCTRL, OMAP54XX_CLKSEL_GPU_HYD_GCLK_SHIFT,
 	       OMAP54XX_CLKSEL_GPU_HYD_GCLK_WIDTH, 0x0, NULL);
+
+DEFINE_CLK_GATE(sl2if_ick, "dpll_iva_h12x2_ck", &dpll_iva_h12x2_ck, 0x0,
+		OMAP54XX_CM_IVA_SL2_CLKCTRL, 0, 0x0,
+		NULL);
 
 static const char *gpu_l3_iclk_parents[] = {
 	"l3_iclk_div",
@@ -1396,6 +1404,14 @@ DEFINE_CLK_DIVIDER(fdif_fclk, "dpll_per_h11x2_ck", &dpll_per_h11x2_ck, 0x0,
 		   OMAP54XX_CM_CAM_FDIF_CLKCTRL, OMAP54XX_CLKSEL_FCLK_SHIFT,
 		   OMAP54XX_CLKSEL_FCLK_WIDTH, 0x0, NULL);
 
+DEFINE_CLK_GATE(ipu_fck, "dpll_core_h22x2_ck", &dpll_core_h22x2_ck, 0x0,
+		OMAP54XX_CM_IPU_IPU_CLKCTRL, 0, 0x0,
+		NULL);
+
+DEFINE_CLK_GATE(iva_fck, "dpll_iva_h12x2_ck", &dpll_iva_h12x2_ck, 0x0,
+		OMAP54XX_CM_IVA_IVA_CLKCTRL, 0, 0x0,
+		NULL);
+
 DEFINE_CLK_DIVIDER(hsi_fclk, "dpll_per_m2x2_ck", &dpll_per_m2x2_ck, 0x0,
 		   OMAP54XX_CM_L3INIT_HSI_CLKCTRL, OMAP54XX_CLKSEL_SHIFT,
 		   OMAP54XX_CLKSEL_WIDTH, 0x0, NULL);
@@ -1625,6 +1641,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_usb_ck",			&dpll_usb_ck,	CK_54XX),
 	CLK(NULL,	"dpll_usb_clkdcoldo",		&dpll_usb_clkdcoldo,	CK_54XX),
 	CLK(NULL,	"dpll_usb_m2_ck",		&dpll_usb_m2_ck,	CK_54XX),
+	CLK(NULL,	"dsp_fck",			&dsp_fck,	CK_54XX),
 	CLK(NULL,	"dss_syc_gfclk_div",		&dss_syc_gfclk_div,	CK_54XX),
 	CLK(NULL,	"l3_iclk_div",			&l3_iclk_div,	CK_54XX),
 	CLK(NULL,	"func_128m_clk",		&func_128m_clk,	CK_54XX),
@@ -1663,10 +1680,13 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"gpio7_dbclk",			&gpio7_dbclk,	CK_54XX),
 	CLK(NULL,	"gpio8_dbclk",			&gpio8_dbclk,	CK_54XX),
 	CLK(NULL,	"iss_ctrlclk",			&iss_ctrlclk,	CK_54XX),
+	CLK(NULL,	"ipu_fck",			&ipu_fck,	CK_54XX),
+	CLK(NULL,	"iva_fck",			&iva_fck,	CK_54XX),
 	CLK(NULL,	"lli_txphy_clk",		&lli_txphy_clk,	CK_54XX),
 	CLK(NULL,	"lli_txphy_ls_clk",		&lli_txphy_ls_clk,	CK_54XX),
 	CLK(NULL,	"mmc1_32khz_clk",		&mmc1_32khz_clk,	CK_54XX),
 	CLK(NULL,	"sata_ref_clk",			&sata_ref_clk,	CK_54XX),
+	CLK(NULL,	"sl2if_ick",			&sl2if_ick,	CK_54XX),
 	CLK(NULL,	"slimbus1_slimbus_clk",		&slimbus1_slimbus_clk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_hsic480m_p1_clk",	&usb_host_hs_hsic480m_p1_clk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_hsic480m_p2_clk",	&usb_host_hs_hsic480m_p2_clk,	CK_54XX),
@@ -1762,6 +1782,30 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK("omap_timer.6",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
 	CLK("omap_timer.7",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
 	CLK("omap_timer.8",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
+	CLK(NULL,       "timer_32k_ck",			&sys_32k_ck,    CK_54XX),
+	/* TODO: Remove "omap_timer.X" aliases once DT migration is complete */
+	CLK("omap_timer.1",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("omap_timer.2",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("omap_timer.3",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("omap_timer.4",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("omap_timer.9",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("omap_timer.10",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("omap_timer.11",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("omap_timer.5",	"timer_sys_ck",	&dss_syc_gfclk_div,	CK_54XX),
+	CLK("omap_timer.6",	"timer_sys_ck",	&dss_syc_gfclk_div,	CK_54XX),
+	CLK("omap_timer.7",	"timer_sys_ck",	&dss_syc_gfclk_div,	CK_54XX),
+	CLK("omap_timer.8",	"timer_sys_ck",	&dss_syc_gfclk_div,	CK_54XX),
+	CLK("4a318000.timer",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("48032000.timer",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("48034000.timer",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("48036000.timer",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("4803e000.timer",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("48086000.timer",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("48088000.timer",	"timer_sys_ck",	&sys_clkin,	CK_54XX),
+	CLK("40138000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div,	CK_54XX),
+	CLK("4013a000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div,	CK_54XX),
+	CLK("4013c000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div,	CK_54XX),
+	CLK("4013e000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div,	CK_54XX),
 };
 
 int __init omap5xxx_clk_init(void)
