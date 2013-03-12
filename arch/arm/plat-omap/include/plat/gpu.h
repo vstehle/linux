@@ -19,8 +19,6 @@
 #ifndef OMAP_GPU_H
 #define OMAP_GPU_H
 
-#include "../arch/arm/mach-omap2/omap-pm.h"
-
 #include <linux/platform_device.h>
 
 struct gpu_platform_data {
