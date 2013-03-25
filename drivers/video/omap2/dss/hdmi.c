@@ -305,7 +305,7 @@ static int hdmi_runtime_get(void)
 {
 	int r;
 
-	DSSDBG("hdmi_runtime_get\n");
+//	DSSDBG("hdmi_runtime_get\n");
 
 	r = pm_runtime_get_sync(&hdmi.pdev->dev);
 	WARN_ON(r < 0);
@@ -319,7 +319,7 @@ static void hdmi_runtime_put(void)
 {
 	int r;
 
-	DSSDBG("hdmi_runtime_put\n");
+//	DSSDBG("hdmi_runtime_put\n");
 
 	r = pm_runtime_put_sync(&hdmi.pdev->dev);
 	WARN_ON(r < 0 && r != -ENOSYS);
