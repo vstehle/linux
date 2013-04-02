@@ -32,7 +32,6 @@
  * make our lives much much simpler. :)
  */
 #define BREAK_INSTR_SIZE	4
-#define GDB_BREAKINST		0xef9f0001
 #define KGDB_BREAKINST		0xe7ffdefe
 #define KGDB_COMPILED_BREAK	0xe7ffdeff
 #define CACHE_FLUSH_IS_SAFE	1
