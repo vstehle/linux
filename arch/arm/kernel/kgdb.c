@@ -250,10 +250,16 @@ void kgdb_arch_exit(void)
  * handler.
  */
 
+#ifdef CONFIG_THUMB2_KERNEL
+#define __bpt_byte(S, N) ((__constant_be16_to_cpu(S) >> ((N) * 8)) & 0xff)
+
+#define __bpt_instr(S)	{__bpt_byte(S, 1), __bpt_byte(S, 0)}
+#else
 #define __bpt_byte(W, N) ((__constant_be32_to_cpu(W) >> ((N) * 8)) & 0xff)
 
 #define __bpt_instr(W)	{__bpt_byte(W, 3), __bpt_byte(W, 2), \
 			 __bpt_byte(W, 1), __bpt_byte(W, 0)}
+#endif
 
 struct kgdb_arch arch_kgdb_ops = {
 	.gdb_bpt_instr		= __bpt_instr(KGDB_BREAKINST)
