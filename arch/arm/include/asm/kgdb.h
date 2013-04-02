@@ -32,9 +32,17 @@
  * Note to ARM HW designers: Add real trap support like SH && PPC to
  * make our lives much much simpler. :)
  */
+
+#ifdef CONFIG_THUMB2_KERNEL
+#define BREAK_INSTR_SIZE	2
+#define KGDB_BREAKINST		0xdefe
+#define KGDB_COMPILED_BREAK	0xdeff
+#else
 #define BREAK_INSTR_SIZE	4
 #define KGDB_BREAKINST		0xe7ffdefe
 #define KGDB_COMPILED_BREAK	0xe7ffdeff
+#endif
+
 #define CACHE_FLUSH_IS_SAFE	1
 
 #ifndef	__ASSEMBLY__
