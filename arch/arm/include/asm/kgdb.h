@@ -2,8 +2,10 @@
  * ARM KGDB support
  *
  * Author: Deepak Saxena <dsaxena@mvista.com>
+ *         Thumb2 support by Vincent Stehlé <v-stehle@ti.com>
  *
  * Copyright (C) 2002 MontaVista Software Inc.
+ * Copyright (C) 2013 Texas Instruments Inc.
  *
  */
 
@@ -31,10 +33,26 @@
  *
  * Note to ARM HW designers: Add real trap support like SH && PPC to
  * make our lives much much simpler. :)
+ *
+ * With thumb2 kernel we need both 16b & 32b breakpoints for the case
+ * where we patch an instruction inside an IT block. See kprobes for the
+ * details.
+ *
+ * Note: we need to make sure the instructions we use do not collide with
+ * others such as kprobes and ptrace.
  */
+
 #define BREAK_INSTR_SIZE	4
+
+#ifdef CONFIG_THUMB2_KERNEL
+#define KGDB_THUMB16_BREAKINST	0xdefe
+#define KGDB_THUMB32_BREAKINST	0xf7ffaefe
+#define KGDB_COMPILED_BREAK	0xf7ffaeff
+#else
 #define KGDB_BREAKINST		0xe7ffdefe
 #define KGDB_COMPILED_BREAK	0xe7ffdeff
+#endif
+
 #define CACHE_FLUSH_IS_SAFE	1
 
 #ifndef	__ASSEMBLY__

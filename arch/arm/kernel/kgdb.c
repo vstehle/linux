@@ -5,9 +5,11 @@
  *
  * Copyright (c) 2002-2004 MontaVista Software, Inc
  * Copyright (c) 2008 Wind River Systems, Inc.
+ * Copyright (c) 2013 Texas Instruments, Inc.
  *
  * Authors:  George Davis <davis_g@mvista.com>
  *           Deepak Saxena <dsaxena@plexity.net>
+ *           Thumb2 support by Vincent Stehlé <v-stehle@ti.com>
  */
 #include <linux/irq.h>
 #include <linux/kdebug.h>
@@ -157,6 +159,28 @@ static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int instr)
 	return 0;
 }
 
+#ifdef CONFIG_THUMB2_KERNEL
+
+static struct undef_hook kgdb_thumb16_brkpt_hook = {
+	.instr_mask		= 0xffff,
+	.instr_val		= KGDB_THUMB16_BREAKINST,
+	.fn			= kgdb_brk_fn
+};
+
+static struct undef_hook kgdb_thumb32_brkpt_hook = {
+	.instr_mask		= 0xffffffff,
+	.instr_val		= KGDB_THUMB32_BREAKINST,
+	.fn			= kgdb_brk_fn
+};
+
+static struct undef_hook kgdb_compiled_brkpt_hook = {
+	.instr_mask		= 0xffff,
+	.instr_val		= KGDB_COMPILED_BREAK,
+	.fn			= kgdb_compiled_brk_fn
+};
+
+#else /* !CONFIG_THUMB2_KERNEL */
+
 static struct undef_hook kgdb_brkpt_hook = {
 	.instr_mask		= 0xffffffff,
 	.instr_val		= KGDB_BREAKINST,
@@ -168,6 +192,8 @@ static struct undef_hook kgdb_compiled_brkpt_hook = {
 	.instr_val		= KGDB_COMPILED_BREAK,
 	.fn			= kgdb_compiled_brk_fn
 };
+
+#endif
 
 static void kgdb_call_nmi_hook(void *ignored)
 {
@@ -221,7 +247,12 @@ int kgdb_arch_init(void)
 	if (ret != 0)
 		return ret;
 
+#ifdef CONFIG_THUMB2_KERNEL
+	register_undef_hook(&kgdb_thumb16_brkpt_hook);
+	register_undef_hook(&kgdb_thumb32_brkpt_hook);
+#else
 	register_undef_hook(&kgdb_brkpt_hook);
+#endif
 	register_undef_hook(&kgdb_compiled_brkpt_hook);
 
 	return 0;
@@ -235,7 +266,12 @@ int kgdb_arch_init(void)
  */
 void kgdb_arch_exit(void)
 {
+#ifdef CONFIG_THUMB2_KERNEL
+	unregister_undef_hook(&kgdb_thumb16_brkpt_hook);
+	unregister_undef_hook(&kgdb_thumb32_brkpt_hook);
+#else
 	unregister_undef_hook(&kgdb_brkpt_hook);
+#endif
 	unregister_undef_hook(&kgdb_compiled_brkpt_hook);
 	unregister_die_notifier(&kgdb_notifier);
 }
@@ -258,5 +294,9 @@ void kgdb_arch_exit(void)
 #endif
 
 struct kgdb_arch arch_kgdb_ops = {
+#ifdef CONFIG_THUMB2_KERNEL
+	.gdb_bpt_instr		= __bpt_instr(KGDB_THUMB32_BREAKINST)
+#else
 	.gdb_bpt_instr		= __bpt_instr(KGDB_BREAKINST)
+#endif
 };
