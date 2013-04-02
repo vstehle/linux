@@ -59,8 +59,6 @@
 		interrupt-parent = <&gic>;
 		ti,audpwron-gpio = <&gpio5 13 0>;  /* gpio line 141 */
 
-		vio-supply = <&smps7_reg>;
-		v2v1-supply = <&smps9_reg>;
 		enable-active-high;
 	};
 };
@@ -118,6 +116,3 @@
 		>;
 	};
 };
-
-/include/ "palmas.dtsi"
-/include/ "twl6040.dtsi"
