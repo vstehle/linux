@@ -11,6 +11,7 @@
 #define __ARM_KGDB_H__
 
 #include <linux/ptrace.h>
+#include <linux/stringify.h>
 
 /*
  * GDB assumes that we're a user process being debugged, so
@@ -40,7 +41,7 @@
 
 static inline void arch_kgdb_breakpoint(void)
 {
-	asm(".word 0xe7ffdeff");
+	asm(".word " __stringify(KGDB_COMPILED_BREAK));
 }
 
 extern void kgdb_handle_bus_error(void);
