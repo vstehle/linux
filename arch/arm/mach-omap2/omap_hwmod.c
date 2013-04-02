@@ -610,8 +610,6 @@ static int _enable_wakeup(struct omap_hwmod *oh, u32 *v)
 
 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
 
-	oh->_int_flags |= _HWMOD_WAKEUP_ENABLED;
-
 	return 0;
 }
 
@@ -644,8 +642,6 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
 		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART, v);
 
 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
-
-	oh->_int_flags &= ~_HWMOD_WAKEUP_ENABLED;
 
 	return 0;
 }
@@ -1368,7 +1364,9 @@ static void _enable_sysc(struct omap_hwmod *oh)
 	}
 
 	if (sf & SYSC_HAS_MIDLEMODE) {
-		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
+		if (oh->flags & HWMOD_FORCE_MSTANDBY) {
+			idlemode = HWMOD_IDLEMODE_FORCE;
+		} else if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
 			idlemode = HWMOD_IDLEMODE_NO;
 		} else {
 			if (sf & SYSC_HAS_ENAWAKEUP)
@@ -1440,7 +1438,8 @@ static void _idle_sysc(struct omap_hwmod *oh)
 	}
 
 	if (sf & SYSC_HAS_MIDLEMODE) {
-		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
+		if ((oh->flags & HWMOD_SWSUP_MSTANDBY) ||
+		    (oh->flags & HWMOD_FORCE_MSTANDBY)) {
 			idlemode = HWMOD_IDLEMODE_FORCE;
 		} else {
 			if (sf & SYSC_HAS_ENAWAKEUP)
