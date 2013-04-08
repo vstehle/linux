@@ -246,10 +246,17 @@ void kgdb_arch_exit(void)
  * and we handle the normal undef case within the do_undefinstr
  * handler.
  */
-struct kgdb_arch arch_kgdb_ops = {
+
+#define __bpt_byte(WORD, BYTE)	(((WORD) >> ((BYTE) * 8)) & 0xff)
+
 #ifndef __ARMEB__
-	.gdb_bpt_instr		= {0xfe, 0xde, 0xff, 0xe7}
-#else /* ! __ARMEB__ */
-	.gdb_bpt_instr		= {0xe7, 0xff, 0xde, 0xfe}
+#define __bpt_instr(WORD)	{__bpt_byte(WORD, 3), __bpt_byte(WORD, 2), \
+				 __bpt_byte(WORD, 1), __bpt_byte(WORD, 0)}
+#else /* __ARMEB__ */
+#define __bpt_instr(WORD)	{__bpt_byte(WORD, 0), __bpt_byte(WORD, 1), \
+				 __bpt_byte(WORD, 2), __bpt_byte(WORD, 3)}
 #endif
+
+struct kgdb_arch arch_kgdb_ops = {
+	.gdb_bpt_instr		= __bpt_instr(KGDB_BREAKINST)
 };
