@@ -13,6 +13,7 @@
 #include <linux/kdebug.h>
 #include <linux/kgdb.h>
 #include <asm/traps.h>
+#include <asm/byteorder.h>
 
 struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] =
 {
@@ -246,10 +247,12 @@ void kgdb_arch_exit(void)
  * and we handle the normal undef case within the do_undefinstr
  * handler.
  */
+
+#define __bpt_byte(W, N) ((__constant_be32_to_cpu(W) >> ((N) * 8)) & 0xff)
+
+#define __bpt_instr(W)	{__bpt_byte(W, 3), __bpt_byte(W, 2), \
+			 __bpt_byte(W, 1), __bpt_byte(W, 0)}
+
 struct kgdb_arch arch_kgdb_ops = {
-#ifndef __ARMEB__
-	.gdb_bpt_instr		= {0xfe, 0xde, 0xff, 0xe7}
-#else /* ! __ARMEB__ */
-	.gdb_bpt_instr		= {0xe7, 0xff, 0xde, 0xfe}
-#endif
+	.gdb_bpt_instr		= __bpt_instr(KGDB_BREAKINST)
 };
