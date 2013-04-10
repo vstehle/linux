@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2012-2013 Texas Instruments Incorporated - http://www.ti.com/
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -33,4 +33,23 @@
 		0x5c 0x100	/* hdmi_scl.hdmi_scl INPUT | MODE 0 */
 		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
 		>;
+};
+
+/* PandaboardES has "half" different status leds gpios compared to PandaBoard4430. */
+&heartbeat {
+	label = "pandaboard::status1";
+	gpios = <&gpio4 14 0>;	/* gpio_110 */
+	linux,default-trigger = "heartbeat";
+};
+
+&leds_core_pins {
+	pinctrl-single,pins = <
+		0xb6 0x3	/* abe_mcbsp2_clkx.gpio_110 OUTPUT | MODE3 */
+	>;
+};
+
+&leds_wkup_pins {
+	pinctrl-single,pins = <
+		0x1c 0x3	/* fref_clk4_out.gpio_wk8 OUTPUT | MODE3 */
+	>;
 };

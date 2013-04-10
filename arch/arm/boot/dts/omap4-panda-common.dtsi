@@ -18,7 +18,7 @@
 
 	leds {
 		compatible = "gpio-leds";
-		heartbeat {
+		heartbeat: heartbeat {
 			label = "pandaboard::status1";
 			gpios = <&gpio1 7 0>;
 			linux,default-trigger = "heartbeat";
@@ -64,6 +64,7 @@
 			&mcbsp1_pins
 			&dss_hdmi_pins
 			&tpd12s015_pins
+			&leds_core_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -133,6 +134,23 @@
 		pinctrl-single,pins = <
 			0xee 0x118        /* i2c4_scl PULLUP | INPUTENABLE | MODE0 */
 			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
+		>;
+	};
+
+	leds_core_pins: pinmux_leds_core_pins {
+	};
+};
+
+&omap4_pmx_wkup {
+	pinctrl-names = "default";
+	pinctrl-0 = <
+			&leds_wkup_pins
+	>;
+
+	leds_wkup_pins: pinmux_leds_wkup_pins {
+		pinctrl-single,pins = <
+			0x1a 0x3	/* fref_clk4_req.gpio_wk7 OUTPUT | MODE3 */
+			0x1c 0x3	/* fref_clk4_out.gpio_wk8 OUTPUT | MODE3 */
 		>;
 	};
 };
