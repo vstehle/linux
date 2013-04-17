@@ -393,6 +393,27 @@ static int call_undef_hook(struct pt_regs *regs, unsigned int instr)
 	return fn ? fn(regs, instr) : 1;
 }
 
+static void dump(void *addr, int n)
+{
+	unsigned a;
+	int i;
+	printk("@%p:", addr);
+
+	for (i = 0, a = (unsigned)addr; i < n; i++, a++) {
+		unsigned char b;
+		int err;
+
+		err = probe_kernel_read(&b, (void *)a, 1);
+
+		if (err)
+			printk("  ??");
+		else
+			printk("  %02x", b);
+	}
+
+	printk("\n");
+}
+
 asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 {
 	unsigned int instr;
@@ -412,6 +433,11 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 		} else
 #endif
 			instr = *(u32 *) pc;
+
+			/* DEBUG */
+			printk("undefined instruction 0x%x@%p\n", instr, pc);
+			dump(pc - 4, 12);
+
 	} else if (thumb_mode(regs)) {
 		if (get_user(instr, (u16 __user *)pc))
 			goto die_sig;
