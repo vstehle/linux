@@ -158,14 +158,16 @@ static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int instr)
 	return 0;
 }
 
+#define __instr_mask ((1ULL<<(BREAK_INSTR_SIZE * 8))-1)
+
 static struct undef_hook kgdb_brkpt_hook = {
-	.instr_mask		= 0xffffffff,
+	.instr_mask		= __instr_mask,
 	.instr_val		= KGDB_BREAKINST,
 	.fn			= kgdb_brk_fn
 };
 
 static struct undef_hook kgdb_compiled_brkpt_hook = {
-	.instr_mask		= 0xffffffff,
+	.instr_mask		= __instr_mask,
 	.instr_val		= KGDB_COMPILED_BREAK,
 	.fn			= kgdb_compiled_brk_fn
 };
