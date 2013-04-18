@@ -132,7 +132,7 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
 		if (kgdb_hex2long(&ptr, &addr))
 			linux_regs->ARM_pc = addr;
 		else if (compiled_break == 1)
-			linux_regs->ARM_pc += 4;
+			linux_regs->ARM_pc += BREAK_INSTR_SIZE;
 
 		compiled_break = 0;
 
