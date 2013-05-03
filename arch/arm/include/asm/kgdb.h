@@ -37,6 +37,7 @@
 
 #ifdef CONFIG_THUMB2_KERNEL
 #define KGDB_BREAKINST		0xdefe
+#define KGDB_THUMB32_BREAKINST	0xf7ffaffe
 #define KGDB_COMPILED_BREAK	0xdeff
 #else
 #define KGDB_BREAKINST		0xe7ffdefe

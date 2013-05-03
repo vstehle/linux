@@ -173,6 +173,14 @@ static struct undef_hook kgdb_compiled_brkpt_hook = {
 	.fn			= kgdb_compiled_brk_fn
 };
 
+#ifdef CONFIG_THUMB2_KERNEL
+static struct undef_hook kgdb_thumb32_brkpt_hook = {
+	.instr_mask		= 0xffffffff,
+	.instr_val		= KGDB_THUMB32_BREAKINST,
+	.fn			= kgdb_brk_fn
+};
+#endif
+
 static void kgdb_call_nmi_hook(void *ignored)
 {
        kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
@@ -227,6 +235,9 @@ int kgdb_arch_init(void)
 
 	register_undef_hook(&kgdb_brkpt_hook);
 	register_undef_hook(&kgdb_compiled_brkpt_hook);
+#ifdef CONFIG_THUMB2_KERNEL
+	register_undef_hook(&kgdb_thumb32_brkpt_hook);
+#endif
 
 	return 0;
 }
@@ -241,6 +252,9 @@ void kgdb_arch_exit(void)
 {
 	unregister_undef_hook(&kgdb_brkpt_hook);
 	unregister_undef_hook(&kgdb_compiled_brkpt_hook);
+#ifdef CONFIG_THUMB2_KERNEL
+	unregister_undef_hook(&kgdb_thumb32_brkpt_hook);
+#endif
 	unregister_die_notifier(&kgdb_notifier);
 }
 
@@ -275,7 +289,7 @@ static int instruction_size(const unsigned char *instr)
 }
 
 static const u16 thumb16_bpt_instr = KGDB_BREAKINST;
-static const u32 thumb32_bpt_instr = 0xdeadbeef;
+static const u32 thumb32_bpt_instr = KGDB_THUMB32_BREAKINST;
 
 int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
 {
