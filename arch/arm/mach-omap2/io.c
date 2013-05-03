@@ -395,12 +395,14 @@ static void __init omap_hwmod_init_postsetup(void)
 	omap_pm_if_early_init();
 }
 
+#if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 static void __init omap_common_late_init(void)
 {
 	omap_mux_late_init();
 	omap2_common_pm_late_init();
 	omap_soc_device_init();
 }
+#endif
 
 #ifdef CONFIG_SOC_OMAP2420
 void __init omap2420_init_early(void)
