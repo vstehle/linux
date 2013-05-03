@@ -224,6 +224,13 @@ static unsigned long lookup_addr(char *arg)
 	else if (!strcmp(arg, "hw_break_val"))
 		addr = (unsigned long)&hw_break_val;
 	addr = (unsigned long) dereference_function_descriptor((void *)addr);
+
+#ifdef CONFIG_THUMB2_KERNEL
+	/* Thumb2 functions addresses have LSB set; remove it before using for
+ 	 * comparing with pc or setting breaks. */
+	addr &= ~1;
+#endif
+
 	return addr;
 }
 
