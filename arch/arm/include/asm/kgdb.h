@@ -36,8 +36,10 @@
 #define BREAK_INSTR_SIZE	4
 
 #ifdef CONFIG_THUMB2_KERNEL
-#define KGDB_BREAKINST		0xdefe
+#define KGDB_THUMB16_BREAKINST	0xdefe
 #define KGDB_THUMB32_BREAKINST	0xf7ffaffe
+#define KGDB_BREAKINST		KGDB_THUMB16_BREAKINST
+/* TODO! Remove all occurences of KGDB_BREAKINST */
 #define KGDB_COMPILED_BREAK	0xdeff
 #else
 #define KGDB_BREAKINST		0xe7ffdefe

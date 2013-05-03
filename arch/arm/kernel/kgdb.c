@@ -288,7 +288,7 @@ static int instruction_size(const unsigned char *instr)
 	return 2;
 }
 
-static const u16 thumb16_bpt_instr = KGDB_BREAKINST;
+static const u16 thumb16_bpt_instr = KGDB_THUMB16_BREAKINST;
 static const u32 thumb32_bpt_instr = KGDB_THUMB32_BREAKINST;
 
 int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
