@@ -1740,6 +1740,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK("usbhs_omap",	"usbhost_ick",		&dummy_ck),
 	CLK("usbhs_omap",	"usbtll_fck",		&dummy_ck),
 	CLK("omap_wdt",	"ick",				&dummy_ck),
+	CLK(NULL,	"timer_32k_ck",	&sys_32k_ck),
 	CLK("omap_timer.1",	"32k_ck",		&sys_32k_ck),
 	CLK("omap_timer.2",	"32k_ck",		&sys_32k_ck),
 	CLK("omap_timer.3",	"32k_ck",		&sys_32k_ck),
