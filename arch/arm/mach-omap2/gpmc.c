@@ -1474,7 +1474,7 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
 	ret = gpmc_cs_remap(cs, res.start);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "cannot remap GPMC CS %d to 0x%x\n",
-			cs, res.start);
+			cs, (unsigned)res.start);
 		goto err;
 	}
 
