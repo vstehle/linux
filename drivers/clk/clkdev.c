@@ -161,7 +161,12 @@ struct clk *clk_get(struct device *dev, const char *con_id)
 			return clk;
 	}
 
-	return clk_get_sys(dev_id, con_id);
+	clk = clk_get_sys(dev_id, con_id);
+
+	if (IS_ERR(clk))
+		printk("clk_get: could not get '%s'!\n", con_id);
+
+	return clk;
 }
 EXPORT_SYMBOL(clk_get);
 
