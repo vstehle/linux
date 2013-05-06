@@ -12,6 +12,7 @@
 #include <linux/irq.h>
 #include <linux/kdebug.h>
 #include <linux/kgdb.h>
+#include <linux/uaccess.h>
 #include <asm/traps.h>
 #include <asm/byteorder.h>
 
@@ -250,17 +251,52 @@ void kgdb_arch_exit(void)
  * handler.
  */
 
-#ifdef CONFIG_THUMB2_KERNEL
-#define __bpt_byte(S, N) ((__constant_be16_to_cpu(S) >> ((N) * 8)) & 0xff)
-
-#define __bpt_instr(S)	{__bpt_byte(S, 1), __bpt_byte(S, 0)}
-#else
+#ifndef CONFIG_THUMB2_KERNEL
 #define __bpt_byte(W, N) ((__constant_be32_to_cpu(W) >> ((N) * 8)) & 0xff)
 
 #define __bpt_instr(W)	{__bpt_byte(W, 3), __bpt_byte(W, 2), \
 			 __bpt_byte(W, 1), __bpt_byte(W, 0)}
-#endif
 
 struct kgdb_arch arch_kgdb_ops = {
 	.gdb_bpt_instr		= __bpt_instr(KGDB_BREAKINST)
 };
+
+#else
+/* In thumb2 kernel the breakpoint instruction size can be 16b or 32b,
+ * depending on the target instruction. */
+
+struct kgdb_arch arch_kgdb_ops;
+
+static int instruction_size(const unsigned char *instr)
+{
+	/* TODO! Endianness? */
+	/* TODO! "decode" (c.f. kprobe) */
+	return 2;
+}
+
+static const u16 thumb16_bpt_instr = KGDB_BREAKINST;
+static const u32 thumb32_bpt_instr = 0xdeadbeef;
+
+int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
+{
+	int err;
+	const unsigned char *bpt_instr;
+	int size;
+
+	err = probe_kernel_read(bpt->saved_instr, (char *)bpt->bpt_addr,
+				BREAK_INSTR_SIZE);
+	if (err)
+		return err;
+
+	size = instruction_size(bpt->saved_instr);
+
+	if (size == 4)
+		bpt_instr = (const unsigned char *)&thumb32_bpt_instr;
+
+	else
+		bpt_instr = (const unsigned char *)&thumb16_bpt_instr;
+
+	err = probe_kernel_write((char *)bpt->bpt_addr, bpt_instr, size);
+	return err;
+}
+#endif /* CONFIG_THUMB2_KERNEL */
