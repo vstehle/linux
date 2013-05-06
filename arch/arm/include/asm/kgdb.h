@@ -33,12 +33,12 @@
  * make our lives much much simpler. :)
  */
 
+#define BREAK_INSTR_SIZE	4
+
 #ifdef CONFIG_THUMB2_KERNEL
-#define BREAK_INSTR_SIZE	2
 #define KGDB_BREAKINST		0xdefe
 #define KGDB_COMPILED_BREAK	0xdeff
 #else
-#define BREAK_INSTR_SIZE	4
 #define KGDB_BREAKINST		0xe7ffdefe
 #define KGDB_COMPILED_BREAK	0xe7ffdeff
 #endif
@@ -49,8 +49,7 @@
 
 static inline void arch_kgdb_breakpoint(void)
 {
-	asm("." __stringify(BREAK_INSTR_SIZE) "byte "
-	    __stringify(KGDB_COMPILED_BREAK));
+	asm(".word " __stringify(KGDB_COMPILED_BREAK));
 }
 
 extern void kgdb_handle_bus_error(void);
