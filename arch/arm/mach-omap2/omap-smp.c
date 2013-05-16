@@ -21,7 +21,9 @@
 #include <linux/io.h>
 #include <linux/irqchip/arm-gic.h>
 
+#ifdef CONFIG_HAVE_ARM_SCU
 #include <asm/smp_scu.h>
+#endif
 
 #include "omap-secure.h"
 #include "omap-wakeupgen.h"
@@ -41,15 +43,19 @@
 
 u16 pm44xx_errata;
 
+#ifdef CONFIG_HAVE_ARM_SCU
 /* SCU base address */
 static void __iomem *scu_base;
+#endif
 
 static DEFINE_SPINLOCK(boot_lock);
 
+#ifdef CONFIG_HAVE_ARM_SCU
 void __iomem *omap4_get_scu_base(void)
 {
 	return scu_base;
 }
+#endif
 
 static void __cpuinit omap4_secondary_init(unsigned int cpu)
 {
@@ -176,6 +182,7 @@ static void __init omap4_smp_init_cpus(void)
 	/* Use ARM cpuid check here, as SoC detection will not work so early */
 	cpu_id = read_cpuid_id() & CPU_MASK;
 	if (cpu_id == CPU_CORTEX_A9) {
+#ifdef CONFIG_HAVE_ARM_SCU
 		/*
 		 * Currently we can't call ioremap here because
 		 * SoC detection won't work until after init_early.
@@ -183,6 +190,7 @@ static void __init omap4_smp_init_cpus(void)
 		scu_base =  OMAP2_L4_IO_ADDRESS(scu_a9_get_base());
 		BUG_ON(!scu_base);
 		ncores = scu_get_core_count(scu_base);
+#endif
 	} else if (cpu_id == CPU_CORTEX_A15) {
 		ncores = OMAP5_CORE_COUNT;
 	}
@@ -203,12 +211,14 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
 	void *startup_addr = omap_secondary_startup;
 	void __iomem *base = omap_get_wakeupgen_base();
 
+#ifdef CONFIG_HAVE_ARM_SCU
 	/*
 	 * Initialise the SCU and wake up the secondary core using
 	 * wakeup_secondary().
 	 */
 	if (scu_base)
 		scu_enable(scu_base);
+#endif
 
 	if (cpu_is_omap446x()) {
 		startup_addr = omap_secondary_startup_4460;
