@@ -10,7 +10,11 @@
  */
 
 #include <linux/linkage.h>
+
+#ifdef CONFIG_HAVE_ARM_SCU
 #include <asm/smp_scu.h>
+#endif
+
 #include <asm/memory.h>
 #include <asm/hardware/cache-l2x0.h>
 
@@ -70,6 +74,7 @@ ENTRY(omap4_finish_suspend)
 	 * Flush all data from the L1 data cache before disabling
 	 * SCTLR.C bit.
 	 */
+#ifdef CONFIG_HAVE_ARM_SCU
 	bl	omap4_get_sar_ram_base
 	ldr	r9, [r0, #OMAP_TYPE_OFFSET]
 	cmp	r9, #0x1			@ Check for HS device
@@ -81,6 +86,7 @@ ENTRY(omap4_finish_suspend)
 	DO_SMC
 	ldmfd   r13!, {r4-r12, r14}
 skip_secure_l1_clean:
+#endif
 	bl	v7_flush_dcache_all
 
 	/*
@@ -108,6 +114,7 @@ skip_secure_l1_clean:
 	 * preventing the CPU from receiving cache, TLB, or BTB
 	 * maintenance operations broadcast by other CPUs in the cluster.
 	 */
+#ifdef CONFIG_HAVE_ARM_SCU
 	bl	omap4_get_sar_ram_base
 	mov	r8, r0
 	ldr	r9, [r8, #OMAP_TYPE_OFFSET]
@@ -131,6 +138,7 @@ scu_gp_set:
 	bl	omap4_get_scu_base
 	bl	scu_power_mode
 skip_scu_gp_set:
+#endif
 	mrc	p15, 0, r0, c1, c1, 2		@ Read NSACR data
 	tst	r0, #(1 << 18)
 	mrcne	p15, 0, r0, c1, c0, 1
@@ -211,6 +219,7 @@ do_WFI:
 	orreq	r0, r0, #(1 << 6)
 	mcreq	p15, 0, r0, c1, c0, 1
 	isb
+#ifdef CONFIG_HAVE_ARM_SCU
 	bl	omap4_get_sar_ram_base
 	mov	r8, r0
 	ldr	r9, [r8, #OMAP_TYPE_OFFSET]
@@ -228,6 +237,7 @@ scu_gp_clear:
 	mov	r1, #SCU_PM_NORMAL
 	bl	scu_power_mode
 skip_scu_gp_clear:
+#endif
 	isb
 	dsb
 	ldmfd	sp!, {r4-r12, pc}
