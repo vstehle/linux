@@ -21,6 +21,7 @@
 #include <linux/ath9k_platform.h>
 #include <linux/module.h>
 #include <linux/relay.h>
+#include <net/ieee80211_radiotap.h>
 
 #include "ath9k.h"
 
@@ -613,9 +614,6 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
 	spin_lock_init(&sc->sc_serial_rw);
 	spin_lock_init(&sc->sc_pm_lock);
 	mutex_init(&sc->mutex);
-#ifdef CONFIG_ATH9K_MAC_DEBUG
-	spin_lock_init(&sc->debug.samp_lock);
-#endif
 	tasklet_init(&sc->intr_tq, ath9k_tasklet, (unsigned long)sc);
 	tasklet_init(&sc->bcon_tasklet, ath9k_beacon_tasklet,
 		     (unsigned long)sc);
@@ -769,8 +767,13 @@ void ath9k_set_hw_capab(struct ath_softc *sc, struct ieee80211_hw *hw)
 		IEEE80211_HW_REPORTS_TX_ACK_STATUS |
 		IEEE80211_HW_SUPPORTS_RC_TABLE;
 
-	if (sc->sc_ah->caps.hw_caps & ATH9K_HW_CAP_HT)
-		 hw->flags |= IEEE80211_HW_AMPDU_AGGREGATION;
+	if (sc->sc_ah->caps.hw_caps & ATH9K_HW_CAP_HT) {
+		hw->flags |= IEEE80211_HW_AMPDU_AGGREGATION;
+
+		if (AR_SREV_9280_20_OR_LATER(ah))
+			hw->radiotap_mcs_details |=
+				IEEE80211_RADIOTAP_MCS_HAVE_STBC;
+	}
 
 	if (AR_SREV_9160_10_OR_LATER(sc->sc_ah) || ath9k_modparam_nohwcrypt)
 		hw->flags |= IEEE80211_HW_MFP_CAPABLE;
