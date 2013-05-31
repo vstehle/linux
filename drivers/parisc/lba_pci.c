@@ -1494,7 +1494,7 @@ lba_driver_probe(struct parisc_device *dev)
 
 	pci_add_resource_offset(&resources, &lba_dev->hba.io_space,
 				HBA_PORT_BASE(lba_dev->hba.hba_num));
-	if (lba_dev->hba.elmmio_space.start)
+	if (lba_dev->hba.elmmio_space.flags)
 		pci_add_resource_offset(&resources, &lba_dev->hba.elmmio_space,
 					lba_dev->hba.lmmio_space_offset);
 	if (lba_dev->hba.lmmio_space.flags)
@@ -1503,6 +1503,7 @@ lba_driver_probe(struct parisc_device *dev)
 	if (lba_dev->hba.gmmio_space.flags)
 		pci_add_resource(&resources, &lba_dev->hba.gmmio_space);
 
+	lba_dev->hba.bus_num.flags = IORESOURCE_BUS;
 	pci_add_resource(&resources, &lba_dev->hba.bus_num);
 
 	dev->dev.platform_data = lba_dev;
