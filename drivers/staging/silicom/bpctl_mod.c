@@ -35,7 +35,7 @@
 #define BP_MOD_DESCR "Silicom Bypass-SD Control driver"
 #define BP_SYNC_FLAG 1
 
-static int major_num = 0;
+static int major_num;
 
 MODULE_AUTHOR("Anna Lukin, annal@silicom.co.il");
 MODULE_LICENSE("GPL");
@@ -43,12 +43,12 @@ MODULE_DESCRIPTION(BP_MOD_DESCR);
 MODULE_VERSION(BP_MOD_VER);
 spinlock_t bpvm_lock;
 
-#define lock_bpctl() 					\
+#define lock_bpctl()					\
 if (down_interruptible(&bpctl_sema)) {			\
 	return -ERESTARTSYS;				\
 }							\
 
-#define unlock_bpctl() 					\
+#define unlock_bpctl()					\
 	up(&bpctl_sema);
 
 /* Media Types */
@@ -112,7 +112,7 @@ typedef struct _bpctl_dev {
 static bpctl_dev_t *bpctl_dev_arr;
 
 static struct semaphore bpctl_sema;
-static int device_num = 0;
+static int device_num;
 
 static int get_dev_idx(int ifindex);
 static bpctl_dev_t *get_master_port_fn(bpctl_dev_t *pbpctl_dev);
@@ -134,7 +134,7 @@ static int bp_device_event(struct notifier_block *unused,
 			   unsigned long event, void *ptr)
 {
 	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
-	static bpctl_dev_t *pbpctl_dev = NULL, *pbpctl_dev_m = NULL;
+	static bpctl_dev_t *pbpctl_dev, *pbpctl_dev_m;
 	int dev_num = 0, ret = 0, ret_d = 0, time_left = 0;
 	/* printk("BP_PROC_SUPPORT event =%d %s %d\n", event,dev->name, dev->ifindex ); */
 	/* return NOTIFY_DONE; */
@@ -165,7 +165,8 @@ static int bp_device_event(struct notifier_block *unused,
 			memcpy(&cbuf, drvinfo.bus_info, 32);
 			buf = &cbuf[0];
 
-			while (*buf++ != ':') ;
+			while (*buf++ != ':')
+				;
 			for (i = 0; i < 10; i++, buf++) {
 				if (*buf == ':')
 					break;
@@ -1414,8 +1415,8 @@ static int wdt_pulse(bpctl_dev_t *pbpctl_dev)
 				(ctrl_ext &
 				 ~(BP10G_MCLK_DATA_OUT | BP10G_MDIO_DATA_OUT)));
 	}
-	if ((pbpctl_dev->wdt_status == WDT_STATUS_EN)	/*&&
-							   (pbpctl_dev->bp_ext_ver<PXG4BPFI_VER) */ )
+	if ((pbpctl_dev->wdt_status == WDT_STATUS_EN))
+		/*&& (pbpctl_dev->bp_ext_ver<PXG4BPFI_VER) */
 		pbpctl_dev->bypass_wdt_on_time = jiffies;
 #ifdef BP_SYNC_FLAG
 	spin_unlock_irqrestore(&pbpctl_dev->bypass_wr_lock, flags);
@@ -2150,12 +2151,14 @@ static void bp75_release_phy(bpctl_dev_t *pbpctl_dev)
 {
 	u16 mask = BPCTLI_SWFW_PHY0_SM;
 	u32 swfw_sync;
+	s32 ret_val;
 
 	if ((pbpctl_dev->func == 1) || (pbpctl_dev->func == 3))
 		mask = BPCTLI_SWFW_PHY1_SM;
 
-	while (bp75_get_hw_semaphore_generic(pbpctl_dev) != 0) ;
-	/* Empty */
+	do
+		ret_val = bp75_get_hw_semaphore_generic(pbpctl_dev);
+	while (ret_val != 0);
 
 	swfw_sync = BPCTL_READ_REG(pbpctl_dev, SW_FW_SYNC);
 	swfw_sync &= ~mask;
@@ -4334,7 +4337,7 @@ int get_bypass_wd_auto(bpctl_dev_t *pbpctl_dev)
 	return BP_NOT_CAP;
 }
 
-#ifdef  BP_SELF_TEST
+#ifdef BP_SELF_TEST
 
 int set_bp_self_test(bpctl_dev_t *pbpctl_dev, unsigned int param)
 {
@@ -5345,7 +5348,8 @@ static void if_scan_init(void)
 		memcpy(&cbuf, drvinfo.bus_info, 32);
 		buf = &cbuf[0];
 
-		while (*buf++ != ':') ;
+		while (*buf++ != ':')
+			;
 		for (i = 0; i < 10; i++, buf++) {
 			if (*buf == ':')
 				break;
@@ -5438,9 +5442,9 @@ static long device_ioctl(struct file *file,	/* see include/linux/fs.h */
 		return -1;
 	}
 
-/*    	preempt_disable();
+/*	preempt_disable();
 	rcu_read_lock();
-      	spin_lock_irqsave(&bpvm_lock, flags);
+	spin_lock_irqsave(&bpvm_lock, flags);
 */
 	if ((bpctl_cmd.in_param[5]) ||
 	    (bpctl_cmd.in_param[6]) || (bpctl_cmd.in_param[7]))
@@ -5787,7 +5791,7 @@ static const struct file_operations Fops = {
 };
 
 #ifndef PCI_DEVICE
-#define PCI_DEVICE(vend,dev) \
+#define PCI_DEVICE(vend, dev) \
 	.vendor = (vend), .device = (dev), \
 	.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID
 #endif
@@ -6629,7 +6633,7 @@ static void find_fw(bpctl_dev_t *dev)
 			    ioremap(mmio_start, mmio_len);
 
 			dev->bp_fw_ver = bypass_fw_ver(dev);
-			if (dev-> bp_fw_ver == 0xa8)
+			if (dev->bp_fw_ver == 0xa8)
 				break;
 		}
 	}
@@ -6878,59 +6882,69 @@ int is_bypass_sd(int ifindex)
 {
 	return is_bypass(get_dev_idx_p(ifindex));
 }
+EXPORT_SYMBOL(is_bypass_sd);
 
 int set_bypass_sd(int ifindex, int bypass_mode)
 {
 
 	return set_bypass_fn(get_dev_idx_p(ifindex), bypass_mode);
 }
+EXPORT_SYMBOL(set_bypass_sd);
 
 int get_bypass_sd(int ifindex)
 {
 
 	return get_bypass_fn(get_dev_idx_p(ifindex));
 }
+EXPORT_SYMBOL(get_bypass_sd);
 
 int get_bypass_change_sd(int ifindex)
 {
 
 	return get_bypass_change_fn(get_dev_idx_p(ifindex));
 }
+EXPORT_SYMBOL(get_bypass_change_sd);
 
 int set_dis_bypass_sd(int ifindex, int dis_param)
 {
 	return set_dis_bypass_fn(get_dev_idx_p(ifindex), dis_param);
 }
+EXPORT_SYMBOL(set_dis_bypass_sd);
 
 int get_dis_bypass_sd(int ifindex)
 {
 
 	return get_dis_bypass_fn(get_dev_idx_p(ifindex));
 }
+EXPORT_SYMBOL(get_dis_bypass_sd);
 
 int set_bypass_pwoff_sd(int ifindex, int bypass_mode)
 {
 	return set_bypass_pwoff_fn(get_dev_idx_p(ifindex), bypass_mode);
 
 }
+EXPORT_SYMBOL(set_bypass_pwoff_sd);
 
 int get_bypass_pwoff_sd(int ifindex)
 {
 	return get_bypass_pwoff_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_bypass_pwoff_sd);
 
 int set_bypass_pwup_sd(int ifindex, int bypass_mode)
 {
 	return set_bypass_pwup_fn(get_dev_idx_p(ifindex), bypass_mode);
 
 }
+EXPORT_SYMBOL(set_bypass_pwup_sd);
 
 int get_bypass_pwup_sd(int ifindex)
 {
 	return get_bypass_pwup_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_bypass_pwup_sd);
 
 int set_bypass_wd_sd(int if_index, int ms_timeout, int *ms_timeout_set)
 {
@@ -6939,136 +6953,159 @@ int set_bypass_wd_sd(int if_index, int ms_timeout, int *ms_timeout_set)
 	*ms_timeout_set = set_bypass_wd_fn(get_dev_idx_p(if_index), ms_timeout);
 	return 0;
 }
+EXPORT_SYMBOL(set_bypass_wd_sd);
 
 int get_bypass_wd_sd(int ifindex, int *timeout)
 {
 	return get_bypass_wd_fn(get_dev_idx_p(ifindex), timeout);
 
 }
+EXPORT_SYMBOL(get_bypass_wd_sd);
 
 int get_wd_expire_time_sd(int ifindex, int *time_left)
 {
 	return get_wd_expire_time_fn(get_dev_idx_p(ifindex), time_left);
 }
+EXPORT_SYMBOL(get_wd_expire_time_sd);
 
 int reset_bypass_wd_timer_sd(int ifindex)
 {
 	return reset_bypass_wd_timer_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(reset_bypass_wd_timer_sd);
 
 int get_wd_set_caps_sd(int ifindex)
 {
 	return get_wd_set_caps_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_wd_set_caps_sd);
 
 int set_std_nic_sd(int ifindex, int nic_mode)
 {
 	return set_std_nic_fn(get_dev_idx_p(ifindex), nic_mode);
 
 }
+EXPORT_SYMBOL(set_std_nic_sd);
 
 int get_std_nic_sd(int ifindex)
 {
 	return get_std_nic_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_std_nic_sd);
 
 int set_tap_sd(int ifindex, int tap_mode)
 {
 	return set_tap_fn(get_dev_idx_p(ifindex), tap_mode);
 
 }
+EXPORT_SYMBOL(set_tap_sd);
 
 int get_tap_sd(int ifindex)
 {
 	return get_tap_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_tap_sd);
 
 int set_tap_pwup_sd(int ifindex, int tap_mode)
 {
 	return set_tap_pwup_fn(get_dev_idx_p(ifindex), tap_mode);
 
 }
+EXPORT_SYMBOL(set_tap_pwup_sd);
 
 int get_tap_pwup_sd(int ifindex)
 {
 	return get_tap_pwup_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_tap_pwup_sd);
 
 int get_tap_change_sd(int ifindex)
 {
 	return get_tap_change_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_tap_change_sd);
 
 int set_dis_tap_sd(int ifindex, int dis_param)
 {
 	return set_dis_tap_fn(get_dev_idx_p(ifindex), dis_param);
 
 }
+EXPORT_SYMBOL(set_dis_tap_sd);
 
 int get_dis_tap_sd(int ifindex)
 {
 	return get_dis_tap_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_dis_tap_sd);
 
 int set_bp_disc_sd(int ifindex, int disc_mode)
 {
 	return set_disc_fn(get_dev_idx_p(ifindex), disc_mode);
 
 }
+EXPORT_SYMBOL(set_bp_disc_sd);
 
 int get_bp_disc_sd(int ifindex)
 {
 	return get_disc_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_bp_disc_sd);
 
 int set_bp_disc_pwup_sd(int ifindex, int disc_mode)
 {
 	return set_disc_pwup_fn(get_dev_idx_p(ifindex), disc_mode);
 
 }
+EXPORT_SYMBOL(set_bp_disc_pwup_sd);
 
 int get_bp_disc_pwup_sd(int ifindex)
 {
 	return get_disc_pwup_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_bp_disc_pwup_sd);
 
 int get_bp_disc_change_sd(int ifindex)
 {
 	return get_disc_change_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_bp_disc_change_sd);
 
 int set_bp_dis_disc_sd(int ifindex, int dis_param)
 {
 	return set_dis_disc_fn(get_dev_idx_p(ifindex), dis_param);
 
 }
+EXPORT_SYMBOL(set_bp_dis_disc_sd);
 
 int get_bp_dis_disc_sd(int ifindex)
 {
 	return get_dis_disc_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_bp_dis_disc_sd);
 
 int get_wd_exp_mode_sd(int ifindex)
 {
 	return get_wd_exp_mode_fn(get_dev_idx_p(ifindex));
 }
+EXPORT_SYMBOL(get_wd_exp_mode_sd);
 
 int set_wd_exp_mode_sd(int ifindex, int param)
 {
 	return set_wd_exp_mode_fn(get_dev_idx_p(ifindex), param);
 
 }
+EXPORT_SYMBOL(set_wd_exp_mode_sd);
 
 int reset_cont_sd(int ifindex)
 {
@@ -7081,35 +7118,41 @@ int set_tx_sd(int ifindex, int tx_state)
 	return set_tx_fn(get_dev_idx_p(ifindex), tx_state);
 
 }
+EXPORT_SYMBOL(set_tx_sd);
 
 int set_tpl_sd(int ifindex, int tpl_state)
 {
 	return set_tpl_fn(get_dev_idx_p(ifindex), tpl_state);
 
 }
+EXPORT_SYMBOL(set_tpl_sd);
 
 int set_bp_hw_reset_sd(int ifindex, int status)
 {
 	return set_bp_hw_reset_fn(get_dev_idx_p(ifindex), status);
 
 }
+EXPORT_SYMBOL(set_bp_hw_reset_sd);
 
 int set_wd_autoreset_sd(int ifindex, int param)
 {
 	return set_wd_autoreset_fn(get_dev_idx_p(ifindex), param);
 
 }
+EXPORT_SYMBOL(set_wd_autoreset_sd);
 
 int get_wd_autoreset_sd(int ifindex)
 {
 	return get_wd_autoreset_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_wd_autoreset_sd);
 
 int get_bypass_caps_sd(int ifindex)
 {
 	return get_bypass_caps_fn(get_dev_idx_p(ifindex));
 }
+EXPORT_SYMBOL(get_bypass_caps_sd);
 
 int get_bypass_slave_sd(int ifindex)
 {
@@ -7120,81 +7163,41 @@ int get_bypass_slave_sd(int ifindex)
 	return -1;
 
 }
+EXPORT_SYMBOL(get_bypass_slave_sd);
 
 int get_tx_sd(int ifindex)
 {
 	return get_tx_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_tx_sd);
 
 int get_tpl_sd(int ifindex)
 {
 	return get_tpl_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_tpl_sd);
 
 int get_bp_hw_reset_sd(int ifindex)
 {
 	return get_bp_hw_reset_fn(get_dev_idx_p(ifindex));
 
 }
+EXPORT_SYMBOL(get_bp_hw_reset_sd);
 
 int get_bypass_info_sd(int ifindex, struct bp_info *bp_info)
 {
 	return get_bypass_info_fn(get_dev_idx_p(ifindex), bp_info->prod_name, &bp_info->fw_ver);
 }
+EXPORT_SYMBOL(get_bypass_info_sd);
 
 int bp_if_scan_sd(void)
 {
 	if_scan_init();
 	return 0;
 }
-
-EXPORT_SYMBOL_NOVERS(is_bypass_sd);
-EXPORT_SYMBOL_NOVERS(get_bypass_slave_sd);
-EXPORT_SYMBOL_NOVERS(get_bypass_caps_sd);
-EXPORT_SYMBOL_NOVERS(get_wd_set_caps_sd);
-EXPORT_SYMBOL_NOVERS(set_bypass_sd);
-EXPORT_SYMBOL_NOVERS(get_bypass_sd);
-EXPORT_SYMBOL_NOVERS(get_bypass_change_sd);
-EXPORT_SYMBOL_NOVERS(set_dis_bypass_sd);
-EXPORT_SYMBOL_NOVERS(get_dis_bypass_sd);
-EXPORT_SYMBOL_NOVERS(set_bypass_pwoff_sd);
-EXPORT_SYMBOL_NOVERS(get_bypass_pwoff_sd);
-EXPORT_SYMBOL_NOVERS(set_bypass_pwup_sd);
-EXPORT_SYMBOL_NOVERS(get_bypass_pwup_sd);
-EXPORT_SYMBOL_NOVERS(set_bypass_wd_sd);
-EXPORT_SYMBOL_NOVERS(get_bypass_wd_sd);
-EXPORT_SYMBOL_NOVERS(get_wd_expire_time_sd);
-EXPORT_SYMBOL_NOVERS(reset_bypass_wd_timer_sd);
-EXPORT_SYMBOL_NOVERS(set_std_nic_sd);
-EXPORT_SYMBOL_NOVERS(get_std_nic_sd);
-EXPORT_SYMBOL_NOVERS(set_tx_sd);
-EXPORT_SYMBOL_NOVERS(get_tx_sd);
-EXPORT_SYMBOL_NOVERS(set_tpl_sd);
-EXPORT_SYMBOL_NOVERS(get_tpl_sd);
-EXPORT_SYMBOL_NOVERS(set_bp_hw_reset_sd);
-EXPORT_SYMBOL_NOVERS(get_bp_hw_reset_sd);
-EXPORT_SYMBOL_NOVERS(set_tap_sd);
-EXPORT_SYMBOL_NOVERS(get_tap_sd);
-EXPORT_SYMBOL_NOVERS(get_tap_change_sd);
-EXPORT_SYMBOL_NOVERS(set_dis_tap_sd);
-EXPORT_SYMBOL_NOVERS(get_dis_tap_sd);
-EXPORT_SYMBOL_NOVERS(set_tap_pwup_sd);
-EXPORT_SYMBOL_NOVERS(get_tap_pwup_sd);
-EXPORT_SYMBOL_NOVERS(set_wd_exp_mode_sd);
-EXPORT_SYMBOL_NOVERS(get_wd_exp_mode_sd);
-EXPORT_SYMBOL_NOVERS(set_wd_autoreset_sd);
-EXPORT_SYMBOL_NOVERS(get_wd_autoreset_sd);
-EXPORT_SYMBOL_NOVERS(set_bp_disc_sd);
-EXPORT_SYMBOL_NOVERS(get_bp_disc_sd);
-EXPORT_SYMBOL_NOVERS(get_bp_disc_change_sd);
-EXPORT_SYMBOL_NOVERS(set_bp_dis_disc_sd);
-EXPORT_SYMBOL_NOVERS(get_bp_dis_disc_sd);
-EXPORT_SYMBOL_NOVERS(set_bp_disc_pwup_sd);
-EXPORT_SYMBOL_NOVERS(get_bp_disc_pwup_sd);
-EXPORT_SYMBOL_NOVERS(get_bypass_info_sd);
-EXPORT_SYMBOL_NOVERS(bp_if_scan_sd);
+EXPORT_SYMBOL(bp_if_scan_sd);
 
 #define BP_PROC_DIR "bypass"
 
@@ -7263,7 +7266,7 @@ static int show_bypass_slave(struct seq_file *m, void *v)
 	if (!slave)
 		slave = dev;
 	if (!slave)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (slave->ndev)
 		seq_printf(m, "%s\n", slave->ndev->name);
 	return 0;
@@ -7275,7 +7278,7 @@ static int show_bypass_caps(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_bypass_caps_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "-1\n");
+		seq_puts(m, "-1\n");
 	else
 		seq_printf(m, "0x%x\n", ret);
 	return 0;
@@ -7287,7 +7290,7 @@ static int show_wd_set_caps(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_wd_set_caps_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "-1\n");
+		seq_puts(m, "-1\n");
 	else
 		seq_printf(m, "0x%x\n", ret);
 	return 0;
@@ -7333,11 +7336,11 @@ static int show_bypass(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_bypass_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 1)
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	return 0;
 }
 RW_FOPS(bypass)
@@ -7357,11 +7360,11 @@ static int show_tap(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_tap_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 1)
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	return 0;
 }
 RW_FOPS(tap)
@@ -7381,11 +7384,11 @@ static int show_disc(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_disc_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 1)
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	return 0;
 }
 RW_FOPS(disc)
@@ -7395,11 +7398,11 @@ static int show_bypass_change(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_bypass_change_fn(dev);
 	if (ret == 1)
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	return 0;
 }
 RO_FOPS(bypass_change)
@@ -7409,11 +7412,11 @@ static int show_tap_change(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_tap_change_fn(dev);
 	if (ret == 1)
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	return 0;
 }
 RO_FOPS(tap_change)
@@ -7423,11 +7426,11 @@ static int show_disc_change(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_disc_change_fn(dev);
 	if (ret == 1)
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	return 0;
 }
 RO_FOPS(disc_change)
@@ -7450,11 +7453,11 @@ static int show_bypass_wd(struct seq_file *m, void *v)
 
 	ret = get_bypass_wd_fn(dev, &timeout);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m,  "fail\n");
+		seq_puts(m,  "fail\n");
 	else if (timeout == -1)
-		seq_printf(m,  "unknown\n");
+		seq_puts(m,  "unknown\n");
 	else if (timeout == 0)
-		seq_printf(m,  "disable\n");
+		seq_puts(m,  "disable\n");
 	else
 		seq_printf(m, "%d\n", timeout);
 	return 0;
@@ -7467,11 +7470,11 @@ static int show_wd_expire_time(struct seq_file *m, void *v)
 	int ret = 0, timeout = 0;
 	ret = get_wd_expire_time_fn(dev, &timeout);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (timeout == -1)
-		seq_printf(m, "expire\n");
+		seq_puts(m, "expire\n");
 	else if (timeout == 0)
-		seq_printf(m, "disable\n");
+		seq_puts(m, "disable\n");
 	else
 		seq_printf(m, "%d\n", timeout);
 	return 0;
@@ -7494,11 +7497,11 @@ static int show_tpl(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_tpl_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 1)
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	return 0;
 }
 RW_FOPS(tpl)
@@ -7520,11 +7523,11 @@ static int show_wait_at_pwup(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_bp_wait_at_pwup_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 1)
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	return 0;
 }
 RW_FOPS(wait_at_pwup)
@@ -7545,11 +7548,11 @@ static int show_hw_reset(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_bp_hw_reset_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 1)
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	return 0;
 }
 RW_FOPS(hw_reset)
@@ -7561,11 +7564,11 @@ static int show_reset_bypass_wd(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = reset_bypass_wd_timer_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 0)
-		seq_printf(m, "disable\n");
+		seq_puts(m, "disable\n");
 	else if (ret == 1)
-		seq_printf(m, "success\n");
+		seq_puts(m, "success\n");
 	return 0;
 }
 RO_FOPS(reset_bypass_wd)
@@ -7585,11 +7588,11 @@ static int show_dis_bypass(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_dis_bypass_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	return 0;
 }
 RW_FOPS(dis_bypass)
@@ -7609,11 +7612,11 @@ static int show_dis_tap(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_dis_tap_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	return 0;
 }
 RW_FOPS(dis_tap)
@@ -7633,11 +7636,11 @@ static int show_dis_disc(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_dis_disc_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	return 0;
 }
 RW_FOPS(dis_disc)
@@ -7657,11 +7660,11 @@ static int show_bypass_pwup(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_bypass_pwup_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	return 0;
 }
 RW_FOPS(bypass_pwup)
@@ -7681,11 +7684,11 @@ static int show_bypass_pwoff(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_bypass_pwoff_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	return 0;
 }
 RW_FOPS(bypass_pwoff)
@@ -7705,11 +7708,11 @@ static int show_tap_pwup(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_tap_pwup_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	return 0;
 }
 RW_FOPS(tap_pwup)
@@ -7729,11 +7732,11 @@ static int show_disc_pwup(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_disc_pwup_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	return 0;
 }
 RW_FOPS(disc_pwup)
@@ -7753,11 +7756,11 @@ static int show_std_nic(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_std_nic_fn(dev);
 	if (ret == BP_NOT_CAP)
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	else if (ret == 0)
-		seq_printf(m, "off\n");
+		seq_puts(m, "off\n");
 	else
-		seq_printf(m, "on\n");
+		seq_puts(m, "on\n");
 	return 0;
 }
 RW_FOPS(std_nic)
@@ -7795,13 +7798,13 @@ static int show_wd_exp_mode(struct seq_file *m, void *v)
 	bpctl_dev_t *dev = m->private;
 	int ret = get_wd_exp_mode_fn(dev);
 	if (ret == 1)
-		seq_printf(m, "tap\n");
+		seq_puts(m, "tap\n");
 	else if (ret == 0)
-		seq_printf(m, "bypass\n");
+		seq_puts(m, "bypass\n");
 	else if (ret == 2)
-		seq_printf(m, "disc\n");
+		seq_puts(m, "disc\n");
 	else
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	return 0;
 }
 RW_FOPS(wd_exp_mode)
@@ -7823,7 +7826,7 @@ static int show_wd_autoreset(struct seq_file *m, void *v)
 	if (ret >= 0)
 		seq_printf(m, "%d\n", ret);
 	else
-		seq_printf(m, "fail\n");
+		seq_puts(m, "fail\n");
 	return 0;
 }
 RW_FOPS(wd_autoreset)
@@ -7831,7 +7834,7 @@ RW_FOPS(wd_autoreset)
 int bypass_proc_create_dev_sd(bpctl_dev_t *pbp_device_block)
 {
 	struct bypass_pfs_sd *current_pfs = &(pbp_device_block->bypass_pfs_set);
-	static struct proc_dir_entry *procfs_dir = NULL;
+	static struct proc_dir_entry *procfs_dir;
 	int ret = 0;
 
 	if (!pbp_device_block->ndev)
