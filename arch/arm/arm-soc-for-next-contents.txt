@@ -29,6 +29,7 @@ next/fixes-non-critical
 		mtd: omap2: allow bulding as a module
 		[SCSI] nsp32: use mdelay instead of large udelay constants
 		hwrng: bcm2835: fix MODULE_LICENSE tag
+		ARM: sirf: use CONFIG_SIRF rather than CONFIG_PRIMA2 where necessary
 
 next/cleanup
 	at91/cleanup
