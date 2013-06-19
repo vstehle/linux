@@ -21,8 +21,14 @@ next/fixes-non-critical
 		git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/board
 	msm/fixes
 		git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-fix-for-3.11
-	patch
+	patches
 		MAINTAINERS: ARM: SIRF: add the source code tree path
+		ARM: dts: msm: Fix merge resolution
+		clocksource: kona: adapt to CLOCKSOURCE_OF_DECLARE change
+		X.509: do not emit any informational output
+		mtd: omap2: allow bulding as a module
+		[SCSI] nsp32: use mdelay instead of large udelay constants
+		hwrng: bcm2835: fix MODULE_LICENSE tag
 
 next/cleanup
 	at91/cleanup
@@ -189,3 +195,5 @@ next/drivers
 		depends on renesas/pinmux-gpio
 	at91/drivers
 		git://github.com/at91linux/linux-at91.git tags/at91-drivers
+	patch
+		gpio: rcar: fix gpio_rcar_of_table
