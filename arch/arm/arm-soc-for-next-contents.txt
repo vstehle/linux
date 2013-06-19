@@ -48,6 +48,8 @@ next/cleanup
 		git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-fix-for-3.11
 	sunxi/core
 		git://github.com/mripard/linux.git tags/sunxi-core-for-3.11
+	zynq/cleanup
+		git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.11
 
 next/soc
 	mvebu/soc
