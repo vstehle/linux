@@ -181,6 +181,8 @@ next/dt
 		git://github.com/mripard/linux.git tags/sunxi-dt-for-3.11
 	at91/dt2
 		git://github.com/at91linux/linux-at91.git tags/at91-dt
+	zynq/dt
+		git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.11
 
 next/drivers
 	ux500/dma40
