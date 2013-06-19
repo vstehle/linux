@@ -115,6 +115,8 @@ next/soc
 		git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.11-soc
 	keystone/soc
 		git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc-for-arm-soc
+	integrator/pci
+		  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git tags/integrator-pci-for-arm-soc
 
 next/boards
 	mvebu/boards
