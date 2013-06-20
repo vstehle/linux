@@ -1023,6 +1023,14 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 			return PTR_ERR(child);
 	}
 
+	if (IS_ENABLED(CONFIG_TWL4030_POWER) && pdata->power) {
+		child = add_child(TWL_MODULE_PM_MASTER, "twl4030_power",
+				  pdata->power, sizeof(*pdata->power), false,
+				  0, 0);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+	}
+
 	return 0;
 }
 
@@ -1234,10 +1242,6 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		WARN(status < 0, "Error: reading twl_idcode register value\n");
 	}
 
-	/* load power event scripts */
-	if (IS_ENABLED(CONFIG_TWL4030_POWER) && pdata && pdata->power)
-		twl4030_power_init(pdata->power);
-
 	/* Maybe init the T2 Interrupt subsystem */
 	if (client->irq) {
 		if (twl_class_is_4030()) {
@@ -1305,17 +1309,7 @@ static struct i2c_driver twl_driver = {
 	.remove		= twl_remove,
 };
 
-static int __init twl_init(void)
-{
-	return i2c_add_driver(&twl_driver);
-}
-subsys_initcall(twl_init);
-
-static void __exit twl_exit(void)
-{
-	i2c_del_driver(&twl_driver);
-}
-module_exit(twl_exit);
+module_i2c_driver(twl_driver);
 
 MODULE_AUTHOR("Texas Instruments, Inc.");
 MODULE_DESCRIPTION("I2C Core interface for TWL");
