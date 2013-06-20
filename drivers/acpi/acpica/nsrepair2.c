@@ -79,11 +79,19 @@ acpi_ns_repair_CID(struct acpi_evaluate_info *info,
 		   union acpi_operand_object **return_object_ptr);
 
 static acpi_status
+acpi_ns_repair_CST(struct acpi_evaluate_info *info,
+		   union acpi_operand_object **return_object_ptr);
+
+static acpi_status
 acpi_ns_repair_FDE(struct acpi_evaluate_info *info,
 		   union acpi_operand_object **return_object_ptr);
 
 static acpi_status
 acpi_ns_repair_HID(struct acpi_evaluate_info *info,
+		   union acpi_operand_object **return_object_ptr);
+
+static acpi_status
+acpi_ns_repair_PRT(struct acpi_evaluate_info *info,
 		   union acpi_operand_object **return_object_ptr);
 
 static acpi_status
@@ -97,18 +105,22 @@ acpi_ns_repair_TSS(struct acpi_evaluate_info *info,
 static acpi_status
 acpi_ns_check_sorted_list(struct acpi_evaluate_info *info,
 			  union acpi_operand_object *return_object,
+			  u32 start_index,
 			  u32 expected_count,
 			  u32 sort_index,
 			  u8 sort_direction, char *sort_key_name);
-
-static void
-acpi_ns_sort_list(union acpi_operand_object **elements,
-		  u32 count, u32 index, u8 sort_direction);
 
 /* Values for sort_direction above */
 
 #define ACPI_SORT_ASCENDING     0
 #define ACPI_SORT_DESCENDING    1
+
+static void
+acpi_ns_remove_element(union acpi_operand_object *obj_desc, u32 index);
+
+static void
+acpi_ns_sort_list(union acpi_operand_object **elements,
+		  u32 count, u32 index, u8 sort_direction);
 
 /*
  * This table contains the names of the predefined methods for which we can
@@ -118,9 +130,11 @@ acpi_ns_sort_list(union acpi_operand_object **elements,
  *
  * _ALR: Sort the list ascending by ambient_illuminance
  * _CID: Strings: uppercase all, remove any leading asterisk
+ * _CST: Sort the list ascending by C state type
  * _FDE: Convert Buffer of BYTEs to a Buffer of DWORDs
  * _GTM: Convert Buffer of BYTEs to a Buffer of DWORDs
  * _HID: Strings: uppercase all, remove any leading asterisk
+ * _PRT: Fix reversed source_name and source_index
  * _PSS: Sort the list descending by Power
  * _TSS: Sort the list descending by Power
  *
@@ -134,9 +148,11 @@ acpi_ns_sort_list(union acpi_operand_object **elements,
 static const struct acpi_repair_info acpi_ns_repairable_names[] = {
 	{"_ALR", acpi_ns_repair_ALR},
 	{"_CID", acpi_ns_repair_CID},
+	{"_CST", acpi_ns_repair_CST},
 	{"_FDE", acpi_ns_repair_FDE},
 	{"_GTM", acpi_ns_repair_FDE},	/* _GTM has same repair as _FDE */
 	{"_HID", acpi_ns_repair_HID},
+	{"_PRT", acpi_ns_repair_PRT},
 	{"_PSS", acpi_ns_repair_PSS},
 	{"_TSS", acpi_ns_repair_TSS},
 	{{0, 0, 0, 0}, NULL}	/* Table terminator */
@@ -237,7 +253,7 @@ acpi_ns_repair_ALR(struct acpi_evaluate_info *info,
 	union acpi_operand_object *return_object = *return_object_ptr;
 	acpi_status status;
 
-	status = acpi_ns_check_sorted_list(info, return_object, 2, 1,
+	status = acpi_ns_check_sorted_list(info, return_object, 0, 2, 1,
 					   ACPI_SORT_ASCENDING,
 					   "AmbientIlluminance");
 
@@ -405,6 +421,92 @@ acpi_ns_repair_CID(struct acpi_evaluate_info *info,
 
 /******************************************************************************
  *
+ * FUNCTION:    acpi_ns_repair_CST
+ *
+ * PARAMETERS:  info                - Method execution information block
+ *              return_object_ptr   - Pointer to the object returned from the
+ *                                    evaluation of a method or object
+ *
+ * RETURN:      Status. AE_OK if object is OK or was repaired successfully
+ *
+ * DESCRIPTION: Repair for the _CST object:
+ *              1. Sort the list ascending by C state type
+ *              2. Ensure type cannot be zero
+ *              3. A sub-package count of zero means _CST is meaningless
+ *              4. Count must match the number of C state sub-packages
+ *
+ *****************************************************************************/
+
+static acpi_status
+acpi_ns_repair_CST(struct acpi_evaluate_info *info,
+		   union acpi_operand_object **return_object_ptr)
+{
+	union acpi_operand_object *return_object = *return_object_ptr;
+	union acpi_operand_object **outer_elements;
+	u32 outer_element_count;
+	union acpi_operand_object *obj_desc;
+	acpi_status status;
+	u8 removing;
+	u32 i;
+
+	ACPI_FUNCTION_NAME(ns_repair_CST);
+
+	/*
+	 * Check if the C-state type values are proportional.
+	 */
+	outer_element_count = return_object->package.count - 1;
+	i = 0;
+	while (i < outer_element_count) {
+		outer_elements = &return_object->package.elements[i + 1];
+		removing = FALSE;
+
+		if ((*outer_elements)->package.count == 0) {
+			ACPI_WARN_PREDEFINED((AE_INFO, info->full_pathname,
+					      info->node_flags,
+					      "SubPackage[%u] - removing entry due to zero count",
+					      i));
+			removing = TRUE;
+			goto remove_element;
+		}
+
+		obj_desc = (*outer_elements)->package.elements[1];	/* Index1 = Type */
+		if ((u32)obj_desc->integer.value == 0) {
+			ACPI_WARN_PREDEFINED((AE_INFO, info->full_pathname,
+					      info->node_flags,
+					      "SubPackage[%u] - removing entry due to invalid Type(0)",
+					      i));
+			removing = TRUE;
+		}
+
+	      remove_element:
+		if (removing) {
+			acpi_ns_remove_element(return_object, i + 1);
+			outer_element_count--;
+		} else {
+			i++;
+		}
+	}
+
+	/* Update top-level package count, Type "Integer" checked elsewhere */
+
+	obj_desc = return_object->package.elements[0];
+	obj_desc->integer.value = outer_element_count;
+
+	/*
+	 * Entries (subpackages) in the _CST Package must be sorted by the
+	 * C-state type, in ascending order.
+	 */
+	status = acpi_ns_check_sorted_list(info, return_object, 1, 4, 1,
+					   ACPI_SORT_ASCENDING, "C-State Type");
+	if (ACPI_FAILURE(status)) {
+		return (status);
+	}
+
+	return (AE_OK);
+}
+
+/******************************************************************************
+ *
  * FUNCTION:    acpi_ns_repair_HID
  *
  * PARAMETERS:  info                - Method execution information block
@@ -488,7 +590,7 @@ acpi_ns_repair_HID(struct acpi_evaluate_info *info,
 
 /******************************************************************************
  *
- * FUNCTION:    acpi_ns_repair_TSS
+ * FUNCTION:    acpi_ns_repair_PRT
  *
  * PARAMETERS:  info                - Method execution information block
  *              return_object_ptr   - Pointer to the object returned from the
@@ -496,38 +598,54 @@ acpi_ns_repair_HID(struct acpi_evaluate_info *info,
  *
  * RETURN:      Status. AE_OK if object is OK or was repaired successfully
  *
- * DESCRIPTION: Repair for the _TSS object. If necessary, sort the object list
- *              descending by the power dissipation values.
+ * DESCRIPTION: Repair for the _PRT object. If necessary, fix reversed
+ *              source_name and source_index field, a common BIOS bug.
  *
  *****************************************************************************/
 
 static acpi_status
-acpi_ns_repair_TSS(struct acpi_evaluate_info *info,
+acpi_ns_repair_PRT(struct acpi_evaluate_info *info,
 		   union acpi_operand_object **return_object_ptr)
 {
-	union acpi_operand_object *return_object = *return_object_ptr;
-	acpi_status status;
-	struct acpi_namespace_node *node;
+	union acpi_operand_object *package_object = *return_object_ptr;
+	union acpi_operand_object **top_object_list;
+	union acpi_operand_object **sub_object_list;
+	union acpi_operand_object *obj_desc;
+	u32 element_count;
+	u32 index;
 
-	/*
-	 * We can only sort the _TSS return package if there is no _PSS in the
-	 * same scope. This is because if _PSS is present, the ACPI specification
-	 * dictates that the _TSS Power Dissipation field is to be ignored, and
-	 * therefore some BIOSs leave garbage values in the _TSS Power field(s).
-	 * In this case, it is best to just return the _TSS package as-is.
-	 * (May, 2011)
-	 */
-	status = acpi_ns_get_node(info->node, "^_PSS",
-				  ACPI_NS_NO_UPSEARCH, &node);
-	if (ACPI_SUCCESS(status)) {
-		return (AE_OK);
+	/* Each element in the _PRT package is a subpackage */
+
+	top_object_list = package_object->package.elements;
+	element_count = package_object->package.count;
+
+	for (index = 0; index < element_count; index++) {
+		sub_object_list = (*top_object_list)->package.elements;
+
+		/*
+		 * If the BIOS has erroneously reversed the _PRT source_name (index 2)
+		 * and the source_index (index 3), fix it. _PRT is important enough to
+		 * workaround this BIOS error. This also provides compatibility with
+		 * other ACPI implementations.
+		 */
+		obj_desc = sub_object_list[3];
+		if (!obj_desc || (obj_desc->common.type != ACPI_TYPE_INTEGER)) {
+			sub_object_list[3] = sub_object_list[2];
+			sub_object_list[2] = obj_desc;
+			info->return_flags |= ACPI_OBJECT_REPAIRED;
+
+			ACPI_WARN_PREDEFINED((AE_INFO, info->full_pathname,
+					      info->node_flags,
+					      "PRT[%X]: Fixed reversed SourceName and SourceIndex",
+					      index));
+		}
+
+		/* Point to the next union acpi_operand_object in the top level package */
+
+		top_object_list++;
 	}
 
-	status = acpi_ns_check_sorted_list(info, return_object, 5, 1,
-					   ACPI_SORT_DESCENDING,
-					   "PowerDissipation");
-
-	return (status);
+	return (AE_OK);
 }
 
 /******************************************************************************
@@ -566,7 +684,7 @@ acpi_ns_repair_PSS(struct acpi_evaluate_info *info,
 	 * incorrectly sorted, sort it. We sort by cpu_frequency, since this
 	 * should be proportional to the power.
 	 */
-	status = acpi_ns_check_sorted_list(info, return_object, 6, 0,
+	status = acpi_ns_check_sorted_list(info, return_object, 0, 6, 0,
 					   ACPI_SORT_DESCENDING,
 					   "CpuFrequency");
 	if (ACPI_FAILURE(status)) {
@@ -601,10 +719,55 @@ acpi_ns_repair_PSS(struct acpi_evaluate_info *info,
 
 /******************************************************************************
  *
+ * FUNCTION:    acpi_ns_repair_TSS
+ *
+ * PARAMETERS:  info                - Method execution information block
+ *              return_object_ptr   - Pointer to the object returned from the
+ *                                    evaluation of a method or object
+ *
+ * RETURN:      Status. AE_OK if object is OK or was repaired successfully
+ *
+ * DESCRIPTION: Repair for the _TSS object. If necessary, sort the object list
+ *              descending by the power dissipation values.
+ *
+ *****************************************************************************/
+
+static acpi_status
+acpi_ns_repair_TSS(struct acpi_evaluate_info *info,
+		   union acpi_operand_object **return_object_ptr)
+{
+	union acpi_operand_object *return_object = *return_object_ptr;
+	acpi_status status;
+	struct acpi_namespace_node *node;
+
+	/*
+	 * We can only sort the _TSS return package if there is no _PSS in the
+	 * same scope. This is because if _PSS is present, the ACPI specification
+	 * dictates that the _TSS Power Dissipation field is to be ignored, and
+	 * therefore some BIOSs leave garbage values in the _TSS Power field(s).
+	 * In this case, it is best to just return the _TSS package as-is.
+	 * (May, 2011)
+	 */
+	status = acpi_ns_get_node(info->node, "^_PSS",
+				  ACPI_NS_NO_UPSEARCH, &node);
+	if (ACPI_SUCCESS(status)) {
+		return (AE_OK);
+	}
+
+	status = acpi_ns_check_sorted_list(info, return_object, 0, 5, 1,
+					   ACPI_SORT_DESCENDING,
+					   "PowerDissipation");
+
+	return (status);
+}
+
+/******************************************************************************
+ *
  * FUNCTION:    acpi_ns_check_sorted_list
  *
  * PARAMETERS:  info                - Method execution information block
  *              return_object       - Pointer to the top-level returned object
+ *              start_index         - Index of the first sub-package
  *              expected_count      - Minimum length of each sub-package
  *              sort_index          - Sub-package entry to sort on
  *              sort_direction      - Ascending or descending
@@ -621,6 +784,7 @@ acpi_ns_repair_PSS(struct acpi_evaluate_info *info,
 static acpi_status
 acpi_ns_check_sorted_list(struct acpi_evaluate_info *info,
 			  union acpi_operand_object *return_object,
+			  u32 start_index,
 			  u32 expected_count,
 			  u32 sort_index,
 			  u8 sort_direction, char *sort_key_name)
@@ -645,11 +809,13 @@ acpi_ns_check_sorted_list(struct acpi_evaluate_info *info,
 	 * Any NULL elements should have been removed by earlier call
 	 * to acpi_ns_remove_null_elements.
 	 */
-	outer_elements = return_object->package.elements;
 	outer_element_count = return_object->package.count;
-	if (!outer_element_count) {
+	if (!outer_element_count || start_index >= outer_element_count) {
 		return (AE_AML_PACKAGE_LIMIT);
 	}
+
+	outer_elements = &return_object->package.elements[start_index];
+	outer_element_count -= start_index;
 
 	previous_value = 0;
 	if (sort_direction == ACPI_SORT_DESCENDING) {
@@ -687,7 +853,8 @@ acpi_ns_check_sorted_list(struct acpi_evaluate_info *info,
 		     (obj_desc->integer.value < previous_value)) ||
 		    ((sort_direction == ACPI_SORT_DESCENDING) &&
 		     (obj_desc->integer.value > previous_value))) {
-			acpi_ns_sort_list(return_object->package.elements,
+			acpi_ns_sort_list(&return_object->package.
+					  elements[start_index],
 					  outer_element_count, sort_index,
 					  sort_direction);
 
@@ -753,4 +920,53 @@ acpi_ns_sort_list(union acpi_operand_object **elements,
 			}
 		}
 	}
+}
+
+/******************************************************************************
+ *
+ * FUNCTION:    acpi_ns_remove_element
+ *
+ * PARAMETERS:  obj_desc            - Package object element list
+ *              index               - Index of element to remove
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Remove the requested element of a package and delete it.
+ *
+ *****************************************************************************/
+
+static void
+acpi_ns_remove_element(union acpi_operand_object *obj_desc, u32 index)
+{
+	union acpi_operand_object **source;
+	union acpi_operand_object **dest;
+	u32 count;
+	u32 new_count;
+	u32 i;
+
+	ACPI_FUNCTION_NAME(ns_remove_element);
+
+	count = obj_desc->package.count;
+	new_count = count - 1;
+
+	source = obj_desc->package.elements;
+	dest = source;
+
+	/* Examine all elements of the package object, remove matched index */
+
+	for (i = 0; i < count; i++) {
+		if (i == index) {
+			acpi_ut_remove_reference(*source);	/* Remove one ref for being in pkg */
+			acpi_ut_remove_reference(*source);
+		} else {
+			*dest = *source;
+			dest++;
+		}
+		source++;
+	}
+
+	/* NULL terminate list and update the package count */
+
+	*dest = NULL;
+	obj_desc->package.count = new_count;
 }

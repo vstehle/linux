@@ -158,7 +158,13 @@ acpi_ns_check_return_value(struct acpi_namespace_node *node,
 		info->parent_package = *return_object_ptr;
 		status = acpi_ns_check_package(info, return_object_ptr);
 		if (ACPI_FAILURE(status)) {
-			goto exit;
+
+			/* We might be able to fix some errors */
+
+			if ((status != AE_AML_OPERAND_TYPE) &&
+			    (status != AE_AML_OPERAND_VALUE)) {
+				goto exit;
+			}
 		}
 	}
 
