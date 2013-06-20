@@ -480,14 +480,9 @@ static int via_suspend(struct hda_codec *codec)
 	struct via_spec *spec = codec->spec;
 	vt1708_stop_hp_work(codec);
 
-	if (spec->codec_type == VT1802) {
-		/* Fix pop noise on headphones */
-		int i;
-		for (i = 0; i < spec->gen.autocfg.hp_outs; i++)
-			snd_hda_codec_write(codec, spec->gen.autocfg.hp_pins[i],
-					    0, AC_VERB_SET_PIN_WIDGET_CONTROL,
-					    0x00);
-	}
+	/* Fix pop noise on headphones */
+	if (spec->codec_type == VT1802)
+		snd_hda_shutup_pins(codec);
 
 	return 0;
 }
@@ -910,6 +905,8 @@ static const struct hda_verb vt1708S_init_verbs[] = {
 static void override_mic_boost(struct hda_codec *codec, hda_nid_t pin,
 			       int offset, int num_steps, int step_size)
 {
+	snd_hda_override_wcaps(codec, pin,
+			       get_wcaps(codec, pin) | AC_WCAP_IN_AMP);
 	snd_hda_override_amp_caps(codec, pin, HDA_INPUT,
 				  (offset << AC_AMPCAP_OFFSET_SHIFT) |
 				  (num_steps << AC_AMPCAP_NUM_STEPS_SHIFT) |
