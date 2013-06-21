@@ -38,6 +38,7 @@
 #include <linux/slab.h>
 #include <linux/hash.h>
 #include <net/ip.h>
+#include <net/ll_poll.h>
 
 #include <linux/mlx4/driver.h>
 #include <linux/mlx4/device.h>
@@ -66,6 +67,34 @@ int mlx4_en_setup_tc(struct net_device *dev, u8 up)
 
 	return 0;
 }
+
+#ifdef CONFIG_NET_LL_RX_POLL
+/* must be called with local_bh_disable()d */
+static int mlx4_en_low_latency_recv(struct napi_struct *napi)
+{
+	struct mlx4_en_cq *cq = container_of(napi, struct mlx4_en_cq, napi);
+	struct net_device *dev = cq->dev;
+	struct mlx4_en_priv *priv = netdev_priv(dev);
+	struct mlx4_en_rx_ring *rx_ring = &priv->rx_ring[cq->ring];
+	int done;
+
+	if (!priv->port_up)
+		return LL_FLUSH_FAILED;
+
+	if (!mlx4_en_cq_lock_poll(cq))
+		return LL_FLUSH_BUSY;
+
+	done = mlx4_en_process_rx_cq(dev, cq, 4);
+	if (likely(done))
+		rx_ring->cleaned += done;
+	else
+		rx_ring->misses++;
+
+	mlx4_en_cq_unlock_poll(cq);
+
+	return done;
+}
+#endif	/* CONFIG_NET_LL_RX_POLL */
 
 #ifdef CONFIG_RFS_ACCEL
 
@@ -1445,6 +1474,8 @@ int mlx4_en_start_port(struct net_device *dev)
 	for (i = 0; i < priv->rx_ring_num; i++) {
 		cq = &priv->rx_cq[i];
 
+		mlx4_en_cq_init_lock(cq);
+
 		err = mlx4_en_activate_cq(priv, cq, i);
 		if (err) {
 			en_err(priv, "Failed activating Rx CQ\n");
@@ -1694,10 +1725,19 @@ void mlx4_en_stop_port(struct net_device *dev, int detach)
 
 	/* Free RX Rings */
 	for (i = 0; i < priv->rx_ring_num; i++) {
+		struct mlx4_en_cq *cq = &priv->rx_cq[i];
+
+		local_bh_disable();
+		while (!mlx4_en_cq_lock_napi(cq)) {
+			pr_info("CQ %d locked\n", i);
+			mdelay(1);
+		}
+		local_bh_enable();
+
 		mlx4_en_deactivate_rx_ring(priv, &priv->rx_ring[i]);
-		while (test_bit(NAPI_STATE_SCHED, &priv->rx_cq[i].napi.state))
+		while (test_bit(NAPI_STATE_SCHED, &cq->napi.state))
 			msleep(1);
-		mlx4_en_deactivate_cq(priv, &priv->rx_cq[i]);
+		mlx4_en_deactivate_cq(priv, cq);
 	}
 
 	/* close port*/
@@ -2061,6 +2101,13 @@ static int mlx4_en_get_vf_config(struct net_device *dev, int vf, struct ifla_vf_
 	return mlx4_get_vf_config(mdev->dev, en_priv->port, vf, ivf);
 }
 
+static int mlx4_en_set_vf_link_state(struct net_device *dev, int vf, int link_state)
+{
+	struct mlx4_en_priv *en_priv = netdev_priv(dev);
+	struct mlx4_en_dev *mdev = en_priv->mdev;
+
+	return mlx4_set_vf_link_state(mdev->dev, en_priv->port, vf, link_state);
+}
 static const struct net_device_ops mlx4_netdev_ops = {
 	.ndo_open		= mlx4_en_open,
 	.ndo_stop		= mlx4_en_close,
@@ -2083,6 +2130,9 @@ static const struct net_device_ops mlx4_netdev_ops = {
 #ifdef CONFIG_RFS_ACCEL
 	.ndo_rx_flow_steer	= mlx4_en_filter_rfs,
 #endif
+#ifdef CONFIG_NET_LL_RX_POLL
+	.ndo_ll_poll		= mlx4_en_low_latency_recv,
+#endif
 };
 
 static const struct net_device_ops mlx4_netdev_ops_master = {
@@ -2101,6 +2151,7 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
 	.ndo_set_vf_mac		= mlx4_en_set_vf_mac,
 	.ndo_set_vf_vlan	= mlx4_en_set_vf_vlan,
 	.ndo_set_vf_spoofchk	= mlx4_en_set_vf_spoofchk,
+	.ndo_set_vf_link_state	= mlx4_en_set_vf_link_state,
 	.ndo_get_vf_config	= mlx4_en_get_vf_config,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= mlx4_en_netpoll,
