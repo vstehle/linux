@@ -17,8 +17,10 @@
  * published by the Free Software Foundation.
 */
 
-/include/ "skeleton.dtsi"
-/include/ "exynos5250-pinctrl.dtsi"
+#include "skeleton.dtsi"
+#include "exynos5250-pinctrl.dtsi"
+
+#include <dt-bindings/clk/exynos-audss-clk.h>
 
 / {
 	compatible = "samsung,exynos5250";
@@ -69,6 +71,12 @@
 	clock: clock-controller@0x10010000 {
 		compatible = "samsung,exynos5250-clock";
 		reg = <0x10010000 0x30000>;
+		#clock-cells = <1>;
+	};
+
+	clock_audss: audss-clock-controller@3810000 {
+		compatible = "samsung,exynos5250-audss-clock";
+		reg = <0x03810000 0x0C>;
 		#clock-cells = <1>;
 	};
 
@@ -161,9 +169,9 @@
 		interrupts = <0 50 0>;
 	};
 
-	pinctrl_3: pinctrl@03680000 {
+	pinctrl_3: pinctrl@03860000 {
 		compatible = "samsung,exynos5250-pinctrl";
-		reg = <0x0368000 0x1000>;
+		reg = <0x03860000 0x1000>;
 		interrupts = <0 47 0>;
 	};
 
@@ -451,6 +459,10 @@
 			&pdma0 9
 			&pdma0 8>;
 		dma-names = "tx", "rx", "tx-sec";
+		clocks = <&clock_audss EXYNOS_I2S_BUS>,
+			<&clock_audss EXYNOS_I2S_BUS>,
+			<&clock_audss EXYNOS_SCLK_I2S>;
+		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
 		samsung,supports-6ch;
 		samsung,supports-rstclr;
 		samsung,supports-secdai;
@@ -465,6 +477,8 @@
 		dmas = <&pdma1 12
 			&pdma1 11>;
 		dma-names = "tx", "rx";
+		clocks = <&clock 307>, <&clock 157>;
+		clock-names = "iis", "i2s_opclk0";
 		pinctrl-names = "default";
 		pinctrl-0 = <&i2s1_bus>;
 	};
@@ -475,8 +489,40 @@
 		dmas = <&pdma0 12
 			&pdma0 11>;
 		dma-names = "tx", "rx";
+		clocks = <&clock 308>, <&clock 158>;
+		clock-names = "iis", "i2s_opclk0";
 		pinctrl-names = "default";
 		pinctrl-0 = <&i2s2_bus>;
+	};
+
+	usb@12000000 {
+		compatible = "samsung,exynos5250-dwusb3";
+		clocks = <&clock 286>;
+		clock-names = "usbdrd30";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		dwc3 {
+			compatible = "synopsys,dwc3";
+			reg = <0x12000000 0x10000>;
+			interrupts = <0 72 0>;
+			usb-phy = <&usb2_phy &usb3_phy>;
+		};
+	};
+
+	usb3_phy: usbphy@12100000 {
+		compatible = "samsung,exynos5250-usb3phy";
+		reg = <0x12100000 0x100>;
+		clocks = <&clock 1>, <&clock 286>;
+		clock-names = "ext_xtal", "usbdrd30";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		usbphy-sys {
+			reg = <0x10040704 0x8>;
+		};
 	};
 
 	usb@12110000 {
@@ -497,7 +543,7 @@
 		clock-names = "usbhost";
 	};
 
-	usbphy@12130000 {
+	usb2_phy: usbphy@12130000 {
 		compatible = "samsung,exynos5250-usb2phy";
 		reg = <0x12130000 0x100>;
 		clocks = <&clock 1>, <&clock 285>;
@@ -621,6 +667,8 @@
 		reg = <0x145b0000 0x1000>;
 		interrupts = <10 3>;
 		interrupt-parent = <&combiner>;
+		clocks = <&clock 342>;
+		clock-names = "dp";
 		#address-cells = <1>;
 		#size-cells = <0>;
 
