@@ -294,3 +294,16 @@ next/late
 		git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v3.11
 	samsung/exynos5420
 		git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git tags/soc-exynos5420-1
+
+testing/soc
+	nspire/soc patches 
+		arm: Add Initial TI-Nspire support
+		arm: Add device trees for TI-Nspire hardware
+	stixxxx/soc patches
+		ARM:stixxxx: Add STiH415 SOC support
+		ARM:stixxxx: Add STiH416 SOC support
+		ARM:stixxxx: Add DEBUG_LL console support
+		ARM:multi_v7_defconfig: rerun savedefconfig
+		ARM:stixxxx: Add stixxxx options to  multi_v7_defconfig
+		ARM:stih41x: Add B2000 board support
+		ARM:stih41x: Add B2020 board support

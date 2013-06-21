@@ -968,6 +968,8 @@ source "arch/arm/mach-netx/Kconfig"
 
 source "arch/arm/mach-nomadik/Kconfig"
 
+source "arch/arm/mach-nspire/Kconfig"
+
 source "arch/arm/plat-omap/Kconfig"
 
 source "arch/arm/mach-omap1/Kconfig"
@@ -994,6 +996,8 @@ source "arch/arm/plat-samsung/Kconfig"
 source "arch/arm/mach-socfpga/Kconfig"
 
 source "arch/arm/mach-spear/Kconfig"
+
+source "arch/arm/mach-stixxxx/Kconfig"
 
 source "arch/arm/mach-s3c24xx/Kconfig"
 
