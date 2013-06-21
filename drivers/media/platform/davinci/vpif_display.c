@@ -14,33 +14,15 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/fs.h>
-#include <linux/mm.h>
 #include <linux/interrupt.h>
-#include <linux/workqueue.h>
-#include <linux/string.h>
-#include <linux/videodev2.h>
-#include <linux/wait.h>
-#include <linux/time.h>
-#include <linux/i2c.h>
+#include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/io.h>
 #include <linux/slab.h>
 
-#include <asm/irq.h>
-#include <asm/page.h>
-
-#include <media/adv7343.h>
-#include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
-#include <media/v4l2-chip-ident.h>
 
-#include "vpif_display.h"
 #include "vpif.h"
+#include "vpif_display.h"
 
 MODULE_DESCRIPTION("TI DaVinci VPIF Display driver");
 MODULE_LICENSE("GPL");
@@ -1518,66 +1500,6 @@ static int vpif_g_dv_timings(struct file *file, void *priv,
 }
 
 /*
- * vpif_g_chip_ident() - Identify the chip
- * @file: file ptr
- * @priv: file handle
- * @chip: chip identity
- *
- * Returns zero or -EINVAL if read operations fails.
- */
-static int vpif_g_chip_ident(struct file *file, void *priv,
-		struct v4l2_dbg_chip_ident *chip)
-{
-	chip->ident = V4L2_IDENT_NONE;
-	chip->revision = 0;
-	if (chip->match.type != V4L2_CHIP_MATCH_I2C_DRIVER &&
-			chip->match.type != V4L2_CHIP_MATCH_I2C_ADDR) {
-		vpif_dbg(2, debug, "match_type is invalid.\n");
-		return -EINVAL;
-	}
-
-	return v4l2_device_call_until_err(&vpif_obj.v4l2_dev, 0, core,
-			g_chip_ident, chip);
-}
-
-#ifdef CONFIG_VIDEO_ADV_DEBUG
-/*
- * vpif_dbg_g_register() - Read register
- * @file: file ptr
- * @priv: file handle
- * @reg: register to be read
- *
- * Debugging only
- * Returns zero or -EINVAL if read operations fails.
- */
-static int vpif_dbg_g_register(struct file *file, void *priv,
-		struct v4l2_dbg_register *reg){
-	struct vpif_fh *fh = priv;
-	struct channel_obj *ch = fh->channel;
-
-	return v4l2_subdev_call(ch->sd, core, g_register, reg);
-}
-
-/*
- * vpif_dbg_s_register() - Write to register
- * @file: file ptr
- * @priv: file handle
- * @reg: register to be modified
- *
- * Debugging only
- * Returns zero or -EINVAL if write operations fails.
- */
-static int vpif_dbg_s_register(struct file *file, void *priv,
-		const struct v4l2_dbg_register *reg)
-{
-	struct vpif_fh *fh = priv;
-	struct channel_obj *ch = fh->channel;
-
-	return v4l2_subdev_call(ch->sd, core, s_register, reg);
-}
-#endif
-
-/*
  * vpif_log_status() - Status information
  * @file: file ptr
  * @priv: file handle
@@ -1616,11 +1538,6 @@ static const struct v4l2_ioctl_ops vpif_ioctl_ops = {
 	.vidioc_enum_dv_timings         = vpif_enum_dv_timings,
 	.vidioc_s_dv_timings            = vpif_s_dv_timings,
 	.vidioc_g_dv_timings            = vpif_g_dv_timings,
-	.vidioc_g_chip_ident		= vpif_g_chip_ident,
-#ifdef CONFIG_VIDEO_ADV_DEBUG
-	.vidioc_g_register		= vpif_dbg_g_register,
-	.vidioc_s_register		= vpif_dbg_s_register,
-#endif
 	.vidioc_log_status		= vpif_log_status,
 };
 
@@ -1742,6 +1659,7 @@ static __init int vpif_probe(struct platform_device *pdev)
 				for (j = 0; j < i; j++)
 					free_irq(j, (void *)
 					(&vpif_obj.dev[res_idx]->channel_id));
+				vpif_err("VPIF IRQ request failed\n");
 				goto vpif_int_err;
 			}
 		}
@@ -1813,6 +1731,7 @@ static __init int vpif_probe(struct platform_device *pdev)
 						NULL);
 		if (!vpif_obj.sd[i]) {
 			vpif_err("Error registering v4l2 subdevice\n");
+			err = -ENODEV;
 			goto probe_subdev_out;
 		}
 
@@ -1895,7 +1814,6 @@ vpif_sd_error:
 	}
 vpif_int_err:
 	v4l2_device_unregister(&vpif_obj.v4l2_dev);
-	vpif_err("VPIF IRQ request failed\n");
 	for (i = 0; i < res_idx; i++) {
 		res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
 		for (j = res->start; j <= res->end; j++)
