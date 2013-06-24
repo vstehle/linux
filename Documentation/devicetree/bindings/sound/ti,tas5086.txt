@@ -11,7 +11,7 @@ Optional properties:
 			chip's !RESET pin. If specified, the driver will
 			assert a hardware reset at probe time.
 
- - ti,charge-period:	This property should contain the time in microseconds
+ - ti,charge-period:	This property should contain the time in nanoseconds
 			that closely matches the external single-ended
 			split-capacitor charge period. The hardware chip
 			waits for this period of time before starting the
@@ -19,6 +19,17 @@ Optional properties:
 
 			When not specified, the hardware default of 1300ms
 			is retained.
+
+ - ti,mid-z-channel-X:	Boolean properties, X being a number from 1 to 6.
+			If given, channel X will start with the Mid-Z start
+			sequence, otherwise the default Low-Z scheme is used.
+
+			The correct configuration depends on how the power
+			stages connected to the PWM output pins work. Not all
+			power stages are compatible to Mid-Z - please refer
+			to the datasheets for more details.
+
+			Most systems should not set any of these properties.
 
 Examples:
 
