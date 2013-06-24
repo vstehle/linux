@@ -213,7 +213,7 @@ static int cifs_debug_data_proc_show(struct seq_file *m, void *v)
 						   tcon->nativeFileSystem);
 				}
 				seq_printf(m, "DevInfo: 0x%x Attributes: 0x%x"
-					"\nPathComponentMax: %d Status: 0x%d",
+					"\n\tPathComponentMax: %d Status: 0x%d",
 					le32_to_cpu(tcon->fsDevInfo.DeviceCharacteristics),
 					le32_to_cpu(tcon->fsAttrInfo.Attributes),
 					le32_to_cpu(tcon->fsAttrInfo.MaxPathNameComponentLength),
@@ -224,6 +224,8 @@ static int cifs_debug_data_proc_show(struct seq_file *m, void *v)
 					seq_puts(m, " type: CDROM ");
 				else
 					seq_printf(m, " type: %d ", dev_type);
+				if (server->ops->dump_share_caps)
+					server->ops->dump_share_caps(m, tcon);
 
 				if (tcon->need_reconnect)
 					seq_puts(m, "\tDISCONNECTED ");
@@ -598,6 +600,7 @@ static int cifs_security_flags_proc_open(struct inode *inode, struct file *file)
 static ssize_t cifs_security_flags_proc_write(struct file *file,
 		const char __user *buffer, size_t count, loff_t *ppos)
 {
+	int rc;
 	unsigned int flags;
 	char flags_string[12];
 	char c;
@@ -620,26 +623,33 @@ static ssize_t cifs_security_flags_proc_write(struct file *file,
 			global_secflags = CIFSSEC_MAX;
 			return count;
 		} else if (!isdigit(c)) {
-			cifs_dbg(VFS, "invalid flag %c\n", c);
+			cifs_dbg(VFS, "Invalid SecurityFlags: %s\n",
+					flags_string);
 			return -EINVAL;
 		}
 	}
-	/* else we have a number */
 
-	flags = simple_strtoul(flags_string, NULL, 0);
+	/* else we have a number */
+	rc = kstrtouint(flags_string, 0, &flags);
+	if (rc) {
+		cifs_dbg(VFS, "Invalid SecurityFlags: %s\n",
+				flags_string);
+		return rc;
+	}
 
 	cifs_dbg(FYI, "sec flags 0x%x\n", flags);
 
-	if (flags <= 0)  {
-		cifs_dbg(VFS, "invalid security flags %s\n", flags_string);
+	if (flags == 0)  {
+		cifs_dbg(VFS, "Invalid SecurityFlags: %s\n", flags_string);
 		return -EINVAL;
 	}
 
 	if (flags & ~CIFSSEC_MASK) {
-		cifs_dbg(VFS, "attempt to set unsupported security flags 0x%x\n",
+		cifs_dbg(VFS, "Unsupported security flags: 0x%x\n",
 			 flags & ~CIFSSEC_MASK);
 		return -EINVAL;
 	}
+
 	/* flags look ok - update the global security flags for cifs module */
 	global_secflags = flags;
 	if (global_secflags & CIFSSEC_MUST_SIGN) {
