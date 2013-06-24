@@ -11,7 +11,7 @@ Optional properties:
 			chip's !RESET pin. If specified, the driver will
 			assert a hardware reset at probe time.
 
- - ti,charge-period:	This property should contain the time in microseconds
+ - ti,charge-period:	This property should contain the time in nanoseconds
 			that closely matches the external single-ended
 			split-capacitor charge period. The hardware chip
 			waits for this period of time before starting the
