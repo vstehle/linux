@@ -196,6 +196,32 @@ static int i915_gem_object_list_info(struct seq_file *m, void *data)
 	} \
 } while (0)
 
+struct file_stats {
+	int count;
+	size_t total, active, inactive, unbound;
+};
+
+static int per_file_stats(int id, void *ptr, void *data)
+{
+	struct drm_i915_gem_object *obj = ptr;
+	struct file_stats *stats = data;
+
+	stats->count++;
+	stats->total += obj->base.size;
+
+	if (obj->gtt_space) {
+		if (!list_empty(&obj->ring_list))
+			stats->active += obj->base.size;
+		else
+			stats->inactive += obj->base.size;
+	} else {
+		if (!list_empty(&obj->global_list))
+			stats->unbound += obj->base.size;
+	}
+
+	return 0;
+}
+
 static int i915_gem_object_info(struct seq_file *m, void* data)
 {
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
@@ -204,6 +230,7 @@ static int i915_gem_object_info(struct seq_file *m, void* data)
 	u32 count, mappable_count, purgeable_count;
 	size_t size, mappable_size, purgeable_size;
 	struct drm_i915_gem_object *obj;
+	struct drm_file *file;
 	int ret;
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
@@ -215,7 +242,7 @@ static int i915_gem_object_info(struct seq_file *m, void* data)
 		   dev_priv->mm.object_memory);
 
 	size = count = mappable_size = mappable_count = 0;
-	count_objects(&dev_priv->mm.bound_list, gtt_list);
+	count_objects(&dev_priv->mm.bound_list, global_list);
 	seq_printf(m, "%u [%u] objects, %zu [%zu] bytes in gtt\n",
 		   count, mappable_count, size, mappable_size);
 
@@ -230,7 +257,7 @@ static int i915_gem_object_info(struct seq_file *m, void* data)
 		   count, mappable_count, size, mappable_size);
 
 	size = count = purgeable_size = purgeable_count = 0;
-	list_for_each_entry(obj, &dev_priv->mm.unbound_list, gtt_list) {
+	list_for_each_entry(obj, &dev_priv->mm.unbound_list, global_list) {
 		size += obj->base.size, ++count;
 		if (obj->madv == I915_MADV_DONTNEED)
 			purgeable_size += obj->base.size, ++purgeable_count;
@@ -238,7 +265,7 @@ static int i915_gem_object_info(struct seq_file *m, void* data)
 	seq_printf(m, "%u unbound objects, %zu bytes\n", count, size);
 
 	size = count = mappable_size = mappable_count = 0;
-	list_for_each_entry(obj, &dev_priv->mm.bound_list, gtt_list) {
+	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_list) {
 		if (obj->fault_mappable) {
 			size += obj->gtt_space->size;
 			++count;
@@ -263,6 +290,21 @@ static int i915_gem_object_info(struct seq_file *m, void* data)
 		   dev_priv->gtt.total,
 		   dev_priv->gtt.mappable_end - dev_priv->gtt.start);
 
+	seq_printf(m, "\n");
+	list_for_each_entry_reverse(file, &dev->filelist, lhead) {
+		struct file_stats stats;
+
+		memset(&stats, 0, sizeof(stats));
+		idr_for_each(&file->object_idr, per_file_stats, &stats);
+		seq_printf(m, "%s: %u objects, %zu bytes (%zu active, %zu inactive, %zu unbound)\n",
+			   get_pid_task(file->pid, PIDTYPE_PID)->comm,
+			   stats.count,
+			   stats.total,
+			   stats.active,
+			   stats.inactive,
+			   stats.unbound);
+	}
+
 	mutex_unlock(&dev->struct_mutex);
 
 	return 0;
@@ -283,7 +325,7 @@ static int i915_gem_gtt_info(struct seq_file *m, void* data)
 		return ret;
 
 	total_obj_size = total_gtt_size = count = 0;
-	list_for_each_entry(obj, &dev_priv->mm.bound_list, gtt_list) {
+	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_list) {
 		if (list == PINNED_LIST && obj->pin_count == 0)
 			continue;
 
@@ -1427,6 +1469,9 @@ static int i915_fbc_status(struct seq_file *m, void *unused)
 		case FBC_MODULE_PARAM:
 			seq_printf(m, "disabled per module param (default off)");
 			break;
+		case FBC_CHIP_DEFAULT:
+			seq_printf(m, "disabled per chip default");
+			break;
 		default:
 			seq_printf(m, "unknown reason");
 		}
@@ -1441,7 +1486,7 @@ static int i915_ips_status(struct seq_file *m, void *unused)
 	struct drm_device *dev = node->minor->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (!IS_ULT(dev)) {
+	if (!HAS_IPS(dev)) {
 		seq_puts(m, "not supported\n");
 		return 0;
 	}
@@ -1944,7 +1989,8 @@ i915_drop_caches_set(void *data, u64 val)
 	}
 
 	if (val & DROP_UNBOUND) {
-		list_for_each_entry_safe(obj, next, &dev_priv->mm.unbound_list, gtt_list)
+		list_for_each_entry_safe(obj, next, &dev_priv->mm.unbound_list,
+					 global_list)
 			if (obj->pages_pin_count == 0) {
 				ret = i915_gem_object_put_pages(obj);
 				if (ret)
