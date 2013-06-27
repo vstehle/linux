@@ -72,6 +72,7 @@
  *	 A store crossing a page boundary might be executed only partially.
  *	 Undo the partial store in this case.
  */
+#include <linux/context_tracking.h>
 #include <linux/mm.h>
 #include <linux/signal.h>
 #include <linux/smp.h>
@@ -1548,11 +1549,14 @@ sigill:
 	    ("Unhandled kernel unaligned access or invalid instruction", regs);
 	force_sig(SIGILL, current);
 }
+
 asmlinkage void do_ade(struct pt_regs *regs)
 {
+	enum ctx_state prev_state;
 	unsigned int __user *pc;
 	mm_segment_t seg;
 
+	prev_state = exception_enter();
 	perf_sw_event(PERF_COUNT_SW_ALIGNMENT_FAULTS,
 			1, regs, regs->cp0_badvaddr);
 	/*
@@ -1628,6 +1632,7 @@ sigbus:
 	/*
 	 * XXX On return from the signal handler we should advance the epc
 	 */
+	exception_exit(prev_state);
 }
 
 #ifdef CONFIG_DEBUG_FS
