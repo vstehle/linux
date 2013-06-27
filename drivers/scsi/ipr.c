@@ -8979,19 +8979,6 @@ static int ipr_alloc_mem(struct ipr_ioa_cfg *ioa_cfg)
 	if (!ioa_cfg->res_entries)
 		goto out;
 
-	if (ioa_cfg->sis64) {
-		ioa_cfg->target_ids = kzalloc(sizeof(unsigned long) *
-					      BITS_TO_LONGS(ioa_cfg->max_devs_supported), GFP_KERNEL);
-		ioa_cfg->array_ids = kzalloc(sizeof(unsigned long) *
-					     BITS_TO_LONGS(ioa_cfg->max_devs_supported), GFP_KERNEL);
-		ioa_cfg->vset_ids = kzalloc(sizeof(unsigned long) *
-					    BITS_TO_LONGS(ioa_cfg->max_devs_supported), GFP_KERNEL);
-
-		if (!ioa_cfg->target_ids || !ioa_cfg->array_ids
-			|| !ioa_cfg->vset_ids)
-			goto out_free_res_entries;
-	}
-
 	for (i = 0; i < ioa_cfg->max_devs_supported; i++) {
 		list_add_tail(&ioa_cfg->res_entries[i].queue, &ioa_cfg->free_res_q);
 		ioa_cfg->res_entries[i].ioa_cfg = ioa_cfg;
@@ -9088,9 +9075,6 @@ out_free_vpd_cbs:
 			    ioa_cfg->vpd_cbs, ioa_cfg->vpd_cbs_dma);
 out_free_res_entries:
 	kfree(ioa_cfg->res_entries);
-	kfree(ioa_cfg->target_ids);
-	kfree(ioa_cfg->array_ids);
-	kfree(ioa_cfg->vset_ids);
 	goto out;
 }
 
@@ -9407,7 +9391,7 @@ static int ipr_probe_ioa(struct pci_dev *pdev,
 	void __iomem *ipr_regs;
 	int rc = PCIBIOS_SUCCESSFUL;
 	volatile u32 mask, uproc, interrupts;
-	unsigned long lock_flags;
+	unsigned long lock_flags, driver_lock_flags;
 
 	ENTER;
 
@@ -9630,9 +9614,9 @@ static int ipr_probe_ioa(struct pci_dev *pdev,
 	} else
 		ioa_cfg->reset = ipr_reset_start_bist;
 
-	spin_lock(&ipr_driver_lock);
+	spin_lock_irqsave(&ipr_driver_lock, driver_lock_flags);
 	list_add_tail(&ioa_cfg->queue, &ipr_ioa_head);
-	spin_unlock(&ipr_driver_lock);
+	spin_unlock_irqrestore(&ipr_driver_lock, driver_lock_flags);
 
 	LEAVE;
 out:
@@ -9715,6 +9699,7 @@ static void __ipr_remove(struct pci_dev *pdev)
 	unsigned long host_lock_flags = 0;
 	struct ipr_ioa_cfg *ioa_cfg = pci_get_drvdata(pdev);
 	int i;
+	unsigned long driver_lock_flags;
 	ENTER;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, host_lock_flags);
@@ -9738,9 +9723,9 @@ static void __ipr_remove(struct pci_dev *pdev)
 	INIT_LIST_HEAD(&ioa_cfg->used_res_q);
 	spin_lock_irqsave(ioa_cfg->host->host_lock, host_lock_flags);
 
-	spin_lock(&ipr_driver_lock);
+	spin_lock_irqsave(&ipr_driver_lock, driver_lock_flags);
 	list_del(&ioa_cfg->queue);
-	spin_unlock(&ipr_driver_lock);
+	spin_unlock_irqrestore(&ipr_driver_lock, driver_lock_flags);
 
 	if (ioa_cfg->sdt_state == ABORT_DUMP)
 		ioa_cfg->sdt_state = WAIT_FOR_DUMP;
@@ -10006,12 +9991,12 @@ static int ipr_halt(struct notifier_block *nb, ulong event, void *buf)
 {
 	struct ipr_cmnd *ipr_cmd;
 	struct ipr_ioa_cfg *ioa_cfg;
-	unsigned long flags = 0;
+	unsigned long flags = 0, driver_lock_flags;
 
 	if (event != SYS_RESTART && event != SYS_HALT && event != SYS_POWER_OFF)
 		return NOTIFY_DONE;
 
-	spin_lock(&ipr_driver_lock);
+	spin_lock_irqsave(&ipr_driver_lock, driver_lock_flags);
 
 	list_for_each_entry(ioa_cfg, &ipr_ioa_head, queue) {
 		spin_lock_irqsave(ioa_cfg->host->host_lock, flags);
@@ -10029,7 +10014,7 @@ static int ipr_halt(struct notifier_block *nb, ulong event, void *buf)
 		ipr_do_req(ipr_cmd, ipr_halt_done, ipr_timeout, IPR_DEVICE_RESET_TIMEOUT);
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, flags);
 	}
-	spin_unlock(&ipr_driver_lock);
+	spin_unlock_irqrestore(&ipr_driver_lock, driver_lock_flags);
 
 	return NOTIFY_OK;
 }
