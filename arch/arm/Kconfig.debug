@@ -258,6 +258,13 @@ choice
 		  Say Y here if you want kernel low-level debugging support
 		  on i.MX6SL.
 
+	config DEBUG_VF6XX_UART
+		bool "Vybrid VF6XX Debug UART"
+		depends on SOC_VF610
+		help
+		  Say Y here if you want kernel low-level debugging support
+		  on Vybrid VF6xx.
+
 	config DEBUG_KEYSTONE_UART0
 		bool "Kernel low-level debugging on KEYSTONE2 using UART0"
 		depends on ARCH_KEYSTONE
@@ -624,7 +631,8 @@ config DEBUG_IMX_UART_PORT
 						DEBUG_IMX51_UART || \
 						DEBUG_IMX53_UART || \
 						DEBUG_IMX6Q_UART || \
-						DEBUG_IMX6SL_UART
+						DEBUG_IMX6SL_UART || \
+						DEBUG_VF6XX_UART
 	default 1
 	depends on ARCH_MXC
 	help
@@ -774,7 +782,8 @@ config DEBUG_LL_INCLUDE
 				 DEBUG_IMX51_UART || \
 				 DEBUG_IMX53_UART ||\
 				 DEBUG_IMX6Q_UART || \
-				 DEBUG_IMX6SL_UART
+				 DEBUG_IMX6SL_UART || \
+				 DEBUG_VF6XX_UART
 	default "debug/keystone.S" if DEBUG_KEYSTONE_UART0 || \
 				      DEBUG_KEYSTONE_UART1
 	default "debug/mvebu.S" if DEBUG_MVEBU_UART || \
