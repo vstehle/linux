@@ -22,7 +22,7 @@ unsigned int __machine_arch_type;
 #include <linux/types.h>
 #include <linux/linkage.h>
 
-static void putstr(const char *ptr);
+extern void putstr(const char *ptr);
 extern void error(char *x);
 
 #include CONFIG_UNCOMPRESS_INCLUDE
@@ -83,7 +83,7 @@ static void icedcc_putc(int ch)
 #define putc(ch)	icedcc_putc(ch)
 #endif
 
-static void putstr(const char *ptr)
+void putstr(const char *ptr)
 {
 	char c;
 

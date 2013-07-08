@@ -9,6 +9,7 @@
 extern unsigned long free_mem_ptr;
 extern unsigned long free_mem_end_ptr;
 extern void error(char *);
+extern void putstr(const char *ptr);
 
 #define STATIC static
 #define STATIC_RW_DATA	/* non-static please */
@@ -57,5 +58,6 @@ extern char * strstr(const char * s1, const char *s2);
 
 int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
 {
+	putstr("This is do_decompress\n");
 	return decompress(input, len, NULL, NULL, output, NULL, error);
 }
