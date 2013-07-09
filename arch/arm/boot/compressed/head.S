@@ -12,6 +12,22 @@
 #include <asm/assembler.h>
 
 	.arch	armv7-a
+
+		/* Debug! */
+		.macro	debug_wait, a, t
+1003:		ldrb	\t, [\a, #4]		@ UARTx_S1
+		tst	\t, #0x80		@ TDRE
+		beq	1003b
+		.endm
+
+		.macro	debug, a, v, c
+		ldr	\a, =0x40028000		@ UART1
+		debug_wait \a, \v
+		mov	\v, #\c
+		strb	\v, [\a, #7]		@ UART1_D
+		debug_wait \a, \v
+		.endm
+
 /*
  * Debugging stuff
  *
@@ -135,8 +151,15 @@ start:
 		.word	_edata			@ zImage end address
  THUMB(		.thumb			)
 1:
+
+		/* Debug! */
+		debug	r9, r8, 0x58		@ 'X'
+
 		mrs	r9, cpsr
 #ifdef CONFIG_ARM_VIRT_EXT
+		/* Debug! */
+		debug	r7, r8, 0x48		@ 'H'
+
 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
 #endif
 		mov	r7, r1			@ save architecture ID
@@ -192,7 +215,12 @@ not_angel:
 		orrcc	r4, r4, #1		@ remember we skipped cache_on
 		blcs	cache_on
 
-restart:	adr	r0, LC0
+restart:
+
+		/* Debug! */
+		debug	r0, r1, 0x52		@ 'R'
+
+		adr	r0, LC0
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
 		ldr	sp, [r0, #28]
 
@@ -562,6 +590,10 @@ params:		ldr	r0, =0x10000100		@ params_phys for RPC
  */
 		.align	5
 cache_on:	mov	r3, #8			@ cache_on function
+
+		/* Debug! */
+		debug	r0, r1, 0x43		@ 'C'
+
 		b	call_cache_fn
 
 /*
@@ -794,6 +826,10 @@ __common_mmu_cache_on:
  */
 
 call_cache_fn:	adr	r12, proc_types
+
+		/* Debug! */
+		debug	r2, r1, 0x63		@ 'c'
+
 #ifdef CONFIG_CPU_CP15
 		mrc	p15, 0, r9, c0, c0	@ get processor ID
 #else
@@ -989,6 +1025,10 @@ proc_types:
  */
 		.align	5
 cache_off:	mov	r3, #12			@ cache_off function
+
+		/* Debug! */
+		debug	r0, r1, 0x4f		@ 'O'
+
 		b	call_cache_fn
 
 __armv4_mpu_cache_off:
@@ -1050,6 +1090,10 @@ __armv7_mmu_cache_off:
 		.align	5
 cache_clean_flush:
 		mov	r3, #16
+
+		/* Debug! */
+		debug	r2, r1, 0x46		@ 'F'
+
 		b	call_cache_fn
 
 __armv4_mpu_cache_flush:
