@@ -17,6 +17,8 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 
+#define DEBUG
+
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/mm.h>
@@ -387,6 +389,8 @@ static int sdma_run_channel(struct sdma_channel *sdmac)
 	int channel = sdmac->channel;
 	int ret;
 
+	printk("sdma_run_channel\n");
+
 	init_completion(&sdmac->done);
 
 	wmb();
@@ -432,6 +436,8 @@ static void sdma_event_enable(struct sdma_channel *sdmac, unsigned int event)
 	int channel = sdmac->channel;
 	u32 val;
 	u32 chnenbl = chnenbl_ofs(sdma, event);
+
+	printk("sdma_event_enable %i\n", event);
 
 	val = readl_relaxed(sdma->regs + chnenbl);
 	val |= (1 << channel);
@@ -911,6 +917,8 @@ out:
 
 static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
 {
+	printk("sdma_enable_channel\n");
+
 	wmb();
 	writel(1 << channel, sdma->regs + SDMA_H_START);
 }
@@ -939,6 +947,8 @@ static dma_cookie_t sdma_tx_submit(struct dma_async_tx_descriptor *tx)
 	struct sdma_engine *sdma = sdmac->sdma;
 	dma_cookie_t cookie;
 	unsigned long flag;
+
+	printk("sdma_tx_submit\n");
 
 	spin_lock_irqsave(&sdmac->lock, flag);
 
