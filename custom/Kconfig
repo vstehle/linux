@@ -22,4 +22,10 @@ config CUSTOM_SCULL
 	---help---
 	  This module is LDD3 scull.
 
+config CUSTOM_SDMA
+	tristate "Custom SDMA"
+	default m
+	---help---
+	  This module is an attempt at SDMA.
+
 endif   # if CUSTOM
