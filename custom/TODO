@@ -1,0 +1,4 @@
+- Mux ext event
+- Toggle gpio to emulate request
+- ioctl to query progress
+- More (see code)
