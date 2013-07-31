@@ -16,4 +16,10 @@ config CUSTOM_HELLO
 	---help---
 	  This module is LDD3 hello.
 
+config CUSTOM_SCULL
+	tristate "Custom scull"
+	default m
+	---help---
+	  This module is LDD3 scull.
+
 endif   # if CUSTOM
