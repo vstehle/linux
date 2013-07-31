@@ -1,0 +1,19 @@
+#
+# Custom configuration
+#
+
+menuconfig CUSTOM
+	bool "Custom modules"
+	default y
+	---help---
+	  Say yes to enable custom folder.
+
+if CUSTOM
+
+config CUSTOM_HELLO
+	tristate "Custom hello"
+	default m
+	---help---
+	  This module is LDD3 hello.
+
+endif   # if CUSTOM

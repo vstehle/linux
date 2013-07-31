@@ -509,6 +509,7 @@ scripts: scripts_basic include/config/auto.conf include/config/tristate.conf
 init-y		:= init/
 drivers-y	:= drivers/ sound/ firmware/
 net-y		:= net/
+custom-y	:= custom/
 libs-y		:= lib/
 core-y		:= usr/
 endif # KBUILD_EXTMOD
@@ -712,17 +713,18 @@ core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
 
 vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
-		     $(net-y) $(net-m) $(libs-y) $(libs-m)))
+		     $(net-y) $(net-m) $(custom-y) $(custom-m) $(libs-y) $(libs-m)))
 
 vmlinux-alldirs	:= $(sort $(vmlinux-dirs) $(patsubst %/,%,$(filter %/, \
 		     $(init-n) $(init-) \
 		     $(core-n) $(core-) $(drivers-n) $(drivers-) \
-		     $(net-n)  $(net-)  $(libs-n)    $(libs-))))
+		     $(net-n)  $(net-) $(custom-n)  $(custom-) $(libs-n)    $(libs-))))
 
 init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
 core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
 drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
 net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
+custom-y	:= $(patsubst %/, %/built-in.o, $(custom-y))
 libs-y1		:= $(patsubst %/, %/lib.a, $(libs-y))
 libs-y2		:= $(patsubst %/, %/built-in.o, $(libs-y))
 libs-y		:= $(libs-y1) $(libs-y2)
@@ -755,7 +757,7 @@ libs-y		:= $(libs-y1) $(libs-y2)
 # System.map is generated to document addresses of all kernel symbols
 
 vmlinux-init := $(head-y) $(init-y)
-vmlinux-main := $(core-y) $(libs-y) $(drivers-y) $(net-y)
+vmlinux-main := $(core-y) $(libs-y) $(drivers-y) $(net-y) $(custom-y)
 vmlinux-all  := $(vmlinux-init) $(vmlinux-main)
 vmlinux-lds  := arch/$(SRCARCH)/kernel/vmlinux.lds
 export KBUILD_VMLINUX_OBJS := $(vmlinux-all)
