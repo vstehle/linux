@@ -442,6 +442,8 @@ static void sdma_event_enable(struct sdma_channel *sdmac, unsigned int event)
 	val = readl_relaxed(sdma->regs + chnenbl);
 	val |= (1 << channel);
 	writel_relaxed(val, sdma->regs + chnenbl);
+
+	printk("sdma_event_enable\n");
 }
 
 static void sdma_event_disable(struct sdma_channel *sdmac, unsigned int event)
@@ -957,6 +959,8 @@ static dma_cookie_t sdma_tx_submit(struct dma_async_tx_descriptor *tx)
 	sdma_enable_channel(sdma, sdmac->channel);
 
 	spin_unlock_irqrestore(&sdmac->lock, flag);
+
+	printk("sdma_tx_submit\n");
 
 	return cookie;
 }
