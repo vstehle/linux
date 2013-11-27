@@ -1,5 +1,5 @@
 config DRM_TEGRA
-	bool "NVIDIA Tegra DRM"
+	tristate "NVIDIA Tegra DRM"
 	depends on ARCH_TEGRA || ARCH_MULTIPLATFORM
 	depends on DRM
 	select TEGRA_HOST1X
@@ -8,6 +8,7 @@ config DRM_TEGRA
 	select FB_SYS_FILLRECT
 	select FB_SYS_COPYAREA
 	select FB_SYS_IMAGEBLIT
+	select TEGRA_HOST1X
 	help
 	  Choose this option if you have an NVIDIA Tegra SoC.
 

@@ -93,6 +93,7 @@ u32 host1x_syncpt_id(struct host1x_syncpt *sp)
 {
 	return sp->id;
 }
+EXPORT_SYMBOL(host1x_syncpt_id);
 
 /*
  * Updates the value sent to hardware.
