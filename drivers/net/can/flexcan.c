@@ -240,12 +240,12 @@ static const struct can_bittiming_const flexcan_bittiming_const = {
 #if defined(__BIG_ENDIAN)
 static inline u32 flexcan_read(void __iomem *addr)
 {
-	return in_be32(addr);
+	return ioread32be(addr);
 }
 
 static inline void flexcan_write(u32 val, void __iomem *addr)
 {
-	out_be32(addr, val);
+	iowrite32be(val, addr);
 }
 #else
 static inline u32 flexcan_read(void __iomem *addr)
