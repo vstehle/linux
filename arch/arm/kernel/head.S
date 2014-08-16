@@ -114,6 +114,9 @@ ENTRY(stext)
 	ldr	r8, =PLAT_PHYS_OFFSET		@ always constant in this case
 #endif
 
+	/* Force machine = NSLU2. */
+	ldr	r1, =597
+
 	/*
 	 * r1 = machine no, r2 = atags or dtb,
 	 * r8 = phys_offset, r9 = cpuid, r10 = procinfo
