@@ -336,6 +336,11 @@ static DEVICE_ATTR(pm_qos_remote_wakeup, 0644,
 static const char _enabled[] = "enabled";
 static const char _disabled[] = "disabled";
 
+static const char unknown[] = "unknown";
+static const char invalid[] = "invalid";
+static const char automatic[] = "automatic";
+static const char user[] = "user";
+
 static ssize_t
 wake_show(struct device * dev, struct device_attribute *attr, char * buf)
 {
