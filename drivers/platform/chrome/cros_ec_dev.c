@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 
+#include "cros_ec_debugfs.h"
 #include "cros_ec_dev.h"
 
 #define DRV_NAME "cros-ec-ctl"
@@ -492,6 +493,9 @@ static int ec_device_probe(struct platform_device *pdev)
 	if (ec_has_lightbar(ec))
 		lb_manual_suspend_ctrl(ec, 1);
 
+	if (cros_ec_debugfs_init(ec))
+		dev_warn(dev, "failed to create debugfs directory\n");
+
 	return 0;
 
 dev_reg_failed:
@@ -512,6 +516,8 @@ static int ec_device_remove(struct platform_device *pdev)
 		lb_manual_suspend_ctrl(ec, 0);
 
 	mfd_remove_devices(ec->dev);
+	cros_ec_debugfs_remove(ec);
+
 	cdev_del(&ec->cdev);
 	device_unregister(&ec->class_dev);
 	return 0;
