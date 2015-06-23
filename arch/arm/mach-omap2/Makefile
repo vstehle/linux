@@ -282,3 +282,5 @@ obj-y					+= hwspinlock.o
 endif
 
 obj-y					+= common-board-devices.o twl-common.o dss-common.o
+
+obj-y					+= remoteproc.o

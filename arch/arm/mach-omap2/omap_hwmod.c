@@ -1763,8 +1763,11 @@ static bool _are_all_hardreset_lines_asserted(struct omap_hwmod *oh)
 		if (_read_hardreset(oh, oh->rst_lines[i].name) > 0)
 			rst_cnt++;
 
-	if (oh->rst_lines_cnt == rst_cnt)
+	if (oh->rst_lines_cnt == rst_cnt) {
+		printk("yes, all reset lines of %s asserted.\n",
+				oh->name);
 		return true;
+	}
 
 	return false;
 }

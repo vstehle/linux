@@ -93,6 +93,8 @@ static void omap_rproc_kick(struct rproc *rproc, int vqid)
 	struct device *dev = rproc->dev.parent;
 	int ret;
 
+	dev_dbg(dev, "omap_rproc_kick\n");
+
 	/* send the index of the triggered virtqueue in the mailbox payload */
 	ret = mbox_send_message(oproc->mbox, (void *)vqid);
 	if (ret < 0)
@@ -114,6 +116,8 @@ static int omap_rproc_start(struct rproc *rproc)
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	int ret;
 	struct mbox_client *client = &oproc->client;
+
+	dev_dbg(dev, "omap_rproc_start\n");
 
 	if (pdata->set_bootaddr)
 		pdata->set_bootaddr(rproc->bootaddr);
@@ -145,6 +149,12 @@ static int omap_rproc_start(struct rproc *rproc)
 		goto put_mbox;
 	}
 
+	if (!pdata->device_enable) {
+		dev_err(dev, "no device_enable!\n");
+		ret = -EINVAL;
+		goto put_mbox;
+	}
+
 	ret = pdata->device_enable(pdev);
 	if (ret) {
 		dev_err(dev, "omap_device_enable failed: %d\n", ret);
@@ -166,6 +176,13 @@ static int omap_rproc_stop(struct rproc *rproc)
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	struct omap_rproc *oproc = rproc->priv;
 	int ret;
+
+	dev_dbg(dev, "omap_rproc_stop\n");
+
+	if (!pdata->device_shutdown) {
+		printk("No device_shutdown!\n");
+		return -EINVAL;
+	}
 
 	ret = pdata->device_shutdown(pdev);
 	if (ret)
@@ -189,6 +206,8 @@ static int omap_rproc_probe(struct platform_device *pdev)
 	struct rproc *rproc;
 	int ret;
 
+	printk("omap_rproc_probe\n");
+
 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
 	if (ret) {
 		dev_err(&pdev->dev, "dma_set_coherent_mask: %d\n", ret);
@@ -205,12 +224,17 @@ static int omap_rproc_probe(struct platform_device *pdev)
 	/* All existing OMAP IPU and DSP processors have an MMU */
 	rproc->has_iommu = true;
 
+	rproc->recovery_disabled = true;
+
 	platform_set_drvdata(pdev, rproc);
 
 	ret = rproc_add(rproc);
-	if (ret)
+	if (ret) {
+		printk("rproc_add failed: %i\n", ret);
 		goto free_rproc;
+	}
 
+	printk("omap_rproc_probe ok\n");
 	return 0;
 
 free_rproc:
@@ -221,6 +245,8 @@ free_rproc:
 static int omap_rproc_remove(struct platform_device *pdev)
 {
 	struct rproc *rproc = platform_get_drvdata(pdev);
+
+	dev_dbg(&pdev->dev, "omap_rproc_remove\n");
 
 	rproc_del(rproc);
 	rproc_put(rproc);

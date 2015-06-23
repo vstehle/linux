@@ -85,7 +85,8 @@ static int rproc_iommu_fault(struct iommu_domain *domain, struct device *dev,
 	 * Let the iommu core know we're not really handling this fault;
 	 * we just used it as a recovery trigger.
 	 */
-	return -ENOSYS;
+//	return -ENOSYS;
+	return 0;
 }
 
 static int rproc_enable_iommu(struct rproc *rproc)
@@ -887,6 +888,8 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
 	struct resource_table *table;
 	int ret, tablesz;
 
+	printk("rproc_fw_config_virtio\n");
+
 	if (rproc_fw_sanity_check(rproc, fw) < 0)
 		goto out;
 
@@ -919,6 +922,8 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
 	ret = rproc_handle_resources(rproc, tablesz, rproc_vdev_handler);
 
 out:
+	printk("rproc_fw_config_virtio out; ret: %i\n", ret);
+
 	release_firmware(fw);
 	/* allow rproc_del() contexts, if any, to proceed */
 	complete_all(&rproc->firmware_loading_complete);
@@ -927,6 +932,8 @@ out:
 static int rproc_add_virtio_devices(struct rproc *rproc)
 {
 	int ret;
+
+	printk("rproc_add_virtio_devices\n");
 
 	/* rproc_del() calls must wait until async loader completes */
 	init_completion(&rproc->firmware_loading_complete);
@@ -947,6 +954,7 @@ static int rproc_add_virtio_devices(struct rproc *rproc)
 		complete_all(&rproc->firmware_loading_complete);
 	}
 
+	printk("rproc_add_virtio_devices ret: %i\n", ret);
 	return ret;
 }
 

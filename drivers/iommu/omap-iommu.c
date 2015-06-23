@@ -139,6 +139,7 @@ static void __iommu_set_twl(struct omap_iommu *obj, bool on)
 		l |= (MMU_CNTL_MMU_EN);
 
 	iommu_write_reg(obj, l, MMU_CNTL);
+	printk("mmu_cntl <- %#x\n", l);
 }
 
 static int omap2_iommu_enable(struct omap_iommu *obj)
@@ -157,6 +158,8 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
 		 (l >> 4) & 0xf, l & 0xf);
 
 	iommu_write_reg(obj, pa, MMU_TTB);
+
+	iommu_write_reg(obj, 0xdeadbeef, MMU_FAULT_AD);
 
 	if (obj->has_bus_err_back)
 		iommu_write_reg(obj, MMU_GP_REG_BUS_ERR_BACK_EN, MMU_GP_REG);
@@ -246,6 +249,8 @@ static u32 iommu_report_fault(struct omap_iommu *obj, u32 *da)
 	u32 status, fault_addr;
 
 	status = iommu_read_reg(obj, MMU_IRQSTATUS);
+	printk("mmu_irqstatus: %#x\n", status);
+
 	status &= MMU_IRQ_MASK;
 	if (!status) {
 		*da = 0;
@@ -253,6 +258,7 @@ static u32 iommu_report_fault(struct omap_iommu *obj, u32 *da)
 	}
 
 	fault_addr = iommu_read_reg(obj, MMU_FAULT_AD);
+	printk("mmu_fault_ad: %#x\n", fault_addr);
 	*da = fault_addr;
 
 	iommu_write_reg(obj, status, MMU_IRQSTATUS);
@@ -1177,6 +1183,8 @@ omap_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		return -EINVAL;
 	}
 
+	dev_info(dev, "has associated iommu %s\n", arch_data->name);
+
 	spin_lock(&omap_domain->lock);
 
 	/* only a single device is supported per domain for now */
@@ -1199,6 +1207,7 @@ omap_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	oiommu->domain = domain;
 
 out:
+	dev_info(dev, "omap_iommu_attach_dev out; ret: %i\n", ret);
 	spin_unlock(&omap_domain->lock);
 	return ret;
 }
