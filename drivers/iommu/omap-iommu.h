@@ -80,6 +80,8 @@ static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
  * MMU Register offsets
  */
 #define MMU_REVISION		0x00
+#define MMU_SYSCONFIG		0x10
+#define MMU_SYSSTATUS		0x14
 #define MMU_IRQSTATUS		0x18
 #define MMU_IRQENABLE		0x1c
 #define MMU_WALKING_ST		0x40
@@ -95,6 +97,8 @@ static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
 #define MMU_READ_CAM		0x68
 #define MMU_READ_RAM		0x6c
 #define MMU_EMU_FAULT_AD	0x70
+#define MMU_FAULT_PC		0x80
+#define MMU_FAULT_STATUS	0x84
 #define MMU_GP_REG		0x88
 
 #define MMU_REG_SIZE		256

@@ -489,6 +489,8 @@ omap2_iommu_dump_ctx(struct omap_iommu *obj, char *buf, ssize_t len)
 	char *p = buf;
 
 	pr_reg(REVISION);
+	pr_reg(SYSCONFIG);
+	pr_reg(SYSSTATUS);
 	pr_reg(IRQSTATUS);
 	pr_reg(IRQENABLE);
 	pr_reg(WALKING_ST);
@@ -504,6 +506,9 @@ omap2_iommu_dump_ctx(struct omap_iommu *obj, char *buf, ssize_t len)
 	pr_reg(READ_CAM);
 	pr_reg(READ_RAM);
 	pr_reg(EMU_FAULT_AD);
+	pr_reg(FAULT_PC);
+	pr_reg(FAULT_STATUS);
+	pr_reg(GP_REG);
 out:
 	return p - buf;
 }
