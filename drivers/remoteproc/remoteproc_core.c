@@ -85,8 +85,7 @@ static int rproc_iommu_fault(struct iommu_domain *domain, struct device *dev,
 	 * Let the iommu core know we're not really handling this fault;
 	 * we just used it as a recovery trigger.
 	 */
-//	return -ENOSYS;
-	return 0;
+	return -ENOSYS;
 }
 
 static int rproc_enable_iommu(struct rproc *rproc)

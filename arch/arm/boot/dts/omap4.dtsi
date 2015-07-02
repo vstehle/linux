@@ -558,7 +558,7 @@
 			reg = <0x55082000 0x100>;
 			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
 			ti,hwmods = "mmu_ipu";
-/*			ti,iommu-bus-err-back;*/
+			ti,iommu-bus-err-back;
 		};
 
 		wdt2: wdt@4a314000 {
