@@ -1,0 +1,18 @@
+#export CCACHE_PREFIX=distcc
+export PATH="/usr/lib/ccache:$PATH"
+
+#export DISTCC_HOSTS="--localslots=4 --localslots_cpp=4 --randomize localhost/4"
+#
+## Do we distribute to romuald?
+##if ping -c 1 romuald >& /dev/null; then
+##	export DISTCC_HOSTS="$DISTCC_HOSTS romuald/16,lzo"
+###	romuald='127.0.0.1:13632/16'
+##fi
+#
+## Do we distribute to radicelle?
+#if ping -c 1 radicelle >& /dev/null; then
+#	export DISTCC_HOSTS="$DISTCC_HOSTS radicelle/16,lzo"
+#fi
+#
+#export CCACHE_PREFIX=distcc
+#distcc -j

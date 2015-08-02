@@ -1,0 +1,10 @@
+#!/bin/bash
+set -eux
+rel=$(make kernelrelease)
+sudo make -j4 modules_install
+sudo cp -vf arch/x86/boot/bzImage /boot/vmlinuz-$rel
+sudo cp -vf .config /boot/config-$rel
+sudo update-initramfs -k $rel -d || :
+sudo update-initramfs -k $rel -c
+sudo update-grub
+sync
