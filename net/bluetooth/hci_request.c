@@ -830,7 +830,7 @@ static u8 get_current_adv_instance(struct hci_dev *hdev)
 	 * setting was set. When neither apply, default to the global settings,
 	 * represented by instance "0".
 	 */
-	if (hci_dev_test_flag(hdev, HCI_ADVERTISING_INSTANCE) &&
+	if (!list_empty(&hdev->adv_instances) &&
 	    !hci_dev_test_flag(hdev, HCI_ADVERTISING))
 		return hdev->cur_adv_instance;
 
@@ -1152,7 +1152,7 @@ void hci_req_reenable_advertising(struct hci_dev *hdev)
 	u8 instance;
 
 	if (!hci_dev_test_flag(hdev, HCI_ADVERTISING) &&
-	    !hci_dev_test_flag(hdev, HCI_ADVERTISING_INSTANCE))
+	    list_empty(&hdev->adv_instances))
 		return;
 
 	instance = get_current_adv_instance(hdev);
@@ -1210,7 +1210,7 @@ int __hci_req_schedule_adv_instance(struct hci_request *req, u8 instance,
 	u16 timeout;
 
 	if (hci_dev_test_flag(hdev, HCI_ADVERTISING) ||
-	    !hci_dev_test_flag(hdev, HCI_ADVERTISING_INSTANCE))
+	    list_empty(&hdev->adv_instances))
 		return -EPERM;
 
 	if (hdev->adv_instance_timeout)
@@ -1327,10 +1327,8 @@ void hci_req_clear_adv_instance(struct hci_dev *hdev, struct hci_request *req,
 		}
 	}
 
-	if (list_empty(&hdev->adv_instances)) {
+	if (list_empty(&hdev->adv_instances))
 		hdev->cur_adv_instance = 0x00;
-		hci_dev_clear_flag(hdev, HCI_ADVERTISING_INSTANCE);
-	}
 
 	if (!req || !hdev_is_powered(hdev) ||
 	    hci_dev_test_flag(hdev, HCI_ADVERTISING))
@@ -1533,7 +1531,7 @@ static int connectable_update(struct hci_request *req, unsigned long opt)
 
 	/* Update the advertising parameters if necessary */
 	if (hci_dev_test_flag(hdev, HCI_ADVERTISING) ||
-	    hci_dev_test_flag(hdev, HCI_ADVERTISING_INSTANCE))
+	    !list_empty(&hdev->adv_instances))
 		__hci_req_enable_advertising(req);
 
 	__hci_update_background_scan(req);
@@ -2234,13 +2232,12 @@ static int powered_update_hci(struct hci_request *req, unsigned long opt)
 		 */
 		if (hci_dev_test_flag(hdev, HCI_LE_ENABLED) &&
 		    (hci_dev_test_flag(hdev, HCI_ADVERTISING) ||
-		     !hci_dev_test_flag(hdev, HCI_ADVERTISING_INSTANCE))) {
+		     list_empty(&hdev->adv_instances))) {
 			__hci_req_update_adv_data(req, HCI_ADV_CURRENT);
 			__hci_req_update_scan_rsp_data(req, HCI_ADV_CURRENT);
 		}
 
-		if (hci_dev_test_flag(hdev, HCI_ADVERTISING_INSTANCE) &&
-		    hdev->cur_adv_instance == 0x00 &&
+		if (hdev->cur_adv_instance == 0x00 &&
 		    !list_empty(&hdev->adv_instances)) {
 			adv_instance = list_first_entry(&hdev->adv_instances,
 							struct adv_info, list);
@@ -2249,7 +2246,7 @@ static int powered_update_hci(struct hci_request *req, unsigned long opt)
 
 		if (hci_dev_test_flag(hdev, HCI_ADVERTISING))
 			__hci_req_enable_advertising(req);
-		else if (hci_dev_test_flag(hdev, HCI_ADVERTISING_INSTANCE) &&
+		else if (!list_empty(&hdev->adv_instances) &&
 			 hdev->cur_adv_instance)
 			__hci_req_schedule_adv_instance(req,
 							hdev->cur_adv_instance,
