@@ -2298,6 +2298,7 @@ static int nvme_revalidate_disk(struct gendisk *disk)
 	u8 lbaf, pi_type;
 	u16 old_ms;
 	unsigned short bs;
+	u32 vs = readl(&dev->bar->vs);
 
 	if (nvme_identify_ns(dev, ns->ns_id, &id)) {
 		dev_warn(dev->dev, "%s: Identify failure nvme%dn%d\n", __func__,
@@ -2318,6 +2319,11 @@ static int nvme_revalidate_disk(struct gendisk *disk)
 		}
 		ns->type = NVME_NS_LIGHTNVM;
 	}
+
+	if (vs >= NVME_VS(1, 1))
+		memcpy(ns->eui, id->eui64, sizeof(ns->eui));
+	if (vs >= NVME_VS(1, 2))
+		memcpy(ns->uuid, id->nguid, sizeof(ns->uuid));
 
 	old_ms = ns->ms;
 	lbaf = id->flbas & NVME_NS_FLBAS_LBA_MASK;
@@ -2509,6 +2515,8 @@ static int nvme_kthread(void *data)
 	return 0;
 }
 
+static const struct attribute_group nvme_ns_attr_group;
+
 static void nvme_alloc_ns(struct nvme_dev *dev, unsigned nsid)
 {
 	struct nvme_ns *ns;
@@ -2570,20 +2578,25 @@ static void nvme_alloc_ns(struct nvme_dev *dev, unsigned nsid)
 		goto out_free_disk;
 
 	kref_get(&dev->kref);
-	if (ns->type != NVME_NS_LIGHTNVM) {
-		add_disk(ns->disk);
-		if (ns->ms) {
-			struct block_device *bd = bdget_disk(ns->disk, 0);
-			if (!bd)
-				return;
-			if (blkdev_get(bd, FMODE_READ, NULL)) {
-				bdput(bd);
-				return;
-			}
-			blkdev_reread_part(bd);
-			blkdev_put(bd, FMODE_READ);
+	if (ns->type == NVME_NS_LIGHTNVM)
+		return;
+
+	add_disk(ns->disk);
+	if (ns->ms) {
+		struct block_device *bd = bdget_disk(ns->disk, 0);
+		if (!bd)
+			return;
+		if (blkdev_get(bd, FMODE_READ, NULL)) {
+			bdput(bd);
+			return;
 		}
+		blkdev_reread_part(bd);
+		blkdev_put(bd, FMODE_READ);
 	}
+	if (sysfs_create_group(&disk_to_dev(ns->disk)->kobj,
+					&nvme_ns_attr_group))
+		pr_warn("%s: failed to create sysfs group for identification\n",
+			ns->disk->disk_name);
 	return;
  out_free_disk:
 	kfree(disk);
@@ -2818,8 +2831,11 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 		 */
 		blk_mq_abort_requeue_list(ns->queue);
 	}
-	if (ns->disk->flags & GENHD_FL_UP)
+	if (ns->disk->flags & GENHD_FL_UP) {
+		sysfs_remove_group(&disk_to_dev(ns->disk)->kobj,
+					&nvme_ns_attr_group);
 		del_gendisk(ns->disk);
+	}
 	if (kill || !blk_queue_dying(ns->queue)) {
 		blk_mq_abort_requeue_list(ns->queue);
 		blk_cleanup_queue(ns->queue);
@@ -3586,6 +3602,59 @@ static ssize_t nvme_sysfs_reset(struct device *dev,
 	return count;
 }
 static DEVICE_ATTR(reset_controller, S_IWUSR, NULL, nvme_sysfs_reset);
+
+static ssize_t uuid_show(struct device *dev, struct device_attribute *attr,
+								char *buf)
+{
+	struct nvme_ns *ns = dev_to_disk(dev)->private_data;
+	return sprintf(buf, "%pU\n", ns->uuid);
+}
+static DEVICE_ATTR(uuid, S_IRUGO, uuid_show, NULL);
+
+static ssize_t eui_show(struct device *dev, struct device_attribute *attr,
+								char *buf)
+{
+	struct nvme_ns *ns = dev_to_disk(dev)->private_data;
+	return sprintf(buf, "%8phd\n", ns->eui);
+}
+static DEVICE_ATTR(eui, S_IRUGO, eui_show, NULL);
+
+static ssize_t nsid_show(struct device *dev, struct device_attribute *attr,
+								char *buf)
+{
+	struct nvme_ns *ns = dev_to_disk(dev)->private_data;
+	return sprintf(buf, "%d\n", ns->ns_id);
+}
+static DEVICE_ATTR(nsid, S_IRUGO, nsid_show, NULL);
+
+static struct attribute *nvme_ns_attrs[] = {
+	&dev_attr_uuid.attr,
+	&dev_attr_eui.attr,
+	&dev_attr_nsid.attr,
+	NULL,
+};
+
+static umode_t nvme_attrs_are_visible(struct kobject *kobj,
+		struct attribute *a, int n)
+{
+	struct device *dev = container_of(kobj, struct device, kobj);
+	struct nvme_ns *ns = dev_to_disk(dev)->private_data;
+
+	if (a == &dev_attr_uuid.attr) {
+		if (!memchr_inv(ns->uuid, 0, sizeof(ns->uuid)))
+			return 0;
+	}
+	if (a == &dev_attr_eui.attr) {
+		if (!memchr_inv(ns->eui, 0, sizeof(ns->eui)))
+			return 0;
+	}
+	return a->mode;
+}
+
+static const struct attribute_group nvme_ns_attr_group = {
+	.attrs		= nvme_ns_attrs,
+	.is_visible	= nvme_attrs_are_visible,
+};
 
 static int nvme_dev_map(struct nvme_dev *dev)
 {
