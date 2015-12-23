@@ -105,6 +105,34 @@ enum cgs_ucode_id {
 	CGS_UCODE_ID_MAXIMUM,
 };
 
+enum cgs_system_info_id {
+	CGS_SYSTEM_INFO_ADAPTER_BDF_ID = 1,
+	CGS_SYSTEM_INFO_PCIE_GEN_INFO,
+	CGS_SYSTEM_INFO_PCIE_MLW,
+	CGS_SYSTEM_INFO_ID_MAXIMUM,
+};
+
+struct cgs_system_info {
+	uint64_t       size;
+	uint64_t       info_id;
+	union {
+		void           *ptr;
+		uint64_t        value;
+	};
+	uint64_t               padding[13];
+};
+
+/*
+ * enum cgs_resource_type - GPU resource type
+ */
+enum cgs_resource_type {
+	CGS_RESOURCE_TYPE_MMIO = 0,
+	CGS_RESOURCE_TYPE_FB,
+	CGS_RESOURCE_TYPE_IO,
+	CGS_RESOURCE_TYPE_DOORBELL,
+	CGS_RESOURCE_TYPE_ROM,
+};
+
 /**
  * struct cgs_clock_limits - Clock limits
  *
@@ -355,6 +383,23 @@ typedef void (*cgs_write_pci_config_word_t)(void *cgs_device, unsigned addr,
 typedef void (*cgs_write_pci_config_dword_t)(void *cgs_device, unsigned addr,
 					     uint32_t value);
 
+
+/**
+ * cgs_get_pci_resource() - provide access to a device resource (PCI BAR)
+ * @cgs_device:	opaque device handle
+ * @resource_type:	Type of Resource (MMIO, IO, ROM, FB, DOORBELL)
+ * @size:	size of the region
+ * @offset:	offset from the start of the region
+ * @resource_base:	base address (not including offset) returned
+ *
+ * Return: 0 on success, -errno otherwise
+ */
+typedef int (*cgs_get_pci_resource_t)(void *cgs_device,
+				      enum cgs_resource_type resource_type,
+				      uint64_t size,
+				      uint64_t offset,
+				      uint64_t *resource_base);
+
 /**
  * cgs_atom_get_data_table() - Get a pointer to an ATOM BIOS data table
  * @cgs_device:	opaque device handle
@@ -516,6 +561,8 @@ struct cgs_ops {
 	cgs_write_pci_config_byte_t write_pci_config_byte;
 	cgs_write_pci_config_word_t write_pci_config_word;
 	cgs_write_pci_config_dword_t write_pci_config_dword;
+	/* PCI resources */
+	cgs_get_pci_resource_t get_pci_resource;
 	/* ATOM BIOS */
 	cgs_atom_get_data_table_t atom_get_data_table;
 	cgs_atom_get_cmd_table_revs_t atom_get_cmd_table_revs;
@@ -620,5 +667,15 @@ struct cgs_device
 	CGS_CALL(set_powergating_state, dev, block_type, state)
 #define cgs_set_clockgating_state(dev, block_type, state)	\
 	CGS_CALL(set_clockgating_state, dev, block_type, state)
+#define cgs_get_active_displays_info(dev, info)	\
+	CGS_CALL(get_active_displays_info, dev, info)
+#define cgs_call_acpi_method(dev, acpi_method, acpi_function, pintput, poutput, output_count, input_size, output_size)	\
+	CGS_CALL(call_acpi_method, dev, acpi_method, acpi_function, pintput, poutput, output_count, input_size, output_size)
+#define cgs_query_system_info(dev, sys_info)	\
+	CGS_CALL(query_system_info, dev, sys_info)
+#define cgs_get_pci_resource(cgs_device, resource_type, size, offset, \
+	resource_base) \
+	CGS_CALL(get_pci_resource, cgs_device, resource_type, size, offset, \
+	resource_base)
 
 #endif /* _CGS_COMMON_H */
