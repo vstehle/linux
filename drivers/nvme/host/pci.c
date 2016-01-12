@@ -3656,6 +3656,36 @@ static const struct attribute_group nvme_ns_attr_group = {
 	.is_visible	= nvme_attrs_are_visible,
 };
 
+#define nvme_show_function(field)						\
+static ssize_t  field##_show(struct device *dev,				\
+			    struct device_attribute *attr, char *buf)		\
+{										\
+        struct nvme_dev *nvme_dev = dev_get_drvdata(dev);			\
+        return sprintf(buf, "%.*s\n", (int)sizeof(nvme_dev->field), nvme_dev->field);	\
+}										\
+static DEVICE_ATTR(field, S_IRUGO, field##_show, NULL);
+
+nvme_show_function(model);
+nvme_show_function(serial);
+nvme_show_function(firmware_rev);
+
+static struct attribute *nvme_dev_attrs[] = {
+	&dev_attr_reset_controller.attr,
+	&dev_attr_model.attr,
+	&dev_attr_serial.attr,
+	&dev_attr_firmware_rev.attr,
+	NULL
+};
+
+static struct attribute_group nvme_dev_attrs_group = {
+	.attrs = nvme_dev_attrs,
+};
+
+static const struct attribute_group *nvme_dev_attr_groups[] = {
+	&nvme_dev_attrs_group,
+	NULL,
+};
+
 static int nvme_dev_map(struct nvme_dev *dev)
 {
 	int bars;
@@ -3716,9 +3746,10 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto release;
 
 	kref_init(&dev->kref);
-	dev->device = device_create(nvme_class, &pdev->dev,
+	dev->device = device_create_with_groups(nvme_class, &pdev->dev,
 				MKDEV(nvme_char_major, dev->instance),
-				dev, "nvme%d", dev->instance);
+				dev, nvme_dev_attr_groups,
+				"nvme%d", dev->instance);
 	if (IS_ERR(dev->device)) {
 		result = PTR_ERR(dev->device);
 		goto release_pools;
@@ -3734,19 +3765,12 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev_pm_qos_update_user_latency_tolerance(dev->device,
 		min(default_ps_max_latency_us, (unsigned long)S32_MAX));
 
-	result = device_create_file(dev->device, &dev_attr_reset_controller);
-	if (result)
-		goto put_dev;
-
 	INIT_LIST_HEAD(&dev->node);
 	INIT_WORK(&dev->scan_work, nvme_dev_scan);
 	INIT_WORK(&dev->probe_work, nvme_probe_work);
 	schedule_work(&dev->probe_work);
 	return 0;
 
- put_dev:
-	device_destroy(nvme_class, MKDEV(nvme_char_major, dev->instance));
-	put_device(dev->device);
  release_pools:
 	nvme_release_prp_pools(dev);
  release:
@@ -3789,7 +3813,6 @@ static void nvme_remove(struct pci_dev *pdev)
 	flush_work(&dev->probe_work);
 	flush_work(&dev->reset_work);
 	flush_work(&dev->scan_work);
-	device_remove_file(dev->device, &dev_attr_reset_controller);
 	nvme_dev_remove(dev);
 	nvme_dev_shutdown(dev);
 	nvme_dev_remove_admin(dev);
