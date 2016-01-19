@@ -768,7 +768,7 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 	if (is_yuv_support(fb->pixel_format) && state->rotation)
 		return -EINVAL;
 
-	if (state->rotation && state->rotation != BIT(DRM_REFLECT_Y))
+	if (state->rotation && (!((state->rotation == BIT(DRM_REFLECT_Y)) || (state->rotation == BIT(DRM_ROTATE_0)))))
 		return -EINVAL;
 
 	if (fb->modifier[0] == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC) {
