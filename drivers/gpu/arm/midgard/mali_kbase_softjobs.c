@@ -182,20 +182,12 @@ static enum base_jd_event_code kbase_fence_trigger(struct kbase_jd_atom *katom, 
 	struct sync_pt *pt;
 	struct sync_timeline *timeline;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
-	if (!list_is_singular(&katom->fence->pt_list_head)) {
-#else
-	if (katom->fence->num_fences != 1) {
-#endif
+	if (katom->sfile->num_fences != 1) {
 		/* Not exactly one item in the list - so it didn't (directly) come from us */
 		return BASE_JD_EVENT_JOB_CANCELLED;
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
-	pt = list_first_entry(&katom->fence->pt_list_head, struct sync_pt, pt_list);
-#else
-	pt = container_of(katom->fence->cbs[0].sync_pt, struct sync_pt, base);
-#endif
+	pt = container_of(katom->sfile->cbs[0].sync_pt, struct sync_pt, base);
 	timeline = sync_pt_parent(pt);
 
 	if (!kbase_sync_timeline_is_ours(timeline)) {
@@ -221,7 +213,7 @@ static void kbase_fence_wait_worker(struct work_struct *data)
 	complete_soft_job(katom);
 }
 
-static void kbase_fence_wait_callback(struct sync_fence *fence, struct kbase_sync_fence_waiter *waiter)
+static void kbase_file_wait_callback(struct sync_file *sfile, struct kbase_sync_file_waiter *waiter)
 {
 	struct kbase_jd_atom *katom = container_of(waiter, struct kbase_jd_atom, sync_waiter);
 	struct kbase_context *kctx;
@@ -235,11 +227,7 @@ static void kbase_fence_wait_callback(struct sync_fence *fence, struct kbase_syn
 	/* Propagate the fence status to the atom.
 	 * If negative then cancel this atom and its dependencies.
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
-	if (fence->status < 0)
-#else
-	if (atomic_read(&fence->status) < 0)
-#endif
+	if (atomic_read(&sfile->status) < 0)
 		katom->event_code = BASE_JD_EVENT_JOB_CANCELLED;
 
 	/* To prevent a potential deadlock we schedule the work onto the job_done_wq workqueue
@@ -254,24 +242,24 @@ static void kbase_fence_wait_callback(struct sync_fence *fence, struct kbase_syn
 }
 
 /*
- * Private copy of deleted sync_fence async wait APIs.
+ * Private copy of deleted sync_file async wait APIs.
  */
-static int kbase_sync_fence_wake_up_wq(wait_queue_t *curr, unsigned mode,
-				       int wake_flags, void *key)
+static int kbase_sync_file_wake_up_wq(wait_queue_t *curr, unsigned mode,
+				      int wake_flags, void *key)
 {
-	struct kbase_sync_fence_waiter *wait;
+	struct kbase_sync_file_waiter *wait;
 
-	wait = container_of(curr, struct kbase_sync_fence_waiter, work);
+	wait = container_of(curr, struct kbase_sync_file_waiter, work);
 	list_del_init(&wait->work.task_list);
 
 	wait->callback(wait->work.private, wait);
 	return 1;
 }
 
-static int kbase_sync_fence_wait_async(struct sync_fence *fence,
-				       struct kbase_sync_fence_waiter *waiter)
+static int kbase_sync_file_wait_async(struct sync_file *sfile,
+				      struct kbase_sync_file_waiter *waiter)
 {
-	int err = atomic_read(&fence->status);
+	int err = atomic_read(&sfile->status);
 	unsigned long flags;
 
 	if (err < 0)
@@ -280,14 +268,14 @@ static int kbase_sync_fence_wait_async(struct sync_fence *fence,
 	if (!err)
 		return 1;
 
-	init_waitqueue_func_entry(&waiter->work, kbase_sync_fence_wake_up_wq);
-	waiter->work.private = fence;
+	init_waitqueue_func_entry(&waiter->work, kbase_sync_file_wake_up_wq);
+	waiter->work.private = sfile;
 
-	spin_lock_irqsave(&fence->wq.lock, flags);
-	err = atomic_read(&fence->status);
+	spin_lock_irqsave(&sfile->wq.lock, flags);
+	err = atomic_read(&sfile->status);
 	if (err > 0)
-		__add_wait_queue_tail(&fence->wq, &waiter->work);
-	spin_unlock_irqrestore(&fence->wq.lock, flags);
+		__add_wait_queue_tail(&sfile->wq, &waiter->work);
+	spin_unlock_irqrestore(&sfile->wq.lock, flags);
 
 	if (err < 0)
 		return err;
@@ -295,23 +283,23 @@ static int kbase_sync_fence_wait_async(struct sync_fence *fence,
 	return !err;
 }
 
-static int kbase_sync_fence_cancel_async(struct sync_fence *fence,
-					 struct kbase_sync_fence_waiter *waiter)
+static int kbase_sync_file_cancel_async(struct sync_file *sfile,
+					struct kbase_sync_file_waiter *waiter)
 {
 	unsigned long flags;
 	int ret = 0;
 
-	spin_lock_irqsave(&fence->wq.lock, flags);
+	spin_lock_irqsave(&sfile->wq.lock, flags);
 	if (!list_empty(&waiter->work.task_list))
 		list_del_init(&waiter->work.task_list);
 	else
 		ret = -ENOENT;
-	spin_unlock_irqrestore(&fence->wq.lock, flags);
+	spin_unlock_irqrestore(&sfile->wq.lock, flags);
 	return ret;
 }
 
-static inline void kbase_sync_fence_waiter_init(struct kbase_sync_fence_waiter *waiter,
-						kbase_sync_callback_t callback)
+static inline void kbase_sync_file_waiter_init(struct kbase_sync_file_waiter *waiter,
+					       kbase_sync_callback_t callback)
 {
 	INIT_LIST_HEAD(&waiter->work.task_list);
 	waiter->callback = callback;
@@ -324,9 +312,9 @@ static int kbase_fence_wait(struct kbase_jd_atom *katom)
 	KBASE_DEBUG_ASSERT(NULL != katom);
 	KBASE_DEBUG_ASSERT(NULL != katom->kctx);
 
-	kbase_sync_fence_waiter_init(&katom->sync_waiter, kbase_fence_wait_callback);
+	kbase_sync_file_waiter_init(&katom->sync_waiter, kbase_file_wait_callback);
 
-	ret = kbase_sync_fence_wait_async(katom->fence, &katom->sync_waiter);
+	ret = kbase_sync_file_wait_async(katom->sfile, &katom->sync_waiter);
 
 	if (ret == 1) {
 		/* Already signalled */
@@ -349,7 +337,7 @@ static int kbase_fence_wait(struct kbase_jd_atom *katom)
 
 static void kbase_fence_cancel_wait(struct kbase_jd_atom *katom)
 {
-	if (kbase_sync_fence_cancel_async(katom->fence, &katom->sync_waiter) != 0) {
+	if (kbase_sync_file_cancel_async(katom->sfile, &katom->sync_waiter) != 0) {
 		/* The wait wasn't cancelled - leave the cleanup for kbase_fence_wait_callback */
 		return;
 	}
@@ -1189,8 +1177,8 @@ int kbase_process_soft_job(struct kbase_jd_atom *katom)
 		KBASE_DEBUG_ASSERT(katom->fence != NULL);
 		katom->event_code = kbase_fence_trigger(katom, katom->event_code == BASE_JD_EVENT_DONE ? 0 : -EFAULT);
 		/* Release the reference as we don't need it any more */
-		sync_fence_put(katom->fence);
-		katom->fence = NULL;
+		sync_file_put(katom->sfile);
+		katom->sfile = NULL;
 		break;
 	case BASE_JD_REQ_SOFT_FENCE_WAIT:
 #if defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)
@@ -1273,16 +1261,16 @@ int kbase_prepare_soft_job(struct kbase_jd_atom *katom)
 			if (fd < 0)
 				return -EINVAL;
 
-			katom->fence = sync_fence_fdget(fd);
+			katom->sfile = sync_file_fdget(fd);
 
-			if (katom->fence == NULL) {
+			if (katom->sfile == NULL) {
 				/* The only way the fence can be NULL is if userspace closed it for us.
 				 * So we don't need to clear it up */
 				return -EINVAL;
 			}
 			fence.basep.fd = fd;
 			if (0 != copy_to_user((__user void *)(uintptr_t) katom->jc, &fence, sizeof(fence))) {
-				katom->fence = NULL;
+				katom->sfile = NULL;
 				sys_close(fd);
 				return -EINVAL;
 			}
@@ -1296,8 +1284,8 @@ int kbase_prepare_soft_job(struct kbase_jd_atom *katom)
 				return -EINVAL;
 
 			/* Get a reference to the fence object */
-			katom->fence = sync_fence_fdget(fence.basep.fd);
-			if (katom->fence == NULL)
+			katom->sfile = sync_file_fdget(fence.basep.fd);
+			if (katom->sfile == NULL)
 				return -EINVAL;
 		}
 		break;
@@ -1335,17 +1323,17 @@ void kbase_finish_soft_job(struct kbase_jd_atom *katom)
 #ifdef CONFIG_SYNC
 	case BASE_JD_REQ_SOFT_FENCE_TRIGGER:
 		/* If fence has not yet been signalled, do it now */
-		if (katom->fence) {
+		if (katom->sfile) {
 			kbase_fence_trigger(katom, katom->event_code ==
 					BASE_JD_EVENT_DONE ? 0 : -EFAULT);
-			sync_fence_put(katom->fence);
-			katom->fence = NULL;
+			sync_file_put(katom->sfile);
+			katom->sfile = NULL;
 		}
 		break;
 	case BASE_JD_REQ_SOFT_FENCE_WAIT:
 		/* Release the reference to the fence object */
-		sync_fence_put(katom->fence);
-		katom->fence = NULL;
+		sync_file_put(katom->sfile);
+		katom->sfile = NULL;
 		break;
 #endif				/* CONFIG_SYNC */
 

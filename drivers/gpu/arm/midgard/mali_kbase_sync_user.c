@@ -74,11 +74,8 @@ int kbase_stream_create_fence(int tl_fd)
 {
 	struct sync_timeline *tl;
 	struct sync_pt *pt;
-	struct sync_fence *fence;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0)
-	struct files_struct *files;
-	struct fdtable *fdt;
-#endif
+	struct sync_file *sfile;
+
 	int fd;
 	struct file *tl_file;
 
@@ -99,8 +96,8 @@ int kbase_stream_create_fence(int tl_fd)
 		goto out;
 	}
 
-	fence = sync_fence_create("mali_fence", pt);
-	if (!fence) {
+	sfile = sync_file_create("mali_fence", pt);
+	if (!sfile) {
 		sync_pt_free(pt);
 		fd = -EFAULT;
 		goto out;
@@ -109,32 +106,14 @@ int kbase_stream_create_fence(int tl_fd)
 	/* from here the fence owns the sync_pt */
 
 	/* create a fd representing the fence */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
 	fd = get_unused_fd_flags(O_RDWR | O_CLOEXEC);
 	if (fd < 0) {
-		sync_fence_put(fence);
+		sync_file_put(sfile);
 		goto out;
 	}
-#else
-	fd = get_unused_fd();
-	if (fd < 0) {
-		sync_fence_put(fence);
-		goto out;
-	}
-
-	files = current->files;
-	spin_lock(&files->file_lock);
-	fdt = files_fdtable(files);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
-	__set_close_on_exec(fd, fdt);
-#else
-	FD_SET(fd, fdt->close_on_exec);
-#endif
-	spin_unlock(&files->file_lock);
-#endif  /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0) */
 
 	/* bind fence to the new fd */
-	sync_fence_install(fence, fd);
+	sync_file_install(sfile, fd);
 
  out:
 	fput(tl_file);
@@ -144,13 +123,13 @@ int kbase_stream_create_fence(int tl_fd)
 
 int kbase_fence_validate(int fd)
 {
-	struct sync_fence *fence;
+	struct sync_file *sfile;
 
-	fence = sync_fence_fdget(fd);
-	if (!fence)
+	sfile = sync_file_fdget(fd);
+	if (!sfile)
 		return -EINVAL;
 
-	sync_fence_put(fence);
+	sync_file_put(sfile);
 	return 0;
 }
 

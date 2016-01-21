@@ -328,16 +328,16 @@ struct kbase_ext_res {
 };
 
 #ifdef CONFIG_SYNC
-struct kbase_sync_fence_waiter;
-typedef void (*kbase_sync_callback_t)(struct sync_fence *fence,
-				      struct kbase_sync_fence_waiter *waiter);
+struct kbase_sync_file_waiter;
+typedef void (*kbase_sync_callback_t)(struct sync_file *sfile,
+				      struct kbase_sync_file_waiter *waiter);
 
 /**
- * struct sync_fence_waiter - metadata for asynchronous waiter on a fence
- * @work:		wait_queue for the fence waiter
- * @callback:		function pointer to call when fence signals
+ * struct sync_file_waiter - metadata for asynchronous waiter on a fence
+ * @work:		wait_queue for the sync file waiter
+ * @callback:		function pointer to call when sync file signals
  */
-struct kbase_sync_fence_waiter {
+struct kbase_sync_file_waiter {
 	wait_queue_t work;
 	kbase_sync_callback_t callback;
 };
@@ -374,8 +374,8 @@ struct kbase_jd_atom {
 	struct fence *rendered_fence;
 #endif				/* CONFIG_DRM_DMA_SYNC */
 #ifdef CONFIG_SYNC
-	struct sync_fence *fence;
-	struct kbase_sync_fence_waiter sync_waiter;
+	struct sync_file *sfile;
+	struct kbase_sync_file_waiter sync_waiter;
 #endif				/* CONFIG_SYNC */
 
 	/* Note: refer to kbasep_js_atom_retained_state, which will take a copy of some of the following members */
