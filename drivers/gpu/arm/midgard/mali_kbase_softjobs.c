@@ -187,7 +187,7 @@ static enum base_jd_event_code kbase_fence_trigger(struct kbase_jd_atom *katom, 
 		return BASE_JD_EVENT_JOB_CANCELLED;
 	}
 
-	pt = container_of(katom->sfile->cbs[0].sync_pt, struct sync_pt, base);
+	pt = container_of(katom->sfile->cbs[0].fence, struct sync_pt, base);
 	timeline = sync_pt_parent(pt);
 
 	if (!kbase_sync_timeline_is_ours(timeline)) {
