@@ -173,6 +173,10 @@ FULL_PROXY_FUNC(unlocked_ioctl, long, filp,
 		PROTO(struct file *filp, unsigned int cmd, unsigned long arg),
 		ARGS(filp, cmd, arg));
 
+FULL_PROXY_FUNC(compat_ioctl, long, filp,
+		PROTO(struct file *filp, unsigned int cmd, unsigned long arg),
+		ARGS(filp, cmd, arg));
+
 static unsigned int full_proxy_poll(struct file *filp,
 				struct poll_table_struct *wait)
 {
@@ -227,6 +231,8 @@ static void __full_proxy_fops_init(struct file_operations *proxy_fops,
 		proxy_fops->poll = full_proxy_poll;
 	if (real_fops->unlocked_ioctl)
 		proxy_fops->unlocked_ioctl = full_proxy_unlocked_ioctl;
+	if (real_fops->compat_ioctl)
+		proxy_fops->compat_ioctl = full_proxy_compat_ioctl;
 }
 
 static int full_proxy_open(struct inode *inode, struct file *filp)
