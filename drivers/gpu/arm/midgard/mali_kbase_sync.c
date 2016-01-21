@@ -29,7 +29,7 @@ struct mali_sync_timeline {
 };
 
 struct mali_sync_pt {
-	struct sync_pt pt;
+	struct fence fence;
 	int order;
 	int result;
 };
@@ -39,15 +39,15 @@ static struct mali_sync_timeline *to_mali_sync_timeline(struct sync_timeline *ti
 	return container_of(timeline, struct mali_sync_timeline, timeline);
 }
 
-static struct mali_sync_pt *to_mali_sync_pt(struct sync_pt *pt)
+static struct mali_sync_pt *to_mali_sync_pt(struct fence *fence)
 {
-	return container_of(pt, struct mali_sync_pt, pt);
+	return container_of(fence, struct mali_sync_pt, fence);
 }
 
-static int timeline_has_signaled(struct sync_pt *pt)
+static int timeline_has_signaled(struct fence *fence)
 {
-	struct mali_sync_pt *mpt = to_mali_sync_pt(pt);
-	struct mali_sync_timeline *mtl = to_mali_sync_timeline(sync_pt_parent(pt));
+	struct mali_sync_pt *mpt = to_mali_sync_pt(fence);
+	struct mali_sync_timeline *mtl = to_mali_sync_timeline(fence_parent(fence));
 	int result = mpt->result;
 
 	int diff = atomic_read(&mtl->signalled) - mpt->order;
@@ -66,9 +66,9 @@ static void timeline_value_str(struct sync_timeline *timeline, char *str,
 	snprintf(str, size, "%d", atomic_read(&mtl->signalled));
 }
 
-static void pt_value_str(struct sync_pt *pt, char *str, int size)
+static void fence_value_str(struct fence *fence, char *str, int size)
 {
-	struct mali_sync_pt *mpt = to_mali_sync_pt(pt);
+	struct mali_sync_pt *mpt = to_mali_sync_pt(fence);
 
 	snprintf(str, size, "%d(%d)", mpt->order, mpt->result);
 }
@@ -77,7 +77,7 @@ static struct sync_timeline_ops mali_timeline_ops = {
 	.driver_name = "Mali",
 	.has_signaled = timeline_has_signaled,
 	.timeline_value_str = timeline_value_str,
-	.pt_value_str       = pt_value_str,
+	.fence_value_str    = fence_value_str,
 };
 
 int kbase_sync_timeline_is_ours(struct sync_timeline *timeline)
@@ -102,26 +102,26 @@ struct sync_timeline *kbase_sync_timeline_alloc(const char *name)
 	return tl;
 }
 
-struct sync_pt *kbase_sync_pt_alloc(struct sync_timeline *parent)
+struct fence *kbase_fence_alloc(struct sync_timeline *parent)
 {
-	struct sync_pt *pt = sync_pt_create(parent, sizeof(struct mali_sync_pt));
+	struct fence *fence = sync_pt_create(parent, sizeof(struct mali_sync_pt));
 	struct mali_sync_timeline *mtl = to_mali_sync_timeline(parent);
 	struct mali_sync_pt *mpt;
 
-	if (!pt)
+	if (!fence)
 		return NULL;
 
-	mpt = to_mali_sync_pt(pt);
+	mpt = to_mali_sync_pt(fence);
 	mpt->order = atomic_inc_return(&mtl->counter);
 	mpt->result = 0;
 
-	return pt;
+	return fence;
 }
 
-void kbase_sync_signal_pt(struct sync_pt *pt, int result)
+void kbase_sync_signal_fence(struct fence *fence, int result)
 {
-	struct mali_sync_pt *mpt = to_mali_sync_pt(pt);
-	struct mali_sync_timeline *mtl = to_mali_sync_timeline(sync_pt_parent(pt));
+	struct mali_sync_pt *mpt = to_mali_sync_pt(fence);
+	struct mali_sync_timeline *mtl = to_mali_sync_timeline(fence_parent(fence));
 	int signalled;
 	int diff;
 

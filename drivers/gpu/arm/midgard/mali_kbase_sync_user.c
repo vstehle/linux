@@ -73,7 +73,7 @@ int kbase_stream_create(const char *name, int *const out_fd)
 int kbase_stream_create_fence(int tl_fd)
 {
 	struct sync_timeline *tl;
-	struct sync_pt *pt;
+	struct fence *fence;
 	struct sync_file *sfile;
 
 	int fd;
@@ -90,20 +90,20 @@ int kbase_stream_create_fence(int tl_fd)
 
 	tl = tl_file->private_data;
 
-	pt = kbase_sync_pt_alloc(tl);
-	if (!pt) {
+	fence = kbase_fence_alloc(tl);
+	if (!fence) {
 		fd = -EFAULT;
 		goto out;
 	}
 
-	sfile = sync_file_create("mali_fence", pt);
+	sfile = sync_file_create("mali_fence", fence);
 	if (!sfile) {
-		sync_pt_free(pt);
+		fence_put(fence);
 		fd = -EFAULT;
 		goto out;
 	}
 
-	/* from here the fence owns the sync_pt */
+	/* from here the sync_fole owns the fence */
 
 	/* create a fd representing the fence */
 	fd = get_unused_fd_flags(O_RDWR | O_CLOEXEC);

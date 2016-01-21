@@ -75,7 +75,7 @@ struct sync_timeline *kbase_sync_timeline_alloc(const char *name);
  *
  * Sync points must be triggered in *exactly* the same order as they are allocated.
  */
-struct sync_pt *kbase_sync_pt_alloc(struct sync_timeline *parent);
+struct fence *kbase_fence_alloc(struct sync_timeline *parent);
 
 /* Signals a particular sync point
  *
@@ -86,6 +86,6 @@ struct sync_pt *kbase_sync_pt_alloc(struct sync_timeline *parent);
  *
  * result can be negative to indicate error, any other value is interpreted as success.
  */
-void kbase_sync_signal_pt(struct sync_pt *pt, int result);
+void kbase_sync_signal_fence(struct fence *fence, int result);
 
 #endif
