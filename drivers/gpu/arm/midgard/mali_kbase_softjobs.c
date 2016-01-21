@@ -221,7 +221,7 @@ static void kbase_fence_wait_worker(struct work_struct *data)
 	complete_soft_job(katom);
 }
 
-static void kbase_fence_wait_callback(struct sync_fence *fence, struct sync_fence_waiter *waiter)
+static void kbase_fence_wait_callback(struct sync_fence *fence, struct kbase_sync_fence_waiter *waiter)
 {
 	struct kbase_jd_atom *katom = container_of(waiter, struct kbase_jd_atom, sync_waiter);
 	struct kbase_context *kctx;
@@ -253,6 +253,70 @@ static void kbase_fence_wait_callback(struct sync_fence *fence, struct sync_fenc
 	queue_work(kctx->jctx.job_done_wq, &katom->work);
 }
 
+/*
+ * Private copy of deleted sync_fence async wait APIs.
+ */
+static int kbase_sync_fence_wake_up_wq(wait_queue_t *curr, unsigned mode,
+				       int wake_flags, void *key)
+{
+	struct kbase_sync_fence_waiter *wait;
+
+	wait = container_of(curr, struct kbase_sync_fence_waiter, work);
+	list_del_init(&wait->work.task_list);
+
+	wait->callback(wait->work.private, wait);
+	return 1;
+}
+
+static int kbase_sync_fence_wait_async(struct sync_fence *fence,
+				       struct kbase_sync_fence_waiter *waiter)
+{
+	int err = atomic_read(&fence->status);
+	unsigned long flags;
+
+	if (err < 0)
+		return err;
+
+	if (!err)
+		return 1;
+
+	init_waitqueue_func_entry(&waiter->work, kbase_sync_fence_wake_up_wq);
+	waiter->work.private = fence;
+
+	spin_lock_irqsave(&fence->wq.lock, flags);
+	err = atomic_read(&fence->status);
+	if (err > 0)
+		__add_wait_queue_tail(&fence->wq, &waiter->work);
+	spin_unlock_irqrestore(&fence->wq.lock, flags);
+
+	if (err < 0)
+		return err;
+
+	return !err;
+}
+
+static int kbase_sync_fence_cancel_async(struct sync_fence *fence,
+					 struct kbase_sync_fence_waiter *waiter)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	spin_lock_irqsave(&fence->wq.lock, flags);
+	if (!list_empty(&waiter->work.task_list))
+		list_del_init(&waiter->work.task_list);
+	else
+		ret = -ENOENT;
+	spin_unlock_irqrestore(&fence->wq.lock, flags);
+	return ret;
+}
+
+static inline void kbase_sync_fence_waiter_init(struct kbase_sync_fence_waiter *waiter,
+						kbase_sync_callback_t callback)
+{
+	INIT_LIST_HEAD(&waiter->work.task_list);
+	waiter->callback = callback;
+}
+
 static int kbase_fence_wait(struct kbase_jd_atom *katom)
 {
 	int ret;
@@ -260,9 +324,9 @@ static int kbase_fence_wait(struct kbase_jd_atom *katom)
 	KBASE_DEBUG_ASSERT(NULL != katom);
 	KBASE_DEBUG_ASSERT(NULL != katom->kctx);
 
-	sync_fence_waiter_init(&katom->sync_waiter, kbase_fence_wait_callback);
+	kbase_sync_fence_waiter_init(&katom->sync_waiter, kbase_fence_wait_callback);
 
-	ret = sync_fence_wait_async(katom->fence, &katom->sync_waiter);
+	ret = kbase_sync_fence_wait_async(katom->fence, &katom->sync_waiter);
 
 	if (ret == 1) {
 		/* Already signalled */
@@ -285,7 +349,7 @@ static int kbase_fence_wait(struct kbase_jd_atom *katom)
 
 static void kbase_fence_cancel_wait(struct kbase_jd_atom *katom)
 {
-	if (sync_fence_cancel_async(katom->fence, &katom->sync_waiter) != 0) {
+	if (kbase_sync_fence_cancel_async(katom->fence, &katom->sync_waiter) != 0) {
 		/* The wait wasn't cancelled - leave the cleanup for kbase_fence_wait_callback */
 		return;
 	}
