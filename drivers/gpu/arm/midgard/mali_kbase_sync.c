@@ -44,22 +44,6 @@ static struct mali_sync_pt *to_mali_sync_pt(struct sync_pt *pt)
 	return container_of(pt, struct mali_sync_pt, pt);
 }
 
-static struct sync_pt *timeline_dup(struct sync_pt *pt)
-{
-	struct mali_sync_pt *mpt = to_mali_sync_pt(pt);
-	struct mali_sync_pt *new_mpt;
-	struct sync_pt *new_pt = sync_pt_create(sync_pt_parent(pt), sizeof(struct mali_sync_pt));
-
-	if (!new_pt)
-		return NULL;
-
-	new_mpt = to_mali_sync_pt(new_pt);
-	new_mpt->order = mpt->order;
-	new_mpt->result = mpt->result;
-
-	return new_pt;
-}
-
 static int timeline_has_signaled(struct sync_pt *pt)
 {
 	struct mali_sync_pt *mpt = to_mali_sync_pt(pt);
@@ -72,19 +56,6 @@ static int timeline_has_signaled(struct sync_pt *pt)
 		return (result < 0) ? result : 1;
 
 	return 0;
-}
-
-static int timeline_compare(struct sync_pt *a, struct sync_pt *b)
-{
-	struct mali_sync_pt *ma = container_of(a, struct mali_sync_pt, pt);
-	struct mali_sync_pt *mb = container_of(b, struct mali_sync_pt, pt);
-
-	int diff = ma->order - mb->order;
-
-	if (diff == 0)
-		return 0;
-
-	return (diff < 0) ? -1 : 1;
 }
 
 static void timeline_value_str(struct sync_timeline *timeline, char *str,
@@ -104,9 +75,7 @@ static void pt_value_str(struct sync_pt *pt, char *str, int size)
 
 static struct sync_timeline_ops mali_timeline_ops = {
 	.driver_name = "Mali",
-	.dup = timeline_dup,
 	.has_signaled = timeline_has_signaled,
-	.compare = timeline_compare,
 	.timeline_value_str = timeline_value_str,
 	.pt_value_str       = pt_value_str,
 };
