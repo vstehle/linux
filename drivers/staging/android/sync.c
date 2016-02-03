@@ -356,16 +356,6 @@ static void android_fence_disable_signaling(struct fence *fence)
 	list_del_init(&fence->active_list);
 }
 
-static int android_fence_fill_driver_data(struct fence *fence,
-					  void *data, int size)
-{
-	struct sync_timeline *parent = fence_parent(fence);
-
-	if (!parent->ops->fill_driver_data)
-		return 0;
-	return parent->ops->fill_driver_data(fence, data, size);
-}
-
 static void android_fence_value_str(struct fence *fence,
 				    char *str, int size)
 {
@@ -400,7 +390,6 @@ static const struct fence_ops android_fence_ops = {
 	.signaled = android_fence_signaled,
 	.wait = fence_default_wait,
 	.release = android_fence_release,
-	.fill_driver_data = android_fence_fill_driver_data,
 	.fence_value_str = android_fence_value_str,
 	.timeline_value_str = android_fence_timeline_value_str,
 };
@@ -499,21 +488,11 @@ err_put_fd:
 static int sync_fill_fence_info(struct fence *fence, void *data, int size)
 {
 	struct sync_fence_info *info = data;
-	int ret;
 
 	if (size < sizeof(*info))
 		return -ENOMEM;
 
 	info->len = sizeof(*info);
-
-	if (fence->ops->fill_driver_data) {
-		ret = fence->ops->fill_driver_data(fence, info->driver_data,
-						   size - sizeof(*info));
-		if (ret < 0)
-			return ret;
-
-		info->len += ret;
-	}
 
 	strlcpy(info->obj_name, fence->ops->get_timeline_name(fence),
 		sizeof(info->obj_name));
