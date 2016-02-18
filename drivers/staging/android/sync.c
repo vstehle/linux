@@ -430,7 +430,7 @@ static unsigned int sync_file_poll(struct file *file, poll_table *wait)
 
 	if (!status)
 		return POLLIN;
-	else if (status < 0)
+	if (status < 0)
 		return POLLERR;
 	return 0;
 }
