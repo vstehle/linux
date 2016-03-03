@@ -280,7 +280,6 @@ update_connector_routing(struct drm_atomic_state *state,
 	const struct drm_connector_helper_funcs *funcs;
 	struct drm_encoder *new_encoder;
 	struct drm_crtc_state *crtc_state;
-	int idx;
 
 	DRM_DEBUG_ATOMIC("Updating routing for [CONNECTOR:%d:%s]\n",
 			 connector->base.id,
@@ -288,16 +287,12 @@ update_connector_routing(struct drm_atomic_state *state,
 
 	if (connector->state->crtc != connector_state->crtc) {
 		if (connector->state->crtc) {
-			idx = drm_crtc_index(connector->state->crtc);
-
-			crtc_state = state->crtc_states[idx];
+			crtc_state = drm_atomic_get_existing_crtc_state(state, connector->state->crtc);
 			crtc_state->connectors_changed = true;
 		}
 
 		if (connector_state->crtc) {
-			idx = drm_crtc_index(connector_state->crtc);
-
-			crtc_state = state->crtc_states[idx];
+			crtc_state = drm_atomic_get_existing_crtc_state(state, connector_state->crtc);
 			crtc_state->connectors_changed = true;
 		}
 	}
@@ -351,14 +346,9 @@ update_connector_routing(struct drm_atomic_state *state,
 
 	steal_encoder(state, new_encoder);
 
-	if (WARN_ON(!connector_state->crtc))
-		return -EINVAL;
-
 	set_best_encoder(state, connector_state, new_encoder);
 
-	idx = drm_crtc_index(connector_state->crtc);
-
-	crtc_state = state->crtc_states[idx];
+	crtc_state = drm_atomic_get_existing_crtc_state(state, connector_state->crtc);
 	crtc_state->connectors_changed = true;
 
 	DRM_DEBUG_ATOMIC("[CONNECTOR:%d:%s] using [ENCODER:%d:%s] on [CRTC:%d:%s]\n",
