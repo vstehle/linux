@@ -1224,25 +1224,29 @@ static int setup_cs(struct spi_device *spi, struct chip_data *chip,
 		gpio_free(chip->gpio_cs);
 
 	/* If (*cs_control) is provided, ignore GPIO chip select */
-	if (chip_info->cs_control) {
+	if (chip_info && chip_info->cs_control) {
 		chip->cs_control = chip_info->cs_control;
 		return 0;
 	}
 
-	if (gpio_is_valid(chip_info->gpio_cs)) {
-		err = gpio_request(chip_info->gpio_cs, "SPI_CS");
-		if (err) {
-			dev_err(&spi->dev, "failed to request chip select GPIO%d\n",
-				chip_info->gpio_cs);
-			return err;
-		}
-
+	if (chip_info && gpio_is_valid(chip_info->gpio_cs))
 		chip->gpio_cs = chip_info->gpio_cs;
-		chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
+	else if (gpio_is_valid(spi->cs_gpio))
+		chip->gpio_cs = spi->cs_gpio;
+	else
+		return 0;
 
-		err = gpio_direction_output(chip->gpio_cs,
-					!chip->gpio_cs_inverted);
+	err = gpio_request(chip->gpio_cs, "SPI_CS");
+	if (err) {
+		dev_err(&spi->dev, "failed to request chip select GPIO%d\n",
+			chip_info->gpio_cs);
+		return err;
 	}
+
+	chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
+
+	err = gpio_direction_output(chip->gpio_cs,
+				    !chip->gpio_cs_inverted);
 
 	return err;
 }
