@@ -47,16 +47,6 @@ struct device_node;
 struct fence;
 struct reservation_object;
 
-#define DRM_MODE_OBJECT_CRTC 0xcccccccc
-#define DRM_MODE_OBJECT_CONNECTOR 0xc0c0c0c0
-#define DRM_MODE_OBJECT_ENCODER 0xe0e0e0e0
-#define DRM_MODE_OBJECT_MODE 0xdededede
-#define DRM_MODE_OBJECT_PROPERTY 0xb0b0b0b0
-#define DRM_MODE_OBJECT_FB 0xfbfbfbfb
-#define DRM_MODE_OBJECT_BLOB 0xbbbbbbbb
-#define DRM_MODE_OBJECT_PLANE 0xeeeeeeee
-#define DRM_MODE_OBJECT_ANY 0
-
 struct drm_mode_object {
 	uint32_t id;
 	uint32_t type;
