@@ -2838,6 +2838,7 @@ static void mwifiex_pcie_get_fw_name(struct mwifiex_adapter *adapter)
 		default:
 			break;
 		}
+		break;
 	case PCIE_DEVICE_ID_MARVELL_88W8997:
 		mwifiex_read_reg(adapter, 0x0c48, &revision_id);
 		switch (revision_id) {
