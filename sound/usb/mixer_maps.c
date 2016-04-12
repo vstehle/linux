@@ -366,6 +366,16 @@ static const struct usbmix_name_map dell_alc4020_map[] = {
 };
 
 /*
+ * Dell usb dock with ALC4020 codec had a firmware problem where it got
+ * screwed up when zero volume is passed; just skip it as a workaround
+ */
+static const struct usbmix_name_map dell_alc4020_map[] = {
+	{ 16, NULL },
+	{ 19, NULL },
+	{ 0 }
+};
+
+/*
  * Control map entries
  */
 
