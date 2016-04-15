@@ -620,7 +620,7 @@ void drm_framebuffer_remove(struct drm_framebuffer *fb)
 	 * in-use fb with fb-id == 0. Userspace is allowed to shoot its own foot
 	 * in this manner.
 	 */
-	if (atomic_read(&fb->refcount.refcount) > 1) {
+	if (drm_framebuffer_read_refcount(fb) > 1) {
 		drm_modeset_lock_all(dev);
 		/* remove from any CRTC */
 		drm_for_each_crtc(crtc, dev) {
@@ -3576,7 +3576,7 @@ int drm_mode_rmfb(struct drm_device *dev,
 	 * so run this in a separate stack as there's no way to correctly
 	 * handle this after the fb is already removed from the lookup table.
 	 */
-	if (atomic_read(&fb->refcount.refcount) > 1) {
+	if (drm_framebuffer_read_refcount(fb) > 1) {
 		struct drm_mode_rmfb_work arg;
 
 		INIT_WORK_ONSTACK(&arg.work, drm_mode_rmfb_work_fn);
@@ -3769,7 +3769,7 @@ void drm_fb_release(struct drm_file *priv)
 	 * at it any more.
 	 */
 	list_for_each_entry_safe(fb, tfb, &priv->fbs, filp_head) {
-		if (atomic_read(&fb->refcount.refcount) > 1) {
+		if (drm_framebuffer_read_refcount(fb) > 1) {
 			list_move_tail(&fb->filp_head, &arg.fbs);
 		} else {
 			list_del_init(&fb->filp_head);
