@@ -40,7 +40,7 @@ int drm_atomic_helper_check(struct drm_device *dev,
 			    struct drm_atomic_state *state);
 int drm_atomic_helper_commit(struct drm_device *dev,
 			     struct drm_atomic_state *state,
-			     bool async);
+			     bool nonblock);
 
 bool drm_atomic_helper_framebuffer_changed(struct drm_device *dev,
 					   struct drm_atomic_state *old_state,
