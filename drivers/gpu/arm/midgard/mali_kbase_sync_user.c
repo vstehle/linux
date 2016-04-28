@@ -108,12 +108,12 @@ int kbase_stream_create_fence(int tl_fd)
 	/* create a fd representing the fence */
 	fd = get_unused_fd_flags(O_RDWR | O_CLOEXEC);
 	if (fd < 0) {
-		sync_file_put(sfile);
+		fput(sfile->file);
 		goto out;
 	}
 
 	/* bind fence to the new fd */
-	sync_file_install(sfile, fd);
+	fd_install(fd, sfile->file);
 
  out:
 	fput(tl_file);
@@ -129,7 +129,7 @@ int kbase_fence_validate(int fd)
 	if (!sfile)
 		return -EINVAL;
 
-	sync_file_put(sfile);
+	fput(sfile->file);
 	return 0;
 }
 

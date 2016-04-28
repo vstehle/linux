@@ -1175,7 +1175,7 @@ int kbase_process_soft_job(struct kbase_jd_atom *katom)
 		KBASE_DEBUG_ASSERT(katom->sfile != NULL);
 		katom->event_code = kbase_fence_trigger(katom, katom->event_code == BASE_JD_EVENT_DONE ? 0 : -EFAULT);
 		/* Release the reference as we don't need it any more */
-		sync_file_put(katom->sfile);
+		fput(katom->sfile->file);
 		katom->sfile = NULL;
 		break;
 	case BASE_JD_REQ_SOFT_FENCE_WAIT:
@@ -1324,13 +1324,13 @@ void kbase_finish_soft_job(struct kbase_jd_atom *katom)
 		if (katom->sfile) {
 			kbase_fence_trigger(katom, katom->event_code ==
 					BASE_JD_EVENT_DONE ? 0 : -EFAULT);
-			sync_file_put(katom->sfile);
+			fput(katom->sfile->file);
 			katom->sfile = NULL;
 		}
 		break;
 	case BASE_JD_REQ_SOFT_FENCE_WAIT:
 		/* Release the reference to the fence object */
-		sync_file_put(katom->sfile);
+		fput(katom->sfile->file);
 		katom->sfile = NULL;
 		break;
 #endif				/* CONFIG_SYNC */
