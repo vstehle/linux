@@ -96,7 +96,7 @@ int kbase_stream_create_fence(int tl_fd)
 		goto out;
 	}
 
-	sfile = sync_file_create("mali_fence", fence);
+	sfile = sync_file_create(fence);
 	if (!sfile) {
 		fence_put(fence);
 		fd = -EFAULT;
