@@ -1259,7 +1259,7 @@ int kbase_prepare_soft_job(struct kbase_jd_atom *katom)
 			if (fd < 0)
 				return -EINVAL;
 
-			katom->sfile = sync_file_fdget(fd);
+			katom->sfile = kbase_sync_file_fdget(fd);
 
 			if (katom->sfile == NULL) {
 				/* The only way the fence can be NULL is if userspace closed it for us.
@@ -1282,7 +1282,7 @@ int kbase_prepare_soft_job(struct kbase_jd_atom *katom)
 				return -EINVAL;
 
 			/* Get a reference to the fence object */
-			katom->sfile = sync_file_fdget(fence.basep.fd);
+			katom->sfile = kbase_sync_file_fdget(fence.basep.fd);
 			if (katom->sfile == NULL)
 				return -EINVAL;
 		}

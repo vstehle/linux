@@ -121,11 +121,41 @@ int kbase_stream_create_fence(int tl_fd)
 	return fd;
 }
 
+/* sync_file_fdget is static now, so implement it ourselves.
+ * We cannot access static fops either, so to verify that this is actual sync
+ * call file info ioctl and verify there is a fence attached.
+ */
+struct sync_file *kbase_sync_file_fdget(int fd)
+{
+	struct file *file = fget(fd);
+	mm_segment_t fs = get_fs();
+	struct sync_file_info info = { { 0 } };
+	int ret;
+
+	if (!file)
+		return NULL;
+
+	if (!file->f_op->unlocked_ioctl)
+		goto err;
+
+	set_fs(get_ds());
+	ret = file->f_op->unlocked_ioctl(file, SYNC_IOC_FILE_INFO, (unsigned long)(uintptr_t)&info);
+	set_fs(fs);
+	if (ret != 0 && info.num_fences == 0)
+		goto err;
+
+	return file->private_data;
+
+err:
+	fput(file);
+	return NULL;
+}
+
 int kbase_fence_validate(int fd)
 {
 	struct sync_file *sfile;
 
-	sfile = sync_file_fdget(fd);
+	sfile = kbase_sync_file_fdget(fd);
 	if (!sfile)
 		return -EINVAL;
 
