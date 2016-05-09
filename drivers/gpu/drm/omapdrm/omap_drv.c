@@ -566,7 +566,7 @@ static int ioctl_gem_cpu_prep(struct drm_device *dev, void *data,
 
 	VERB("%p:%p: handle=%d, op=%x", dev, file_priv, args->handle, args->op);
 
-	obj = drm_gem_object_lookup(dev, file_priv, args->handle);
+	obj = drm_gem_object_lookup(file_priv, args->handle);
 	if (!obj)
 		return -ENOENT;
 
@@ -589,7 +589,7 @@ static int ioctl_gem_cpu_fini(struct drm_device *dev, void *data,
 
 	VERB("%p:%p: handle=%d", dev, file_priv, args->handle);
 
-	obj = drm_gem_object_lookup(dev, file_priv, args->handle);
+	obj = drm_gem_object_lookup(file_priv, args->handle);
 	if (!obj)
 		return -ENOENT;
 
@@ -613,7 +613,7 @@ static int ioctl_gem_info(struct drm_device *dev, void *data,
 
 	VERB("%p:%p: handle=%d", dev, file_priv, args->handle);
 
-	obj = drm_gem_object_lookup(dev, file_priv, args->handle);
+	obj = drm_gem_object_lookup(file_priv, args->handle);
 	if (!obj)
 		return -ENOENT;
 

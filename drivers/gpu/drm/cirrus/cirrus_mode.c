@@ -438,7 +438,7 @@ static int cirrus_bo_to_cursor(struct cirrus_device *cdev,
 	}
 
 	mutex_lock(&dev->struct_mutex);
-	obj = drm_gem_object_lookup(dev, file_priv, handle);
+	obj = drm_gem_object_lookup(file_priv, handle);
 	if (obj == NULL) {
 		ret = -ENOENT;
 		DRM_ERROR("Buffer handle for cursor is invalid\n");

@@ -204,7 +204,7 @@ int evdi_gem_mmap(struct drm_file *file,
 	int ret = 0;
 
 	mutex_lock(&dev->struct_mutex);
-	obj = drm_gem_object_lookup(dev, file, handle);
+	obj = drm_gem_object_lookup(file, handle);
 	if (obj == NULL) {
 		ret = -ENOENT;
 		goto unlock;

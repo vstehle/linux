@@ -478,7 +478,7 @@ struct drm_framebuffer *evdi_fb_user_fb_create(struct drm_device *dev,
 		return ERR_PTR(-EINVAL);
 	}
 
-	obj = drm_gem_object_lookup(dev, file, mode_cmd->handles[0]);
+	obj = drm_gem_object_lookup(file, mode_cmd->handles[0]);
 	if (obj == NULL)
 		return ERR_PTR(-ENOENT);
 

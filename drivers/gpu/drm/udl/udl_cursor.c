@@ -128,7 +128,7 @@ int udl_cursor_set(struct drm_crtc *crtc, struct drm_file *file,
 					UDL_CURSOR_W, UDL_CURSOR_H);
 			return -EINVAL;
 		}
-		obj = drm_gem_object_lookup(crtc->dev, file, handle);
+		obj = drm_gem_object_lookup(file, handle);
 		if (!obj) {
 			DRM_ERROR("failed to lookup gem object.\n");
 			return -EINVAL;

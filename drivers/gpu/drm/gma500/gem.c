@@ -65,7 +65,7 @@ int psb_gem_dumb_map_gtt(struct drm_file *file, struct drm_device *dev,
 	mutex_lock(&dev->struct_mutex);
 
 	/* GEM does all our handle to object mapping */
-	obj = drm_gem_object_lookup(dev, file, handle);
+	obj = drm_gem_object_lookup(file, handle);
 	if (obj == NULL) {
 		ret = -ENOENT;
 		goto unlock;
