@@ -612,6 +612,8 @@
 	dr_mode = "host";
 };
 
+#include "common/cros-ec-keyboard.dtsi"
+
 /* PINCTRL: always below everything else */
 
 &pinctrl {
