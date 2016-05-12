@@ -179,6 +179,7 @@ struct chv_pinctrl {
 	const struct chv_community *community;
 	u32 saved_intmask;
 	struct chv_pin_context *saved_pin_context;
+	u32 saved_mux_padctrl1;
 };
 
 #define ALTERNATE_FUNCTION(p, m, i)		\
@@ -899,6 +900,7 @@ static int chv_gpio_request_enable(struct pinctrl_dev *pctldev,
 		/* Disable interrupt generation */
 		reg = chv_padreg(pctrl, offset, CHV_PADCTRL1);
 		value = readl(reg);
+		pctrl->saved_mux_padctrl1 = value;
 		value &= ~CHV_PADCTRL1_INTWAKECFG_MASK;
 		value &= ~CHV_PADCTRL1_INVRXTX_MASK;
 		chv_writel(value, reg);
@@ -940,6 +942,15 @@ static void chv_gpio_disable_free(struct pinctrl_dev *pctldev,
 
 	reg = chv_padreg(pctrl, offset, CHV_PADCTRL0);
 	value = readl(reg) & ~CHV_PADCTRL0_GPIOEN;
+	chv_writel(value, reg);
+
+	/* Restore previous pad configuration */
+	reg = chv_padreg(pctrl, offset, CHV_PADCTRL1);
+	value = readl(reg);
+	value &= ~CHV_PADCTRL1_INTWAKECFG_MASK;
+	value |= pctrl->saved_mux_padctrl1 & CHV_PADCTRL1_INTWAKECFG_MASK;
+	value &= ~CHV_PADCTRL1_INVRXTX_MASK;
+	value |= pctrl->saved_mux_padctrl1 & CHV_PADCTRL1_INVRXTX_MASK;
 	chv_writel(value, reg);
 
 	raw_spin_unlock_irqrestore(&chv_lock, flags);
