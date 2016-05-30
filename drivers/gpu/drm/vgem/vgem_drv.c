@@ -292,7 +292,7 @@ static const struct file_operations vgem_driver_fops = {
 static struct drm_driver vgem_driver = {
 	.driver_features		=
 		DRIVER_GEM | DRIVER_PRIME | DRIVER_RENDER,
-	.gem_free_object		= vgem_gem_free_object,
+	.gem_free_object_unlocked	= vgem_gem_free_object,
 	.gem_vm_ops			= &vgem_gem_vm_ops,
 	.ioctls				= vgem_ioctls,
 	.num_ioctls			= ARRAY_SIZE(vgem_ioctls),
