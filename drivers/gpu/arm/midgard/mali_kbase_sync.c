@@ -23,6 +23,8 @@
 #include <mali_kbase.h>
 #include <mali_kbase_sync.h>
 
+#define TIMELINE_DRV_NAME "Mali"
+
 struct mali_sync_timeline {
 	struct sync_timeline timeline;
 	int counter;
@@ -44,13 +46,11 @@ static struct mali_sync_pt *to_mali_sync_pt(struct fence *fence)
 	return container_of(fence, struct mali_sync_pt, fence);
 }
 
-static struct sync_timeline_ops mali_timeline_ops = {
-	.driver_name = "Mali",
-};
-
 int kbase_sync_timeline_is_ours(struct sync_timeline *timeline)
 {
-	return timeline->ops == &mali_timeline_ops;
+	if (!timeline)
+		return false;
+	return strncmp(TIMELINE_DRV_NAME, timeline->drv_name, sizeof(timeline->drv_name)) == 0;
 }
 
 struct sync_timeline *kbase_sync_timeline_alloc(const char *name)
@@ -58,7 +58,7 @@ struct sync_timeline *kbase_sync_timeline_alloc(const char *name)
 	struct sync_timeline *tl;
 	struct mali_sync_timeline *mtl;
 
-	tl = sync_timeline_create(&mali_timeline_ops, sizeof(struct mali_sync_timeline), name);
+	tl = sync_timeline_create(sizeof(struct mali_sync_timeline), TIMELINE_DRV_NAME, name);
 	if (!tl)
 		return NULL;
 
