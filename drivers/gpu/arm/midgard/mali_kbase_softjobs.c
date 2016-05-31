@@ -179,16 +179,12 @@ static void complete_soft_job(struct kbase_jd_atom *katom)
 
 static enum base_jd_event_code kbase_fence_trigger(struct kbase_jd_atom *katom, int result)
 {
-	struct sync_timeline *timeline;
-
 	if (katom->sfile->num_fences != 1) {
 		/* Not exactly one item in the list - so it didn't (directly) come from us */
 		return BASE_JD_EVENT_JOB_CANCELLED;
 	}
 
-	timeline = fence_parent(katom->sfile->cbs[0].fence);
-
-	if (!kbase_sync_timeline_is_ours(timeline)) {
+	if (!kbase_sync_fence_is_ours(katom->sfile->cbs[0].fence)) {
 		/* Fence has a sync_pt which isn't ours! */
 		return BASE_JD_EVENT_JOB_CANCELLED;
 	}

@@ -72,8 +72,8 @@ struct sync_file *kbase_sync_file_fdget(int fd);
  */
 int kbase_fence_validate(int fd);
 
-/* Returns true if the specified timeline is allocated by Mali */
-int kbase_sync_timeline_is_ours(struct sync_timeline *timeline);
+/* Returns true if the specified fence is allocated by Mali */
+int kbase_sync_fence_is_ours(struct fence *fence);
 
 /* Allocates a timeline for Mali
  *

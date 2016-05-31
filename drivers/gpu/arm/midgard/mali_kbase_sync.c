@@ -23,8 +23,6 @@
 #include <mali_kbase.h>
 #include <mali_kbase_sync.h>
 
-#define TIMELINE_DRV_NAME "Mali"
-
 struct mali_sync_pt {
 	struct sync_pt sync_pt;
 	int result;
@@ -35,11 +33,23 @@ static struct mali_sync_pt *to_mali_sync_pt(struct sync_pt *sync_pt)
 	return container_of(sync_pt, struct mali_sync_pt, sync_pt);
 }
 
-int kbase_sync_timeline_is_ours(struct sync_timeline *timeline)
+/* It doesn't quite prove it it is our fence, but at least we know it is
+ * sw_sync fence.
+ */
+int kbase_sync_fence_is_ours(struct fence *fence)
 {
-	if (!timeline)
+	struct sync_pt *sync_pt;
+	if (!fence)
 		return false;
-	return strncmp(TIMELINE_DRV_NAME, timeline->drv_name, sizeof(timeline->drv_name)) == 0;
+
+	sync_pt = fence_to_sync_pt(fence);
+	if (!sync_pt)
+		return false;
+
+	if (!fence->ops->get_driver_name)
+		return false;
+
+	return strcmp("sw_sync", fence->ops->get_driver_name(fence)) == 0;
 }
 
 struct mali_sync_timeline *kbase_sync_timeline_alloc(const char *name)
@@ -50,7 +60,7 @@ struct mali_sync_timeline *kbase_sync_timeline_alloc(const char *name)
 	if (!mtl)
 		return NULL;
 
-	mtl->timeline = sync_timeline_create(TIMELINE_DRV_NAME, name);
+	mtl->timeline = sync_timeline_create(name);
 	if (!mtl->timeline) {
 		kfree(mtl);
 		return NULL;

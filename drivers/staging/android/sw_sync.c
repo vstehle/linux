@@ -49,14 +49,12 @@ struct sync_pt *fence_to_sync_pt(struct fence *fence)
 
 /**
  * sync_timeline_create() - creates a sync object
- * @drv_name:	sync_timeline driver name
  * @name:	sync_timeline name
  *
  * Creates a new sync_timeline. Returns the sync_timeline object or NULL in
  * case of error.
  */
-struct sync_timeline *sync_timeline_create(const char *drv_name,
-					   const char *name)
+struct sync_timeline *sync_timeline_create(const char *name)
 {
 	struct sync_timeline *obj;
 
@@ -67,7 +65,6 @@ struct sync_timeline *sync_timeline_create(const char *drv_name,
 	kref_init(&obj->kref);
 	obj->context = fence_context_alloc(1);
 	strlcpy(obj->name, name, sizeof(obj->name));
-	strlcpy(obj->drv_name, drv_name, sizeof(obj->drv_name));
 
 	INIT_LIST_HEAD(&obj->child_list_head);
 	INIT_LIST_HEAD(&obj->active_list_head);
@@ -163,9 +160,7 @@ struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
 
 static const char *timeline_fence_get_driver_name(struct fence *fence)
 {
-	struct sync_timeline *parent = fence_parent(fence);
-
-	return parent->drv_name;
+	return "sw_sync";
 }
 
 static const char *timeline_fence_get_timeline_name(struct fence *fence)
@@ -256,7 +251,7 @@ static int sw_sync_debugfs_open(struct inode *inode, struct file *file)
 
 	get_task_comm(task_comm, current);
 
-	obj = sync_timeline_create("sw_sync", task_comm);
+	obj = sync_timeline_create(task_comm);
 	if (!obj)
 		return -ENOMEM;
 

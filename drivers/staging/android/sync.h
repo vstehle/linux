@@ -23,7 +23,6 @@
 /**
  * struct sync_timeline - sync object
  * @kref:		reference count on fence.
- * @drv_name:		drv_name of the driver using the sync_timeline
  * @name:		name of the sync_timeline. Useful for debugging
  * @child_list_head:	list of children sync_pts for this sync_timeline
  * @child_list_lock:	lock protecting @child_list_head and fence.status
@@ -32,7 +31,6 @@
  */
 struct sync_timeline {
 	struct kref		kref;
-	char			drv_name[32];
 	char			name[32];
 
 	/* protected by child_list_lock */
@@ -50,8 +48,7 @@ struct sync_timeline {
 
 struct sync_pt *fence_to_sync_pt(struct fence *fence);
 
-struct sync_timeline *sync_timeline_create(const char *drv_name,
-					   const char *name);
+struct sync_timeline *sync_timeline_create(const char *name);
 
 struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
 			     unsigned int value);
