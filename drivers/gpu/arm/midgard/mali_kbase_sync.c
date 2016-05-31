@@ -17,6 +17,7 @@
 
 #ifdef CONFIG_SYNC
 
+#include <linux/mutex.h>
 #include <linux/seq_file.h>
 #include "sync.h"
 #include <mali_kbase.h>
@@ -24,13 +25,12 @@
 
 struct mali_sync_timeline {
 	struct sync_timeline timeline;
-	atomic_t counter;
-	atomic_t signalled;
+	int counter;
+	struct mutex counter_lock;
 };
 
 struct mali_sync_pt {
 	struct fence fence;
-	int order;
 	int result;
 };
 
@@ -44,38 +44,21 @@ static struct mali_sync_pt *to_mali_sync_pt(struct fence *fence)
 	return container_of(fence, struct mali_sync_pt, fence);
 }
 
-static int timeline_has_signaled(struct fence *fence)
-{
-	struct mali_sync_pt *mpt = to_mali_sync_pt(fence);
-	struct mali_sync_timeline *mtl = to_mali_sync_timeline(fence_parent(fence));
-	int result = mpt->result;
-
-	int diff = atomic_read(&mtl->signalled) - mpt->order;
-
-	if (diff >= 0)
-		return (result < 0) ? result : 1;
-
-	return 0;
-}
-
 static void timeline_value_str(struct sync_timeline *timeline, char *str,
 			       int size)
 {
-	struct mali_sync_timeline *mtl = to_mali_sync_timeline(timeline);
-
-	snprintf(str, size, "%d", atomic_read(&mtl->signalled));
+	snprintf(str, size, "%d", timeline->value);
 }
 
 static void fence_value_str(struct fence *fence, char *str, int size)
 {
 	struct mali_sync_pt *mpt = to_mali_sync_pt(fence);
 
-	snprintf(str, size, "%d(%d)", mpt->order, mpt->result);
+	snprintf(str, size, "%d(%d)", (int)mpt->fence.seqno, mpt->result);
 }
 
 static struct sync_timeline_ops mali_timeline_ops = {
 	.driver_name = "Mali",
-	.has_signaled = timeline_has_signaled,
 	.timeline_value_str = timeline_value_str,
 	.fence_value_str    = fence_value_str,
 };
@@ -96,23 +79,30 @@ struct sync_timeline *kbase_sync_timeline_alloc(const char *name)
 
 	/* Set the counter in our private struct */
 	mtl = to_mali_sync_timeline(tl);
-	atomic_set(&mtl->counter, 0);
-	atomic_set(&mtl->signalled, 0);
+	/* mtl->counter set to 0 by kzalloc */;
+	mutex_init(&mtl->counter_lock);
 
 	return tl;
 }
 
 struct fence *kbase_fence_alloc(struct sync_timeline *parent)
 {
-	struct fence *fence = sync_pt_create(parent, sizeof(struct mali_sync_pt));
+	struct fence *fence;
 	struct mali_sync_timeline *mtl = to_mali_sync_timeline(parent);
 	struct mali_sync_pt *mpt;
 
-	if (!fence)
-		return NULL;
+	/* Counter has to be incremented only if fence create succeeds.. */
+	mutex_lock(&mtl->counter_lock);
+	fence = sync_pt_create(parent, sizeof(struct mali_sync_pt), mtl->counter + 1);
 
+	if (!fence) {
+		mutex_unlock(&mtl->counter_lock);
+		return NULL;
+	}
+
+	mtl->counter++;
+	mutex_unlock(&mtl->counter_lock);
 	mpt = to_mali_sync_pt(fence);
-	mpt->order = atomic_inc_return(&mtl->counter);
 	mpt->result = 0;
 
 	return fence;
@@ -122,30 +112,38 @@ void kbase_sync_signal_fence(struct fence *fence, int result)
 {
 	struct mali_sync_pt *mpt = to_mali_sync_pt(fence);
 	struct mali_sync_timeline *mtl = to_mali_sync_timeline(fence_parent(fence));
-	int signalled;
+	unsigned long flags;
 	int diff;
 
 	mpt->result = result;
 
-	do {
-		signalled = atomic_read(&mtl->signalled);
+	/* timeline.value is protected by child_list_lock */
+	spin_lock_irqsave(&mtl->timeline.child_list_lock, flags);
 
-		diff = signalled - mpt->order;
+	diff = mtl->timeline.value - (int)mpt->fence.seqno;
 
-		if (diff > 0) {
-			/* The timeline is already at or ahead of this point.
-			 * This should not happen unless userspace has been
-			 * signalling fences out of order, so warn but don't
-			 * violate the sync_pt API.
-			 * The warning is only in debug builds to prevent
-			 * a malicious user being able to spam dmesg.
-			 */
+	if (diff > 0) {
+		/* The timeline is already at or ahead of this point.
+		 * This should not happen unless userspace has been
+		 * signalling fences out of order, so warn but don't
+		 * violate the sync_pt API.
+		 * The warning is only in debug builds to prevent
+		 * a malicious user being able to spam dmesg.
+		 */
 #ifdef CONFIG_MALI_DEBUG
-			pr_err("Fences were triggered in a different order to allocation!");
+		pr_err("Fences were triggered in a different order to allocation!");
 #endif				/* CONFIG_MALI_DEBUG */
-			return;
-		}
-	} while (atomic_cmpxchg(&mtl->signalled, signalled, mpt->order) != signalled);
+		spin_unlock_irqrestore(&mtl->timeline.child_list_lock, flags);
+		sync_timeline_signal(&mtl->timeline, 0);
+		return;
+	}
+
+	/* We set timeline value ourselves and just use sync_signal_timeline to
+	 * remove fences from the list
+	 */
+	mtl->timeline.value = (int)mpt->fence.seqno;
+	spin_unlock_irqrestore(&mtl->timeline.child_list_lock, flags);
+	sync_timeline_signal(&mtl->timeline, 0);
 }
 
 #endif				/* CONFIG_SYNC */

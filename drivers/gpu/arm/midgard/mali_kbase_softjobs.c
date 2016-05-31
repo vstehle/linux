@@ -195,8 +195,6 @@ static enum base_jd_event_code kbase_fence_trigger(struct kbase_jd_atom *katom, 
 
 	kbase_sync_signal_fence(katom->sfile->cbs[0].fence, result);
 
-	sync_timeline_signal(timeline);
-
 	return (result < 0) ? BASE_JD_EVENT_JOB_CANCELLED : BASE_JD_EVENT_DONE;
 }
 
