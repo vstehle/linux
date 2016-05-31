@@ -954,7 +954,7 @@ struct kbase_mem_phy_alloc *kbase_map_external_resource(
 #endif
 #if defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)
 		, bool exclusive
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 		, bool implicit_sync
 #endif
 #endif

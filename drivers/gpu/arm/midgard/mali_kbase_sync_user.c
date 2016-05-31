@@ -22,7 +22,7 @@
  *
  */
 
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 
 #include <linux/sched.h>
 #include <linux/fdtable.h>
@@ -164,4 +164,4 @@ int kbase_fence_validate(int fd)
 	return 0;
 }
 
-#endif				/* CONFIG_SYNC */
+#endif				/* CONFIG_SW_SYNC */

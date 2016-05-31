@@ -459,7 +459,7 @@ static int kbase_jd_pre_external_resources(struct kbase_jd_atom *katom, const st
 #endif
 #if defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)
 				, exclusive
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 				, katom->kctx->jctx.implicit_sync
 #endif
 #endif
@@ -1733,7 +1733,7 @@ int kbase_jd_init(struct kbase_context *kctx)
 	kctx->jctx.fence_context = fence_context_alloc(1);
 	atomic_set(&kctx->jctx.fence_seqno, 0);
 #endif
-#if (defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)) && defined(CONFIG_SYNC)
+#if (defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)) && defined(CONFIG_SW_SYNC)
 	kctx->jctx.implicit_sync = true;
 #endif				/* CONFIG_KDS or CONFIG_DRM_DMA_SYNC */
 	kctx->jctx.job_nr = 0;

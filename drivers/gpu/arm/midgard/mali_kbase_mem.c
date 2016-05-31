@@ -2290,7 +2290,7 @@ struct kbase_mem_phy_alloc *kbase_map_external_resource(
 #endif
 #if defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)
 		, bool exclusive
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 		, bool implicit_sync
 #endif
 #endif
@@ -2339,7 +2339,7 @@ struct kbase_mem_phy_alloc *kbase_map_external_resource(
 			kds_res = get_dma_buf_kds_resource(
 					reg->gpu_alloc->imported.umm.dma_buf);
 			if (kds_res
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 			    && implicit_sync
 #endif
 			   )
@@ -2353,7 +2353,7 @@ struct kbase_mem_phy_alloc *kbase_map_external_resource(
 				struct reservation_object *resv =
 					reg->gpu_alloc->imported.umm.dma_buf->resv;
 				if (resv
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 				    && implicit_sync
 #endif
 				) {
@@ -2476,7 +2476,7 @@ struct kbase_ctx_ext_res_meta *kbase_sticky_resource_acquire(
 #endif
 #if defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)
 				, false
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 				, false
 #endif
 #endif

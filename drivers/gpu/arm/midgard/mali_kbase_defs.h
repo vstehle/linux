@@ -53,9 +53,9 @@
 #include <drm/drm_sync_helper.h>
 #endif				/* CONFIG_DRM_DMA_SYNC */
 
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 #include "sync.h"
-#endif				/* CONFIG_SYNC */
+#endif				/* CONFIG_SW_SYNC */
 
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
@@ -327,7 +327,7 @@ struct kbase_ext_res {
 	struct kbase_mem_phy_alloc *alloc;
 };
 
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 struct kbase_sync_file_waiter;
 typedef void (*kbase_sync_callback_t)(struct sync_file *sfile,
 				      struct kbase_sync_file_waiter *waiter);
@@ -341,7 +341,7 @@ struct kbase_sync_file_waiter {
 	wait_queue_t work;
 	kbase_sync_callback_t callback;
 };
-#endif				/* CONFIG_SYNC */
+#endif				/* CONFIG_SW_SYNC */
 
 struct kbase_jd_atom {
 	struct work_struct work;
@@ -373,10 +373,10 @@ struct kbase_jd_atom {
 	struct drm_reservation_cb rcb;
 	struct fence *rendered_fence;
 #endif				/* CONFIG_DRM_DMA_SYNC */
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 	struct sync_file *sfile;
 	struct kbase_sync_file_waiter sync_waiter;
-#endif				/* CONFIG_SYNC */
+#endif				/* CONFIG_SW_SYNC */
 
 	/* Note: refer to kbasep_js_atom_retained_state, which will take a copy of some of the following members */
 	enum base_jd_event_code event_code;
@@ -496,9 +496,9 @@ struct kbase_jd_context {
 	unsigned fence_context;
 	atomic_t fence_seqno;
 #endif				/* CONFIG_KDS */
-#if (defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)) && defined(CONFIG_SYNC)
+#if (defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)) && defined(CONFIG_SW_SYNC)
 	bool implicit_sync;
-#endif				/* (CONFIG_KDS or CONFIG_DRM_DMA_SYNC) && CONFIG_SYNC */
+#endif				/* (CONFIG_KDS or CONFIG_DRM_DMA_SYNC) && CONFIG_SW_SYNC */
 #ifdef CONFIG_GPU_TRACEPOINTS
 	atomic_t work_id;
 #endif

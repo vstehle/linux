@@ -15,7 +15,7 @@
 
 
 
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 
 #include <linux/seq_file.h>
 #include <linux/slab.h>
@@ -129,4 +129,4 @@ void kbase_sync_signal_fence(struct fence *fence, int result)
 	sync_timeline_signal(tl, 0);
 }
 
-#endif				/* CONFIG_SYNC */
+#endif				/* CONFIG_SW_SYNC */

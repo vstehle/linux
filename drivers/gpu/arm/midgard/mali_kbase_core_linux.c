@@ -74,9 +74,9 @@
 #ifdef CONFIG_MALI_PLATFORM_FAKE
 #include <platform/mali_kbase_platform_fake.h>
 #endif /*CONFIG_MALI_PLATFORM_FAKE */
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 #include <mali_kbase_sync.h>
-#endif /* CONFIG_SYNC */
+#endif /* CONFIG_SW_SYNC */
 #ifdef CONFIG_PM_DEVFREQ
 #include <linux/devfreq.h>
 #endif /* CONFIG_PM_DEVFREQ */
@@ -947,7 +947,7 @@ copy_failed:
 
 	case KBASE_FUNC_STREAM_CREATE:
 		{
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 			struct kbase_uk_stream_create *screate = (struct kbase_uk_stream_create *)args;
 
 			if (sizeof(*screate) != args_size)
@@ -963,14 +963,14 @@ copy_failed:
 				ukh->ret = MALI_ERROR_FUNCTION_FAILED;
 			else
 				ukh->ret = MALI_ERROR_NONE;
-#else /* CONFIG_SYNC */
+#else /* CONFIG_SW_SYNC */
 			ukh->ret = MALI_ERROR_FUNCTION_FAILED;
-#endif /* CONFIG_SYNC */
+#endif /* CONFIG_SW_SYNC */
 			break;
 		}
 	case KBASE_FUNC_FENCE_VALIDATE:
 		{
-#ifdef CONFIG_SYNC
+#ifdef CONFIG_SW_SYNC
 			struct kbase_uk_fence_validate *fence_validate = (struct kbase_uk_fence_validate *)args;
 
 			if (sizeof(*fence_validate) != args_size)
@@ -980,7 +980,7 @@ copy_failed:
 				ukh->ret = MALI_ERROR_FUNCTION_FAILED;
 			else
 				ukh->ret = MALI_ERROR_NONE;
-#endif /* CONFIG_SYNC */
+#endif /* CONFIG_SW_SYNC */
 			break;
 		}
 
