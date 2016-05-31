@@ -26,13 +26,13 @@
 #define TIMELINE_DRV_NAME "Mali"
 
 struct mali_sync_pt {
-	struct fence fence;
+	struct sync_pt sync_pt;
 	int result;
 };
 
-static struct mali_sync_pt *to_mali_sync_pt(struct fence *fence)
+static struct mali_sync_pt *to_mali_sync_pt(struct sync_pt *sync_pt)
 {
-	return container_of(fence, struct mali_sync_pt, fence);
+	return container_of(sync_pt, struct mali_sync_pt, sync_pt);
 }
 
 int kbase_sync_timeline_is_ours(struct sync_timeline *timeline)
@@ -71,29 +71,29 @@ void kbase_sync_timeline_free(struct mali_sync_timeline *mtl)
 
 struct fence *kbase_fence_alloc(struct mali_sync_timeline *mtl)
 {
-	struct fence *fence;
+	struct sync_pt *sync_pt;
 	struct mali_sync_pt *mpt;
 
 	/* Counter has to be incremented only if fence create succeeds.. */
 	mutex_lock(&mtl->counter_lock);
-	fence = sync_pt_create(mtl->timeline, sizeof(struct mali_sync_pt), mtl->counter + 1);
+	sync_pt = sync_pt_create(mtl->timeline, sizeof(struct mali_sync_pt), mtl->counter + 1);
 
-	if (!fence) {
+	if (!sync_pt) {
 		mutex_unlock(&mtl->counter_lock);
 		return NULL;
 	}
 
 	mtl->counter++;
 	mutex_unlock(&mtl->counter_lock);
-	mpt = to_mali_sync_pt(fence);
+	mpt = to_mali_sync_pt(sync_pt);
 	mpt->result = 0;
 
-	return fence;
+	return &sync_pt->base;
 }
 
 void kbase_sync_signal_fence(struct fence *fence, int result)
 {
-	struct mali_sync_pt *mpt = to_mali_sync_pt(fence);
+	struct mali_sync_pt *mpt = to_mali_sync_pt(fence_to_sync_pt(fence));
 	struct sync_timeline *tl = fence_parent(fence);
 	unsigned long flags;
 	int diff;
@@ -103,7 +103,7 @@ void kbase_sync_signal_fence(struct fence *fence, int result)
 	/* timeline.value is protected by child_list_lock */
 	spin_lock_irqsave(&tl->child_list_lock, flags);
 
-	diff = tl->value - (int)mpt->fence.seqno;
+	diff = tl->value - (int)mpt->sync_pt.base.seqno;
 
 	if (diff > 0) {
 		/* The timeline is already at or ahead of this point.
@@ -124,7 +124,7 @@ void kbase_sync_signal_fence(struct fence *fence, int result)
 	/* We set timeline value ourselves and just use sync_signal_timeline to
 	 * remove fences from the list
 	 */
-	tl->value = (int)mpt->fence.seqno;
+	tl->value = (int)mpt->sync_pt.base.seqno;
 	spin_unlock_irqrestore(&tl->child_list_lock, flags);
 	sync_timeline_signal(tl, 0);
 }
