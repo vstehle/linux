@@ -32,16 +32,17 @@
 #include <linux/anon_inodes.h>
 #include <linux/version.h>
 #include <linux/uaccess.h>
+#include <linux/slab.h>
 #include <mali_kbase_sync.h>
 #include <mali_base_kernel_sync.h>
 
 static int kbase_stream_close(struct inode *inode, struct file *file)
 {
-	struct sync_timeline *tl;
+	struct mali_sync_timeline *mtl;
 
-	tl = (struct sync_timeline *)file->private_data;
-	BUG_ON(!tl);
-	sync_timeline_destroy(tl);
+	mtl = (struct mali_sync_timeline *)file->private_data;
+	BUG_ON(!mtl);
+	kbase_sync_timeline_free(mtl);
 	return 0;
 }
 
@@ -52,18 +53,18 @@ static const struct file_operations stream_fops = {
 
 int kbase_stream_create(const char *name, int *const out_fd)
 {
-	struct sync_timeline *tl;
+	struct mali_sync_timeline *mtl;
 
 	BUG_ON(!out_fd);
 
-	tl = kbase_sync_timeline_alloc(name);
-	if (!tl)
+	mtl = kbase_sync_timeline_alloc(name);
+	if (!mtl)
 		return -EINVAL;
 
-	*out_fd = anon_inode_getfd(name, &stream_fops, tl, O_RDONLY | O_CLOEXEC);
+	*out_fd = anon_inode_getfd(name, &stream_fops, mtl, O_RDONLY | O_CLOEXEC);
 
 	if (*out_fd < 0) {
-		sync_timeline_destroy(tl);
+		kbase_sync_timeline_free(mtl);
 		return -EINVAL;
 	}
 
@@ -72,7 +73,7 @@ int kbase_stream_create(const char *name, int *const out_fd)
 
 int kbase_stream_create_fence(int tl_fd)
 {
-	struct sync_timeline *tl;
+	struct mali_sync_timeline *mtl;
 	struct fence *fence;
 	struct sync_file *sfile;
 
@@ -88,9 +89,9 @@ int kbase_stream_create_fence(int tl_fd)
 		goto out;
 	}
 
-	tl = tl_file->private_data;
+	mtl = tl_file->private_data;
 
-	fence = kbase_fence_alloc(tl);
+	fence = kbase_fence_alloc(mtl);
 	if (!fence) {
 		fd = -EFAULT;
 		goto out;

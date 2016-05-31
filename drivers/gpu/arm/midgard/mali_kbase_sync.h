@@ -25,6 +25,7 @@
 #ifndef MALI_KBASE_SYNC_H
 #define MALI_KBASE_SYNC_H
 
+#include <linux/mutex.h>
 #include "sync.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
@@ -35,6 +36,12 @@ static inline struct sync_timeline *sync_pt_parent(struct sync_pt *pt)
 	return pt->parent;
 }
 #endif
+
+struct mali_sync_timeline {
+	struct sync_timeline *timeline;
+	int counter;
+	struct mutex counter_lock;
+};
 
 /*
  * Create a stream object.
@@ -72,7 +79,11 @@ int kbase_sync_timeline_is_ours(struct sync_timeline *timeline);
  *
  * One timeline should be allocated per API context.
  */
-struct sync_timeline *kbase_sync_timeline_alloc(const char *name);
+struct mali_sync_timeline *kbase_sync_timeline_alloc(const char *name);
+
+/* Free Mali timeline.
+ */
+void kbase_sync_timeline_free(struct mali_sync_timeline *mtl);
 
 /* Allocates a sync point within the timeline.
  *
@@ -80,7 +91,7 @@ struct sync_timeline *kbase_sync_timeline_alloc(const char *name);
  *
  * Sync points must be triggered in *exactly* the same order as they are allocated.
  */
-struct fence *kbase_fence_alloc(struct sync_timeline *parent);
+struct fence *kbase_fence_alloc(struct mali_sync_timeline *mtl);
 
 /* Signals a particular sync point
  *
