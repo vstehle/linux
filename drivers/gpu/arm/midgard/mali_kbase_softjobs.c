@@ -25,7 +25,7 @@
 #endif /* defined(CONFIG_DMA_SHARED_BUFFER) */
 #include <linux/dma-mapping.h>
 #ifdef CONFIG_SW_SYNC
-#include "sync.h"
+#include "sync_debug.h"
 #include <linux/syscalls.h>
 #include "mali_kbase_sync.h"
 #endif

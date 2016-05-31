@@ -26,7 +26,7 @@
 #define MALI_KBASE_SYNC_H
 
 #include <linux/mutex.h>
-#include "sync.h"
+#include "sync_debug.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
 /* For backwards compatiblility with kernels before 3.17. After 3.17

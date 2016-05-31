@@ -19,7 +19,7 @@
 
 #include <linux/seq_file.h>
 #include <linux/slab.h>
-#include "sync.h"
+#include "sync_debug.h"
 #include <mali_kbase.h>
 #include <mali_kbase_sync.h>
 

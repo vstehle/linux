@@ -54,7 +54,7 @@
 #endif				/* CONFIG_DRM_DMA_SYNC */
 
 #ifdef CONFIG_SW_SYNC
-#include "sync.h"
+#include "sync_debug.h"
 #endif				/* CONFIG_SW_SYNC */
 
 #ifdef CONFIG_DEBUG_FS
