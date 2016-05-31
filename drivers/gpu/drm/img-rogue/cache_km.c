@@ -45,7 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
 #include <linux/sw_sync.h>
 #else
-#include <../drivers/staging/android/sw_sync.h>
+#include <../drivers/staging/android/sync.h>
 #endif
 #include <linux/file.h>
 #include <linux/fs.h>
@@ -1207,7 +1207,7 @@ static PVRSRV_ERROR CacheOpExecRangeBased(PVRSRV_DATA *psPVRSRVData,
 			OSAtomicWrite(&ghCompletedCacheOpSeqNum, psCacheOpWorkItem->ui32OpSeqNum);
 
 #if defined(CONFIG_SW_SYNC)
-			sw_sync_timeline_inc(psCacheOpWorkItem->psTimeline->private_data, 1);
+			sync_timeline_signal(psCacheOpWorkItem->psTimeline->private_data, 1);
 			fput(psCacheOpWorkItem->psTimeline);
 #endif
 
@@ -1670,7 +1670,7 @@ PVRSRV_ERROR CacheOpSetTimeline (IMG_INT32 i32Timeline)
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-	sw_sync_timeline_inc(psFile->private_data, 1);
+	sync_timeline_signal(psFile->private_data, 1);
 	fput(psFile);
 
 	eError = PVRSRV_OK;
@@ -1881,7 +1881,7 @@ PVRSRV_ERROR CacheOpSetTimeline (IMG_INT32 i32Timeline)
 		goto e0;
 	}
 
-	sw_sync_timeline_inc(psFile->private_data, 1);
+	sync_timeline_signal(psFile->private_data, 1);
 	fput(psFile);
 e0:
 #else
