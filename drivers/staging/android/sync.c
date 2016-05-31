@@ -190,14 +190,7 @@ static void android_fence_disable_signaling(struct fence *fence)
 static void android_fence_value_str(struct fence *fence,
 				    char *str, int size)
 {
-	struct sync_timeline *parent = fence_parent(fence);
-
-	if (!parent->ops->fence_value_str) {
-		if (size)
-			*str = 0;
-		return;
-	}
-	parent->ops->fence_value_str(fence, str, size);
+	snprintf(str, size, "%d", fence->seqno);
 }
 
 static void android_fence_timeline_value_str(struct fence *fence,
@@ -205,12 +198,7 @@ static void android_fence_timeline_value_str(struct fence *fence,
 {
 	struct sync_timeline *parent = fence_parent(fence);
 
-	if (!parent->ops->timeline_value_str) {
-		if (size)
-			*str = 0;
-		return;
-	}
-	parent->ops->timeline_value_str(parent, str, size);
+	snprintf(str, size, "%d", parent->value);
 }
 
 static const struct fence_ops android_fence_ops = {

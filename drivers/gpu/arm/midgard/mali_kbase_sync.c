@@ -44,23 +44,8 @@ static struct mali_sync_pt *to_mali_sync_pt(struct fence *fence)
 	return container_of(fence, struct mali_sync_pt, fence);
 }
 
-static void timeline_value_str(struct sync_timeline *timeline, char *str,
-			       int size)
-{
-	snprintf(str, size, "%d", timeline->value);
-}
-
-static void fence_value_str(struct fence *fence, char *str, int size)
-{
-	struct mali_sync_pt *mpt = to_mali_sync_pt(fence);
-
-	snprintf(str, size, "%d(%d)", (int)mpt->fence.seqno, mpt->result);
-}
-
 static struct sync_timeline_ops mali_timeline_ops = {
 	.driver_name = "Mali",
-	.timeline_value_str = timeline_value_str,
-	.fence_value_str    = fence_value_str,
 };
 
 int kbase_sync_timeline_is_ours(struct sync_timeline *timeline)
