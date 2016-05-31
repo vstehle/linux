@@ -58,7 +58,7 @@ struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
 
 void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc);
 
-void sync_timeline_destroy(struct sync_timeline *obj);
+void sync_timeline_put(struct sync_timeline *obj);
 
 static inline struct sync_timeline *fence_parent(struct fence *fence)
 {

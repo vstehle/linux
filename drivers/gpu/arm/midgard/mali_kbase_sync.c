@@ -65,7 +65,7 @@ struct mali_sync_timeline *kbase_sync_timeline_alloc(const char *name)
 void kbase_sync_timeline_free(struct mali_sync_timeline *mtl)
 {
 	mutex_destroy(&mtl->counter_lock);
-	sync_timeline_destroy(mtl->timeline);
+	sync_timeline_put(mtl->timeline);
 	kfree(mtl);
 }
 

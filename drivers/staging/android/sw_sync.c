@@ -93,24 +93,9 @@ static void sync_timeline_get(struct sync_timeline *obj)
 	kref_get(&obj->kref);
 }
 
-static void sync_timeline_put(struct sync_timeline *obj)
+void sync_timeline_put(struct sync_timeline *obj)
 {
 	kref_put(&obj->kref, sync_timeline_free);
-}
-
-/**
- * sync_timeline_destroy() - destroys a sync object
- * @obj:	sync_timeline to destroy
- *
- * A sync implementation should call this when the @obj is going away
- * (i.e. module unload.)  @obj won't actually be freed until all its children
- * fences are freed.
- */
-void sync_timeline_destroy(struct sync_timeline *obj)
-{
-	smp_wmb();
-
-	sync_timeline_put(obj);
 }
 
 /**
@@ -284,7 +269,9 @@ static int sw_sync_debugfs_release(struct inode *inode, struct file *file)
 {
 	struct sync_timeline *obj = file->private_data;
 
-	sync_timeline_destroy(obj);
+	smp_wmb();
+
+	sync_timeline_put(obj);
 	return 0;
 }
 
