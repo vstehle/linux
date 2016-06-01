@@ -96,7 +96,7 @@ pvr_fence_context_fences_dump(struct pvr_fence_context *fctx,
 	list_for_each_entry(pvr_fence, &fctx->fence_list, fence_head) {
 		(void)SyncPrimGetFirmwareAddr(pvr_fence->sync, &sync_addr);
 		PVR_DUMPDEBUG_LOG(pfnDumpDebugPrintf, pvDumpDebugFile,
-				  "f %u#%u: (%s%s) Refs = %u, FWAddr = %#08x, Current = %#08x, Next = %#08x, %s %s",
+				  "f %llu#%u: (%s%s) Refs = %u, FWAddr = %#08x, Current = %#08x, Next = %#08x, %s %s",
 				  pvr_fence->fence->context,
 				  pvr_fence->fence->seqno,
 				  test_bit(FENCE_FLAG_ENABLE_SIGNAL_BIT, &pvr_fence->fence->flags) ? "+" : "-",

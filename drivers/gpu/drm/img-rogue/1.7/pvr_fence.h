@@ -81,7 +81,7 @@ struct pvr_fence_context {
 	void *dbg_request_handle;
 
 	struct SYNC_PRIM_CONTEXT *sync_prim_context;
-	unsigned fence_context;
+	u64 fence_context;
 	atomic_t fence_seqno;
 
 	struct workqueue_struct *fence_wq;
@@ -165,7 +165,7 @@ int pvr_fence_sync_sw_signal(struct pvr_fence *pvr_fence);
 #define PVR_FENCE_CTX_TRACE(c, fmt, ...)				\
 	do {								\
 		struct pvr_fence_context *__fctx = (c);			\
-		pr_err("c %u: (PVR) " fmt, __fctx->fence_context,	\
+		pr_err("c %llu: (PVR) " fmt, __fctx->fence_context,	\
 		       ## __VA_ARGS__);					\
 	} while(0)
 #else
@@ -175,14 +175,14 @@ int pvr_fence_sync_sw_signal(struct pvr_fence *pvr_fence);
 #define PVR_FENCE_CTX_WARN(c, fmt, ...)					\
 	do {								\
 		struct pvr_fence_context *__fctx = (c);			\
-		pr_warn("c %u: (PVR) " fmt, __fctx->fence_context,	\
+		pr_warn("c %llu: (PVR) " fmt, __fctx->fence_context,	\
 			## __VA_ARGS__);				\
 	} while(0)
 
 #define PVR_FENCE_CTX_ERR(c, fmt, ...)					\
 	do {								\
 		struct pvr_fence_context *__fctx = (c);			\
-		pr_err("c %u: (PVR) " fmt, __fctx->fence_context,	\
+		pr_err("c %llu: (PVR) " fmt, __fctx->fence_context,	\
 		       ## __VA_ARGS__);					\
 	} while(0)
 

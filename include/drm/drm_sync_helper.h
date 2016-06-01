@@ -27,7 +27,7 @@
  * @context: execution context
  * @seqno: the sequence number of this fence inside the execution context
  */
-struct fence *drm_sw_fence_new(unsigned int context,
+struct fence *drm_sw_fence_new(u64 context,
 			unsigned seqno);
 
 /**

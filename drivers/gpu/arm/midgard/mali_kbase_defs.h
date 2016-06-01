@@ -493,7 +493,7 @@ struct kbase_jd_context {
 	struct kds_callback kds_cb;
 #endif
 #ifdef CONFIG_DRM_DMA_SYNC
-	unsigned fence_context;
+	u64 fence_context;
 	atomic_t fence_seqno;
 #endif				/* CONFIG_KDS */
 #if (defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)) && defined(CONFIG_SW_SYNC)

@@ -2050,7 +2050,7 @@ struct amdgpu_device {
 	struct amdgpu_irq_src		hpd_irq;
 
 	/* rings */
-	unsigned			fence_context;
+	u64				fence_context;
 	struct mutex			ring_lock;
 	unsigned			num_rings;
 	struct amdgpu_ring		*rings[AMDGPU_MAX_RINGS];

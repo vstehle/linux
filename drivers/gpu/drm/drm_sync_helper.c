@@ -297,7 +297,7 @@ static const struct fence_ops sw_fence_ops = {
 	.release = NULL
 };
 
-struct fence *drm_sw_fence_new(unsigned int context, unsigned seqno)
+struct fence *drm_sw_fence_new(u64 context, unsigned seqno)
 {
 	struct fence *fence;
 

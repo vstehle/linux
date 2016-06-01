@@ -34,7 +34,8 @@ struct sync_timeline {
 	char			name[32];
 
 	/* protected by child_list_lock */
-	int			context, value;
+	int			value;
+	u64			context;
 
 	struct list_head	child_list_head;
 	spinlock_t		child_list_lock;
