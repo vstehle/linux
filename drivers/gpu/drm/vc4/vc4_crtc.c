@@ -322,6 +322,7 @@ static int vc4_crtc_atomic_check(struct drm_crtc *crtc,
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	struct drm_plane *plane;
 	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
+	const struct drm_plane_state *plane_state;
 	u32 dlist_count = 0;
 
 	/* The pixelvalve can only feed one encoder (and encoders are
@@ -330,18 +331,8 @@ static int vc4_crtc_atomic_check(struct drm_crtc *crtc,
 	if (drm_atomic_connectors_for_crtc(state->state, crtc) > 1)
 		return -EINVAL;
 
-	drm_atomic_crtc_state_for_each_plane(plane, state) {
-		struct drm_plane_state *plane_state =
-			state->state->plane_states[drm_plane_index(plane)];
-
-		/* plane might not have changed, in which case take
-		 * current state:
-		 */
-		if (!plane_state)
-			plane_state = plane->state;
-
+	drm_atomic_crtc_state_for_each_plane_state(plane, plane_state, state)
 		dlist_count += vc4_plane_dlist_size(plane_state);
-	}
 
 	dlist_count++; /* Account for SCALER_CTL0_END. */
 
