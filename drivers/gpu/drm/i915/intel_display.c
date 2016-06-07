@@ -14567,15 +14567,18 @@ out:
  * FIXME: Remove this once i915 is fully DRIVER_ATOMIC by calling
  *        drm_atomic_helper_legacy_gamma_set() directly.
  */
-static void intel_atomic_legacy_gamma_set(struct drm_crtc *crtc,
+static int intel_atomic_legacy_gamma_set(struct drm_crtc *crtc,
                                           u16 *red, u16 *green, u16 *blue,
-                                          uint32_t start, uint32_t size)
+                                          uint32_t size)
 {
 	struct drm_device *dev = crtc->dev;
 	struct drm_mode_config *config = &dev->mode_config;
 	struct drm_crtc_state *state;
+	int ret;
 
-	drm_atomic_helper_legacy_gamma_set(crtc, red, green, blue, start, size);
+	ret = drm_atomic_helper_legacy_gamma_set(crtc, red, green, blue, size);
+	if (ret)
+		return ret;
 
 	/*
 	 * Make sure we update the legacy properties so this works when
@@ -14598,6 +14601,8 @@ static void intel_atomic_legacy_gamma_set(struct drm_crtc *crtc,
 				      config->gamma_lut_property,
 				      (state->gamma_lut) ?
 				      state->gamma_lut->base.id : 0);
+
+	return 0;
 }
 
 static const struct drm_crtc_funcs intel_crtc_funcs = {
