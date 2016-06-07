@@ -199,7 +199,62 @@ struct drm_connector_helper_funcs {
 	int (*get_modes)(struct drm_connector *connector);
 	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
 					   struct drm_display_mode *mode);
+	/**
+	 * @best_encoder:
+	 *
+	 * This function should select the best encoder for the given connector.
+	 *
+	 * This function is used by both the atomic helpers (in the
+	 * drm_atomic_helper_check_modeset() function) and in the legacy CRTC
+	 * helpers.
+	 *
+	 * NOTE:
+	 *
+	 * In atomic drivers this function is called in the check phase of an
+	 * atomic update. The driver is not allowed to change or inspect
+	 * anything outside of arguments passed-in. Atomic drivers which need to
+	 * inspect dynamic configuration state should instead use
+	 * @atomic_best_encoder.
+	 *
+	 * You can leave this function to NULL if the connector is only
+	 * attached to a single encoder and you are using the atomic helpers.
+	 * In this case, the core will call drm_atomic_helper_best_encoder()
+	 * for you.
+	 *
+	 * RETURNS:
+	 *
+	 * Encoder that should be used for the given connector and connector
+	 * state, or NULL if no suitable encoder exists. Note that the helpers
+	 * will ensure that encoders aren't used twice, drivers should not check
+	 * for this.
+	 */
 	struct drm_encoder *(*best_encoder)(struct drm_connector *connector);
+
+	/**
+	 * @atomic_best_encoder:
+	 *
+	 * This is the atomic version of @best_encoder for atomic drivers which
+	 * need to select the best encoder depending upon the desired
+	 * configuration and can't select it statically.
+	 *
+	 * This function is used by drm_atomic_helper_check_modeset().
+	 * If it is not implemented, the core will fallback to @best_encoder
+	 * (or drm_atomic_helper_best_encoder() if @best_encoder is NULL).
+	 *
+	 * NOTE:
+	 *
+	 * This function is called in the check phase of an atomic update. The
+	 * driver is not allowed to change anything outside of the free-standing
+	 * state objects passed-in or assembled in the overall &drm_atomic_state
+	 * update tracking structure.
+	 *
+	 * RETURNS:
+	 *
+	 * Encoder that should be used for the given connector and connector
+	 * state, or NULL if no suitable encoder exists. Note that the helpers
+	 * will ensure that encoders aren't used twice, drivers should not check
+	 * for this.
+	 */
 	struct drm_encoder *(*atomic_best_encoder)(struct drm_connector *connector,
 						   struct drm_connector_state *connector_state);
 };
