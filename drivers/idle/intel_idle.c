@@ -61,9 +61,11 @@
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/module.h>
+#include <linux/suspend.h>
 #include <asm/cpu_device_id.h>
 #include <asm/mwait.h>
 #include <asm/msr.h>
+#include <asm/pmc_core.h>
 
 #define INTEL_IDLE_VERSION "0.4.1"
 #define PREFIX "intel_idle: "
@@ -93,12 +95,29 @@ struct idle_cpu {
 	bool disable_promotion_to_c1e;
 };
 
+/*
+ * The limit for the exponential backoff for the freeze duration. At this point,
+ * power impact is is far from measurable. An estimate is about 3uW based on
+ * scaling from waking up 10 times a second.
+ */
+#define MAX_SLP_S0_SECONDS 1000
+#define SLP_S0_EXP_BASE 10
+
+static bool slp_s0_check;
+static unsigned int slp_s0_seconds;
+
+static DEFINE_SPINLOCK(slp_s0_check_lock);
+static unsigned int slp_s0_num_cpus;
+static bool slp_s0_check_inprogress;
+
 static const struct idle_cpu *icpu;
 static struct cpuidle_device __percpu *intel_idle_cpuidle_devices;
 static int intel_idle(struct cpuidle_device *dev,
 			struct cpuidle_driver *drv, int index);
 static int intel_idle_freeze(struct cpuidle_device *dev,
 			     struct cpuidle_driver *drv, int index);
+static int intel_idle_freeze_and_check(struct cpuidle_device *dev,
+				       struct cpuidle_driver *drv, int index);
 static int intel_idle_cpu_init(int cpu);
 
 static struct cpuidle_state *cpuidle_state_table;
@@ -599,7 +618,7 @@ static struct cpuidle_state skl_cstates[] = {
 		.exit_latency = 2,
 		.target_residency = 2,
 		.enter = &intel_idle,
-		.enter_freeze = intel_idle_freeze, },
+		.enter_freeze = intel_idle_freeze_and_check, },
 	{
 		.name = "C1E-SKL",
 		.desc = "MWAIT 0x01",
@@ -607,7 +626,7 @@ static struct cpuidle_state skl_cstates[] = {
 		.exit_latency = 10,
 		.target_residency = 20,
 		.enter = &intel_idle,
-		.enter_freeze = intel_idle_freeze, },
+		.enter_freeze = intel_idle_freeze_and_check, },
 	{
 		.name = "C3-SKL",
 		.desc = "MWAIT 0x10",
@@ -615,7 +634,7 @@ static struct cpuidle_state skl_cstates[] = {
 		.exit_latency = 70,
 		.target_residency = 100,
 		.enter = &intel_idle,
-		.enter_freeze = intel_idle_freeze, },
+		.enter_freeze = intel_idle_freeze_and_check, },
 	{
 		.name = "C6-SKL",
 		.desc = "MWAIT 0x20",
@@ -623,7 +642,7 @@ static struct cpuidle_state skl_cstates[] = {
 		.exit_latency = 85,
 		.target_residency = 200,
 		.enter = &intel_idle,
-		.enter_freeze = intel_idle_freeze, },
+		.enter_freeze = intel_idle_freeze_and_check, },
 	{
 		.name = "C7s-SKL",
 		.desc = "MWAIT 0x33",
@@ -631,7 +650,7 @@ static struct cpuidle_state skl_cstates[] = {
 		.exit_latency = 124,
 		.target_residency = 800,
 		.enter = &intel_idle,
-		.enter_freeze = intel_idle_freeze, },
+		.enter_freeze = intel_idle_freeze_and_check, },
 	{
 		.name = "C8-SKL",
 		.desc = "MWAIT 0x40",
@@ -639,7 +658,7 @@ static struct cpuidle_state skl_cstates[] = {
 		.exit_latency = 200,
 		.target_residency = 800,
 		.enter = &intel_idle,
-		.enter_freeze = intel_idle_freeze, },
+		.enter_freeze = intel_idle_freeze_and_check, },
 	{
 		.name = "C9-SKL",
 		.desc = "MWAIT 0x50",
@@ -647,7 +666,7 @@ static struct cpuidle_state skl_cstates[] = {
 		.exit_latency = 480,
 		.target_residency = 5000,
 		.enter = &intel_idle,
-		.enter_freeze = intel_idle_freeze, },
+		.enter_freeze = intel_idle_freeze_and_check, },
 	{
 		.name = "C10-SKL",
 		.desc = "MWAIT 0x60",
@@ -655,7 +674,7 @@ static struct cpuidle_state skl_cstates[] = {
 		.exit_latency = 890,
 		.target_residency = 5000,
 		.enter = &intel_idle,
-		.enter_freeze = intel_idle_freeze, },
+		.enter_freeze = intel_idle_freeze_and_check, },
 	{
 		.enter = NULL }
 };
@@ -808,6 +827,8 @@ static int intel_idle(struct cpuidle_device *dev,
  * @dev: cpuidle_device
  * @drv: cpuidle driver
  * @index: state index
+ *
+ * @return 0 for success, no failure state
  */
 static int intel_idle_freeze(struct cpuidle_device *dev,
 			     struct cpuidle_driver *drv, int index)
@@ -819,6 +840,101 @@ static int intel_idle_freeze(struct cpuidle_device *dev,
 
 	return 0;
 }
+
+static int check_slp_s0(u32 slp_s0_saved_count)
+{
+	u32 slp_s0_new_count;
+
+	if (intel_pmc_slp_s0_counter_read(&slp_s0_new_count)) {
+		pr_warn("Unable to read SLP S0 residency counter\n");
+		return -EIO;
+	}
+
+	if (slp_s0_saved_count == slp_s0_new_count) {
+		pr_warn("CPU did not enter SLP S0 for suspend-to-idle.\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+/**
+ * intel_idle_freeze_and_check - enters suspend-to-idle and validates the power
+ * state
+ *
+ * This function enters suspend-to-idle with intel_idle_freeze, but also sets up
+ * a timer to check that S0ix (low power state for suspend-to-idle on Intel
+ * CPUs) is properly entered.
+ *
+ * @dev: cpuidle_device
+ * @drv: cpuidle_driver
+ * @index: state index
+ * @return 0 for success, -EERROR if S0ix was not entered.
+ */
+static int intel_idle_freeze_and_check(struct cpuidle_device *dev,
+				       struct cpuidle_driver *drv, int index)
+{
+	bool check_on_this_cpu = false;
+	u32 slp_s0_saved_count;
+	unsigned long flags;
+	int cpu = smp_processor_id();
+	int ret;
+
+	/* The last CPU to freeze sets up checking SLP S0 assertion. */
+	spin_lock_irqsave(&slp_s0_check_lock, flags);
+	slp_s0_num_cpus++;
+	if (slp_s0_seconds &&
+	    slp_s0_num_cpus == num_online_cpus() &&
+	    !slp_s0_check_inprogress &&
+	    !intel_pmc_slp_s0_counter_read(&slp_s0_saved_count)) {
+		ret = tick_set_freeze_event(cpu, ktime_set(slp_s0_seconds, 0));
+		if (ret < 0) {
+			spin_unlock_irqrestore(&slp_s0_check_lock, flags);
+			goto out;
+		}
+
+		/*
+		 * Make sure check_slp_s0 isn't scheduled on another CPU if it
+		 * were to leave freeze and enter it again before this CPU
+		 * leaves freeze.
+		 */
+		slp_s0_check_inprogress = true;
+		check_on_this_cpu = true;
+	}
+	spin_unlock_irqrestore(&slp_s0_check_lock, flags);
+
+	ret = intel_idle_freeze(dev, drv, index);
+	if (ret < 0)
+		goto out;
+
+	if (check_on_this_cpu && tick_clear_freeze_event(cpu))
+		ret = check_slp_s0(slp_s0_saved_count);
+
+out:
+	spin_lock_irqsave(&slp_s0_check_lock, flags);
+	if (check_on_this_cpu) {
+		slp_s0_check_inprogress = false;
+		slp_s0_seconds = min_t(unsigned int,
+				       SLP_S0_EXP_BASE * slp_s0_seconds,
+				       MAX_SLP_S0_SECONDS);
+	}
+	slp_s0_num_cpus--;
+	spin_unlock_irqrestore(&slp_s0_check_lock, flags);
+	return ret;
+}
+
+static int slp_s0_check_prepare(struct notifier_block *nb, unsigned long action,
+				void *data)
+{
+	if (action == PM_SUSPEND_PREPARE)
+		slp_s0_seconds = slp_s0_check ? 1 : 0;
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block intel_slp_s0_check_nb = {
+	.notifier_call = slp_s0_check_prepare,
+};
 
 static void __setup_broadcast_timer(void *arg)
 {
@@ -1254,6 +1370,13 @@ static int __init intel_idle_init(void)
 		return retval;
 	}
 
+	retval = register_pm_notifier(&intel_slp_s0_check_nb);
+	if (retval) {
+		free_percpu(intel_idle_cpuidle_devices);
+		cpuidle_unregister_driver(&intel_idle_driver);
+		return retval;
+	}
+
 	cpu_notifier_register_begin();
 
 	for_each_online_cpu(i) {
@@ -1261,6 +1384,7 @@ static int __init intel_idle_init(void)
 		if (retval) {
 			intel_idle_cpuidle_devices_uninit();
 			cpu_notifier_register_done();
+			unregister_pm_notifier(&intel_slp_s0_check_nb);
 			cpuidle_unregister_driver(&intel_idle_driver);
 			free_percpu(intel_idle_cpuidle_devices);
 			return retval;
@@ -1299,6 +1423,7 @@ static void __exit intel_idle_exit(void)
 
 	cpu_notifier_register_done();
 
+	unregister_pm_notifier(&intel_slp_s0_check_nb);
 	cpuidle_unregister_driver(&intel_idle_driver);
 	free_percpu(intel_idle_cpuidle_devices);
 }
@@ -1307,6 +1432,7 @@ module_init(intel_idle_init);
 module_exit(intel_idle_exit);
 
 module_param(max_cstate, int, 0444);
+module_param(slp_s0_check, bool, 0644);
 
 MODULE_AUTHOR("Len Brown <len.brown@intel.com>");
 MODULE_DESCRIPTION("Cpuidle driver for Intel Hardware v" INTEL_IDLE_VERSION);
