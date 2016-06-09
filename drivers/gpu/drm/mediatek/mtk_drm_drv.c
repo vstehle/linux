@@ -279,7 +279,7 @@ static int mtk_atomic_commit(struct drm_device *drm,
 		return ret;
 	}
 
-	drm_atomic_helper_swap_state(drm, state);
+	drm_atomic_helper_swap_state(state, true);
 
 	if (async)
 		mtk_atomic_schedule(drm, state);

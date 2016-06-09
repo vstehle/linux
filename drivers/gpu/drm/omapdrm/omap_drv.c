@@ -187,7 +187,7 @@ static int omap_atomic_commit(struct drm_device *dev,
 	spin_unlock_irqrestore(&dev->event_lock, flags);
 
 	/* Swap the state, this is the point of no return. */
-	drm_atomic_helper_swap_state(dev, state);
+	drm_atomic_helper_swap_state(state, true);
 
 	if (async)
 		schedule_work(&commit->work);
