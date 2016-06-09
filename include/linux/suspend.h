@@ -246,6 +246,8 @@ static inline bool idle_should_freeze(void)
 	return unlikely(suspend_freeze_state == FREEZE_STATE_ENTER);
 }
 
+int tick_set_freeze_event(int cpu, ktime_t expires);
+int tick_clear_freeze_event(int cpu);
 extern void freeze_set_ops(const struct platform_freeze_ops *ops);
 extern void freeze_wake(void);
 
