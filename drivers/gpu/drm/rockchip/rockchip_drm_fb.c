@@ -425,7 +425,7 @@ static int rockchip_drm_atomic_commit(struct drm_device *dev,
 		}
 	}
 
-	drm_atomic_helper_swap_state(dev, state);
+	drm_atomic_helper_swap_state(state, true);
 
 	commit->dev = dev;
 	commit->state = state;
