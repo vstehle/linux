@@ -34,6 +34,8 @@
 #include <linux/fence.h>
 #include <linux/fence-array.h>
 
+#include "drm_crtc_internal.h"
+
 /**
  * DOC: overview
  *
@@ -607,6 +609,10 @@ drm_atomic_helper_check_planes(struct drm_device *dev,
 	struct drm_plane *plane;
 	struct drm_plane_state *plane_state;
 	int i, ret = 0;
+
+	ret = drm_atomic_helper_normalize_zpos(dev, state);
+	if (ret)
+		return ret;
 
 	for_each_plane_in_state(state, plane, plane_state, i) {
 		const struct drm_plane_helper_funcs *funcs;
@@ -3019,6 +3025,7 @@ void __drm_atomic_helper_crtc_duplicate_state(struct drm_crtc *crtc,
 	state->planes_changed = false;
 	state->connectors_changed = false;
 	state->color_mgmt_changed = false;
+	state->zpos_changed = false;
 	state->event = NULL;
 }
 EXPORT_SYMBOL(__drm_atomic_helper_crtc_duplicate_state);
