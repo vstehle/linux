@@ -35,6 +35,7 @@
 #include <linux/shmem_fs.h>
 #include <linux/dma-buf.h>
 #include "vgem_drv.h"
+#include "../drm_crtc_internal.h"
 
 #define DRIVER_NAME	"vgem"
 #define DRIVER_DESC	"Virtual GEM provider"
