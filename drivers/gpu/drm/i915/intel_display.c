@@ -4025,7 +4025,7 @@ intel_trans_dp_port_sel(struct drm_crtc *crtc)
 	struct intel_encoder *encoder;
 
 	for_each_encoder_on_crtc(dev, crtc, encoder) {
-		if (encoder->type == INTEL_OUTPUT_DISPLAYPORT ||
+		if (encoder->type == INTEL_OUTPUT_DP ||
 		    encoder->type == INTEL_OUTPUT_EDP)
 			return enc_to_dig_port(&encoder->base)->port;
 	}
@@ -5109,7 +5109,7 @@ intel_display_port_power_domain(struct intel_encoder *intel_encoder)
 	case INTEL_OUTPUT_UNKNOWN:
 		/* Only DDI platforms should ever use this output type */
 		WARN_ON_ONCE(!HAS_DDI(dev));
-	case INTEL_OUTPUT_DISPLAYPORT:
+	case INTEL_OUTPUT_DP:
 	case INTEL_OUTPUT_HDMI:
 	case INTEL_OUTPUT_EDP:
 		intel_dig_port = enc_to_dig_port(&intel_encoder->base);
@@ -5143,7 +5143,7 @@ intel_display_port_aux_power_domain(struct intel_encoder *intel_encoder)
 		 * run the DP detection too.
 		 */
 		WARN_ON_ONCE(!HAS_DDI(dev));
-	case INTEL_OUTPUT_DISPLAYPORT:
+	case INTEL_OUTPUT_DP:
 	case INTEL_OUTPUT_EDP:
 		intel_dig_port = enc_to_dig_port(&intel_encoder->base);
 		return port_to_aux_power_domain(intel_dig_port->port);
@@ -12371,7 +12371,7 @@ static bool check_digital_port_conflicts(struct drm_atomic_state *state)
 		case INTEL_OUTPUT_UNKNOWN:
 			if (WARN_ON(!HAS_DDI(dev)))
 				break;
-		case INTEL_OUTPUT_DISPLAYPORT:
+		case INTEL_OUTPUT_DP:
 		case INTEL_OUTPUT_HDMI:
 		case INTEL_OUTPUT_EDP:
 			port_mask = 1 << enc_to_dig_port(&encoder->base)->port;
