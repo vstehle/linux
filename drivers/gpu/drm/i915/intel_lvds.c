@@ -1120,7 +1120,6 @@ out:
 		DRM_DEBUG_KMS("lid notifier registration failed\n");
 		lvds_connector->lid_notifier.notifier_call = NULL;
 	}
-	drm_connector_register(connector);
 
 	return;
 

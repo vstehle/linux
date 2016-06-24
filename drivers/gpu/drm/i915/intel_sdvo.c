@@ -2396,19 +2396,11 @@ intel_sdvo_connector_init(struct intel_sdvo_connector *connector,
 	connector->base.get_hw_state = intel_sdvo_connector_get_hw_state;
 
 	intel_connector_attach_encoder(&connector->base, &encoder->base);
-	ret = drm_connector_register(drm_connector);
-	if (ret < 0)
-		goto err1;
 
 	intel_i2c_register(encoder->base.base.dev, &connector->base.base,
 			   encoder->ddc_bus);
 
 	return 0;
-
-err1:
-	drm_connector_cleanup(drm_connector);
-
-	return ret;
 }
 
 static void
@@ -2535,7 +2527,6 @@ intel_sdvo_tv_init(struct intel_sdvo *intel_sdvo, int type)
 	return true;
 
 err:
-	drm_connector_unregister(connector);
 	intel_sdvo_destroy(connector);
 	return false;
 }
@@ -2614,7 +2605,6 @@ intel_sdvo_lvds_init(struct intel_sdvo *intel_sdvo, int device)
 	return true;
 
 err:
-	drm_connector_unregister(connector);
 	intel_sdvo_destroy(connector);
 	return false;
 }
