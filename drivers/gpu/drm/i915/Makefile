@@ -100,9 +100,6 @@ i915-y += dvo_ch7017.o \
 # virtual gpu code
 i915-y += i915_vgpu.o
 
-# legacy horrors
-i915-y += i915_dma.o
-
 obj-$(CONFIG_DRM_I915)  += i915.o
 
 CFLAGS_i915_trace_points.o := -I$(src)
