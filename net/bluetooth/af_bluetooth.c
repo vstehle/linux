@@ -244,6 +244,7 @@ int bt_sock_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb;
 	size_t copied;
+	size_t skblen;
 	int err;
 
 	BT_DBG("sock %p sk %p len %zu", sock, sk, len);
@@ -259,6 +260,7 @@ int bt_sock_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 		return err;
 	}
 
+	skblen = skb->len;
 	copied = skb->len;
 	if (len < copied) {
 		msg->msg_flags |= MSG_TRUNC;
@@ -276,6 +278,9 @@ int bt_sock_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 	}
 
 	skb_free_datagram(sk, skb);
+
+	if (msg->msg_flags & MSG_TRUNC)
+		copied = skblen;
 
 	return err ? : copied;
 }
