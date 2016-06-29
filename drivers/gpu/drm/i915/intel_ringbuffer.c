@@ -2876,6 +2876,7 @@ static int gen6_ring_flush(struct drm_i915_gem_request *req,
 static void intel_ring_default_vfuncs(struct drm_i915_private *dev_priv,
 				      struct intel_engine_cs *engine)
 {
+	engine->init_hw = init_ring_common;
 	engine->write_tail = ring_write_tail;
 	engine->get_seqno = ring_get_seqno;
 	engine->set_seqno = ring_set_seqno;
@@ -3094,7 +3095,6 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 		}
 		engine->dispatch_execbuffer = i965_dispatch_execbuffer;
 	}
-	engine->init_hw = init_ring_common;
 
 	return intel_init_ring_buffer(dev, engine);
 }
@@ -3125,7 +3125,6 @@ int intel_init_bsd2_ring_buffer(struct drm_device *dev)
 		engine->semaphore.signal = gen8_xcs_signal;
 		GEN8_RING_SEMAPHORE_INIT(engine);
 	}
-	engine->init_hw = init_ring_common;
 
 	return intel_init_ring_buffer(dev, engine);
 }
@@ -3178,7 +3177,6 @@ int intel_init_blt_ring_buffer(struct drm_device *dev)
 			engine->semaphore.mbox.signal[VCS2] = GEN6_NOSYNC;
 		}
 	}
-	engine->init_hw = init_ring_common;
 
 	return intel_init_ring_buffer(dev, engine);
 }
@@ -3227,7 +3225,6 @@ int intel_init_vebox_ring_buffer(struct drm_device *dev)
 			engine->semaphore.mbox.signal[VCS2] = GEN6_NOSYNC;
 		}
 	}
-	engine->init_hw = init_ring_common;
 
 	return intel_init_ring_buffer(dev, engine);
 }
