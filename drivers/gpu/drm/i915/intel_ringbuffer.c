@@ -2878,10 +2878,12 @@ static void intel_ring_default_vfuncs(struct drm_i915_private *dev_priv,
 {
 	engine->write_tail = ring_write_tail;
 
-	if (INTEL_GEN(dev_priv) >= 6)
+	if (INTEL_GEN(dev_priv) >= 6) {
 		engine->add_request = gen6_add_request;
-	else
+		engine->irq_seqno_barrier = gen6_seqno_barrier;
+	} else {
 		engine->add_request = i9xx_add_request;
+	}
 }
 
 int intel_init_render_ring_buffer(struct drm_device *dev)
@@ -2939,7 +2941,6 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		engine->irq_get = gen6_ring_get_irq;
 		engine->irq_put = gen6_ring_put_irq;
 		engine->irq_enable_mask = GT_RENDER_USER_INTERRUPT;
-		engine->irq_seqno_barrier = gen6_seqno_barrier;
 		engine->get_seqno = ring_get_seqno;
 		engine->set_seqno = ring_set_seqno;
 		if (i915_semaphore_is_enabled(dev_priv)) {
@@ -3054,7 +3055,6 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 		if (IS_GEN6(dev_priv))
 			engine->write_tail = gen6_bsd_ring_write_tail;
 		engine->flush = gen6_bsd_ring_flush;
-		engine->irq_seqno_barrier = gen6_seqno_barrier;
 		engine->get_seqno = ring_get_seqno;
 		engine->set_seqno = ring_set_seqno;
 		if (INTEL_GEN(dev_priv) >= 8) {
@@ -3128,7 +3128,6 @@ int intel_init_bsd2_ring_buffer(struct drm_device *dev)
 	intel_ring_default_vfuncs(dev_priv, engine);
 
 	engine->flush = gen6_bsd_ring_flush;
-	engine->irq_seqno_barrier = gen6_seqno_barrier;
 	engine->get_seqno = ring_get_seqno;
 	engine->set_seqno = ring_set_seqno;
 	engine->irq_enable_mask =
@@ -3161,7 +3160,6 @@ int intel_init_blt_ring_buffer(struct drm_device *dev)
 	intel_ring_default_vfuncs(dev_priv, engine);
 
 	engine->flush = gen6_ring_flush;
-	engine->irq_seqno_barrier = gen6_seqno_barrier;
 	engine->get_seqno = ring_get_seqno;
 	engine->set_seqno = ring_set_seqno;
 	if (INTEL_GEN(dev_priv) >= 8) {
@@ -3221,7 +3219,6 @@ int intel_init_vebox_ring_buffer(struct drm_device *dev)
 	intel_ring_default_vfuncs(dev_priv, engine);
 
 	engine->flush = gen6_ring_flush;
-	engine->irq_seqno_barrier = gen6_seqno_barrier;
 	engine->get_seqno = ring_get_seqno;
 	engine->set_seqno = ring_set_seqno;
 
