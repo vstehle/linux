@@ -1536,6 +1536,7 @@ gen8_ring_sync(struct drm_i915_gem_request *waiter_req,
 {
 	struct intel_engine_cs *waiter = waiter_req->engine;
 	struct drm_i915_private *dev_priv = waiter_req->i915;
+	u64 offset = GEN8_WAIT_OFFSET(waiter, signaller->id);
 	struct i915_hw_ppgtt *ppgtt;
 	int ret;
 
@@ -1547,10 +1548,8 @@ gen8_ring_sync(struct drm_i915_gem_request *waiter_req,
 				MI_SEMAPHORE_GLOBAL_GTT |
 				MI_SEMAPHORE_SAD_GTE_SDD);
 	intel_ring_emit(waiter, seqno);
-	intel_ring_emit(waiter,
-			lower_32_bits(GEN8_WAIT_OFFSET(waiter, signaller->id)));
-	intel_ring_emit(waiter,
-			upper_32_bits(GEN8_WAIT_OFFSET(waiter, signaller->id)));
+	intel_ring_emit(waiter, lower_32_bits(offset));
+	intel_ring_emit(waiter, upper_32_bits(offset));
 	intel_ring_advance(waiter);
 
 	/* When the !RCS engines idle waiting upon a semaphore, they lose their
