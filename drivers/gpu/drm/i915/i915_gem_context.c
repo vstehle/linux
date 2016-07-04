@@ -250,7 +250,7 @@ static struct i915_gem_context *
 __create_hw_context(struct drm_device *dev,
 		    struct drm_i915_file_private *file_priv)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct i915_gem_context *ctx;
 	int ret;
 
@@ -362,7 +362,7 @@ static void i915_gem_context_unpin(struct i915_gem_context *ctx,
 
 void i915_gem_context_reset(struct drm_device *dev)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 
 	lockdep_assert_held(&dev->struct_mutex);
 
@@ -378,7 +378,7 @@ void i915_gem_context_reset(struct drm_device *dev)
 
 int i915_gem_context_init(struct drm_device *dev)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct i915_gem_context *ctx;
 
 	/* Init should only be called once per module load. Eventually the
@@ -465,7 +465,7 @@ void i915_gem_context_lost(struct drm_i915_private *dev_priv)
 
 void i915_gem_context_fini(struct drm_device *dev)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct i915_gem_context *dctx = dev_priv->kernel_context;
 
 	lockdep_assert_held(&dev->struct_mutex);
@@ -1062,7 +1062,7 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 int i915_gem_context_reset_stats_ioctl(struct drm_device *dev,
 				       void *data, struct drm_file *file)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_i915_reset_stats *args = data;
 	struct i915_ctx_hang_stats *hs;
 	struct i915_gem_context *ctx;
