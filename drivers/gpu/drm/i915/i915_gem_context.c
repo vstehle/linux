@@ -992,6 +992,9 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 		else
 			args->value = to_i915(dev)->ggtt.base.total;
 		break;
+	case I915_CONTEXT_PARAM_NO_ERROR_CAPTURE:
+		args->value = !!(ctx->flags & CONTEXT_NO_ERROR_CAPTURE);
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -1035,6 +1038,16 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 		} else {
 			ctx->flags &= ~CONTEXT_NO_ZEROMAP;
 			ctx->flags |= args->value ? CONTEXT_NO_ZEROMAP : 0;
+		}
+		break;
+	case I915_CONTEXT_PARAM_NO_ERROR_CAPTURE:
+		if (args->size) {
+			ret = -EINVAL;
+		} else {
+			if (args->value)
+				ctx->flags |= CONTEXT_NO_ERROR_CAPTURE;
+			else
+				ctx->flags &= ~CONTEXT_NO_ERROR_CAPTURE;
 		}
 		break;
 	default:
