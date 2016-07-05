@@ -320,7 +320,7 @@ static void chv_set_memory_pm5(struct drm_i915_private *dev_priv, bool enable)
 
 void intel_set_memory_cxsr(struct drm_i915_private *dev_priv, bool enable)
 {
-	struct drm_device *dev = dev_priv->dev;
+	struct drm_device *dev = &dev_priv->drm;
 	u32 val;
 
 	if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev)) {
@@ -2237,7 +2237,7 @@ static void intel_print_wm_latency(struct drm_device *dev,
 static bool ilk_increase_wm_latency(struct drm_i915_private *dev_priv,
 				    uint16_t wm[5], uint16_t min)
 {
-	int level, max_level = ilk_wm_max_level(dev_priv->dev);
+	int level, max_level = ilk_wm_max_level(&dev_priv->drm);
 
 	if (wm[0] >= min)
 		return false;
@@ -2766,7 +2766,7 @@ static bool _ilk_disable_lp_wm(struct drm_i915_private *dev_priv,
 static void ilk_write_wm_values(struct drm_i915_private *dev_priv,
 				struct ilk_wm_values *results)
 {
-	struct drm_device *dev = dev_priv->dev;
+	struct drm_device *dev = &dev_priv->drm;
 	struct ilk_wm_values *previous = &dev_priv->wm.hw;
 	unsigned int dirty;
 	uint32_t val;
@@ -3499,7 +3499,6 @@ skl_compute_wm_level(const struct drm_i915_private *dev_priv,
 		     int level,
 		     struct skl_wm_level *result)
 {
-	struct drm_device *dev = dev_priv->dev;
 	struct drm_atomic_state *state = cstate->base.state;
 	struct intel_crtc *intel_crtc = to_intel_crtc(cstate->base.crtc);
 	struct drm_plane *plane;
@@ -3515,7 +3514,9 @@ skl_compute_wm_level(const struct drm_i915_private *dev_priv,
 	 */
 	memset(result, 0, sizeof(*result));
 
-	for_each_intel_plane_mask(dev, intel_plane, cstate->base.plane_mask) {
+	for_each_intel_plane_mask(&dev_priv->drm,
+				  intel_plane,
+				  cstate->base.plane_mask) {
 		int i = skl_wm_plane_id(intel_plane);
 
 		plane = &intel_plane->base;
@@ -3683,7 +3684,7 @@ static void skl_ddb_entry_write(struct drm_i915_private *dev_priv,
 static void skl_write_wm_values(struct drm_i915_private *dev_priv,
 				const struct skl_wm_values *new)
 {
-	struct drm_device *dev = dev_priv->dev;
+	struct drm_device *dev = &dev_priv->drm;
 	struct intel_crtc *crtc;
 
 	for_each_intel_crtc(dev, crtc) {
@@ -3780,7 +3781,7 @@ skl_ddb_allocation_included(const struct skl_ddb_allocation *old,
 static void skl_flush_wm_values(struct drm_i915_private *dev_priv,
 				struct skl_wm_values *new_values)
 {
-	struct drm_device *dev = dev_priv->dev;
+	struct drm_device *dev = &dev_priv->drm;
 	struct skl_ddb_allocation *cur_ddb, *new_ddb;
 	bool reallocated[I915_MAX_PIPES] = {};
 	struct intel_crtc *crtc;
@@ -4057,7 +4058,7 @@ static void ilk_compute_wm_config(struct drm_device *dev,
 
 static void ilk_program_watermarks(struct drm_i915_private *dev_priv)
 {
-	struct drm_device *dev = dev_priv->dev;
+	struct drm_device *dev = &dev_priv->drm;
 	struct intel_pipe_wm lp_wm_1_2 = {}, lp_wm_5_6 = {}, *best_lp_wm;
 	struct ilk_wm_maximums max;
 	struct intel_wm_config config = {};
@@ -5743,7 +5744,7 @@ static void valleyview_setup_pctx(struct drm_i915_private *dev_priv)
 	u32 pcbr;
 	int pctx_size = 24*1024;
 
-	mutex_lock(&dev_priv->dev->struct_mutex);
+	mutex_lock(&dev_priv->drm.struct_mutex);
 
 	pcbr = I915_READ(VLV_PCBR);
 	if (pcbr) {
@@ -5751,7 +5752,7 @@ static void valleyview_setup_pctx(struct drm_i915_private *dev_priv)
 		int pcbr_offset;
 
 		pcbr_offset = (pcbr & (~4095)) - dev_priv->mm.stolen_base;
-		pctx = i915_gem_object_create_stolen_for_preallocated(dev_priv->dev,
+		pctx = i915_gem_object_create_stolen_for_preallocated(&dev_priv->drm,
 								      pcbr_offset,
 								      I915_GTT_OFFSET_NONE,
 								      pctx_size);
@@ -5768,7 +5769,7 @@ static void valleyview_setup_pctx(struct drm_i915_private *dev_priv)
 	 * overlap with other ranges, such as the frame buffer, protected
 	 * memory, or any other relevant ranges.
 	 */
-	pctx = i915_gem_object_create_stolen(dev_priv->dev, pctx_size);
+	pctx = i915_gem_object_create_stolen(&dev_priv->drm, pctx_size);
 	if (!pctx) {
 		DRM_DEBUG("not enough stolen space for PCTX, disabling\n");
 		goto out;
@@ -5780,7 +5781,7 @@ static void valleyview_setup_pctx(struct drm_i915_private *dev_priv)
 out:
 	DRM_DEBUG_DRIVER("PCBR: 0x%08x\n", I915_READ(VLV_PCBR));
 	dev_priv->vlv_pctx = pctx;
-	mutex_unlock(&dev_priv->dev->struct_mutex);
+	mutex_unlock(&dev_priv->drm.struct_mutex);
 }
 
 static void valleyview_cleanup_pctx(struct drm_i915_private *dev_priv)
@@ -6724,9 +6725,9 @@ void intel_enable_gt_powersave(struct drm_i915_private *dev_priv)
 
 	if (IS_IRONLAKE_M(dev_priv)) {
 		ironlake_enable_drps(dev_priv);
-		mutex_lock(&dev_priv->dev->struct_mutex);
+		mutex_lock(&dev_priv->drm.struct_mutex);
 		intel_init_emon(dev_priv);
-		mutex_unlock(&dev_priv->dev->struct_mutex);
+		mutex_unlock(&dev_priv->drm.struct_mutex);
 	} else if (INTEL_INFO(dev_priv)->gen >= 6) {
 		/*
 		 * PCU communication is slow and this doesn't need to be
