@@ -588,9 +588,9 @@ static void intel_prepare_hdmi_ddi_buffers(struct intel_encoder *encoder)
 
 	if (IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv)) {
 		ddi_translations_hdmi = skl_get_buf_trans_hdmi(dev_priv, &n_hdmi_entries);
+
 		/* If we're boosting the current, set bit 31 of trans1 */
-		if (dev_priv->vbt.ddi_port_info[port].hdmi_boost_level ||
-		    dev_priv->vbt.ddi_port_info[port].dp_boost_level)
+		if (dev_priv->vbt.ddi_port_info[port].hdmi_boost_level)
 			iboost_bit = DDI_BUF_BALANCE_LEG_ENABLE;
 	} else if (IS_BROADWELL(dev_priv)) {
 		ddi_translations_hdmi = bdw_ddi_translations_hdmi;
