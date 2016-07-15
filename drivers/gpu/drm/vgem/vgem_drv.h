@@ -32,9 +32,16 @@
 #include <drm/drmP.h>
 #include <drm/drm_gem.h>
 
+#include <uapi/drm/vgem_drm.h>
+
 #define DRM_VGEM_MODE_MAP_DUMB 0x00
 #define DRM_IOCTL_VGEM_MODE_MAP_DUMB DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_VGEM_MODE_MAP_DUMB, struct drm_mode_map_dumb)
+
+struct vgem_file {
+	struct idr fence_idr;
+	struct mutex fence_mutex;
+};
 
 #define to_vgem_bo(x) container_of(x, struct drm_vgem_gem_object, base)
 struct drm_vgem_gem_object {
@@ -60,5 +67,13 @@ vgem_gem_prime_import_sg_table(struct drm_device *dev,
 			       struct dma_buf_attachment *attach,
 			       struct sg_table *sg);
 
+int vgem_fence_open(struct vgem_file *file);
+int vgem_fence_attach_ioctl(struct drm_device *dev,
+			    void *data,
+			    struct drm_file *file);
+int vgem_fence_signal_ioctl(struct drm_device *dev,
+			    void *data,
+			    struct drm_file *file);
+void vgem_fence_close(struct vgem_file *file);
 
 #endif
