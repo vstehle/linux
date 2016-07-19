@@ -1233,7 +1233,15 @@ struct drm_connector {
 	struct drm_mode_object base;
 
 	char *name;
-	int connector_id;
+
+	/**
+	 * @index: Compacted connector index, which matches the position inside
+	 * the mode_config.list for drivers not supporting hot-add/removing. Can
+	 * be used as an array index. It is invariant over the lifetime of the
+	 * connector.
+	 */
+	unsigned index;
+
 	int connector_type;
 	int connector_type_id;
 	bool interlace_allowed;
@@ -2479,7 +2487,7 @@ void drm_connector_unregister(struct drm_connector *connector);
 extern void drm_connector_cleanup(struct drm_connector *connector);
 static inline unsigned drm_connector_index(struct drm_connector *connector)
 {
-	return connector->connector_id;
+	return connector->index;
 }
 /* helpers to {un}register all connectors from sysfs for device */
 extern int drm_connector_register_all(struct drm_device *dev);
