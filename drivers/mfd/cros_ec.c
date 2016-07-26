@@ -39,7 +39,7 @@ static int cros_ec_get_next_event(struct cros_ec_device *ec_dev)
 	struct {
 		struct cros_ec_command msg;
 		struct ec_response_get_next_event event;
-	} buf;
+	} __packed buf;
 	struct cros_ec_command *msg = &buf.msg;
 	struct ec_response_get_next_event *event = &buf.event;
 	int ret;
@@ -68,7 +68,7 @@ static int cros_ec_get_keyboard_state_event(struct cros_ec_device *ec_dev)
 	struct {
 		struct cros_ec_command msg;
 		union ec_response_get_next_data data;
-	} buf;
+	} __packed buf;
 	union ec_response_get_next_data *data = &buf.data;
 	struct cros_ec_command *msg = &buf.msg;
 	int ret;
