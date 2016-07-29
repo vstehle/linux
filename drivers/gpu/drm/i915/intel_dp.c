@@ -3520,86 +3520,69 @@ intel_dp_link_down(struct intel_dp *intel_dp)
 }
 
 static bool
-intel_dp_get_dpcd(struct intel_dp *intel_dp)
+intel_dp_read_dpcd(struct intel_dp *intel_dp)
 {
-	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
-	struct drm_device *dev = dig_port->base.base.dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
-
 	if (drm_dp_dpcd_read(&intel_dp->aux, 0x000, intel_dp->dpcd,
 			     sizeof(intel_dp->dpcd)) < 0)
 		return false; /* aux transfer failed */
 
 	DRM_DEBUG_KMS("DPCD: %*ph\n", (int) sizeof(intel_dp->dpcd), intel_dp->dpcd);
 
-	if (intel_dp->dpcd[DP_DPCD_REV] == 0)
-		return false; /* DPCD not present */
+	return intel_dp->dpcd[DP_DPCD_REV] != 0;
+}
 
-	if (drm_dp_dpcd_read(&intel_dp->aux, DP_SINK_COUNT,
-			     &intel_dp->sink_count, 1) < 0)
+static bool
+intel_edp_init_dpcd(struct intel_dp *intel_dp)
+{
+	struct drm_i915_private *dev_priv =
+		to_i915(dp_to_dig_port(intel_dp)->base.base.dev);
+
+	/* this function is meant to be called only once */
+	WARN_ON(intel_dp->dpcd[DP_DPCD_REV] != 0);
+
+	if (!intel_dp_read_dpcd(intel_dp))
 		return false;
 
-	/*
-	 * Sink count can change between short pulse hpd hence
-	 * a member variable in intel_dp will track any changes
-	 * between short pulse interrupts.
-	 */
-	intel_dp->sink_count = DP_GET_SINK_COUNT(intel_dp->sink_count);
-
-	/*
-	 * SINK_COUNT == 0 and DOWNSTREAM_PORT_PRESENT == 1 implies that
-	 * a dongle is present but no display. Unless we require to know
-	 * if a dongle is present or not, we don't need to update
-	 * downstream port information. So, an early return here saves
-	 * time from performing other operations which are not required.
-	 */
-	if (!is_edp(intel_dp) && !intel_dp->sink_count)
-		return false;
+	if (intel_dp->dpcd[DP_DPCD_REV] >= 0x11)
+		dev_priv->no_aux_handshake = intel_dp->dpcd[DP_MAX_DOWNSPREAD] &
+			DP_NO_AUX_HANDSHAKE_LINK_TRAINING;
 
 	/* Check if the panel supports PSR */
-	memset(intel_dp->psr_dpcd, 0, sizeof(intel_dp->psr_dpcd));
-	if (is_edp(intel_dp)) {
-		drm_dp_dpcd_read(&intel_dp->aux, DP_PSR_SUPPORT,
-				 intel_dp->psr_dpcd,
-				 sizeof(intel_dp->psr_dpcd));
-		if (intel_dp->psr_dpcd[0] & DP_PSR_IS_SUPPORTED) {
-			dev_priv->psr.sink_support = true;
-			DRM_DEBUG_KMS("Detected EDP PSR Panel.\n");
-		}
-
-		if (INTEL_INFO(dev_priv)->gen >= 9 &&
-			(intel_dp->psr_dpcd[0] & DP_PSR2_IS_SUPPORTED)) {
-			uint8_t frame_sync_cap;
-
-			dev_priv->psr.sink_support = true;
-			drm_dp_dpcd_read(&intel_dp->aux,
-					 DP_SINK_DEVICE_AUX_FRAME_SYNC_CAP,
-					 &frame_sync_cap, 1);
-			dev_priv->psr.aux_frame_sync = frame_sync_cap ? true : false;
-			/* PSR2 needs frame sync as well */
-			dev_priv->psr.psr2_support = dev_priv->psr.aux_frame_sync;
-			/* PSR2 is completely broken (b/35587162, b/36457321) */
-			dev_priv->psr.psr2_support = false;
-			DRM_DEBUG_KMS("PSR2 %s on sink",
-				dev_priv->psr.psr2_support ? "supported" : "not supported");
-		}
-
-		/* Read the eDP Display control capabilities registers */
-		memset(intel_dp->edp_dpcd, 0, sizeof(intel_dp->edp_dpcd));
-		if ((intel_dp->dpcd[DP_EDP_CONFIGURATION_CAP] & DP_DPCD_DISPLAY_CONTROL_CAPABLE) &&
-		                (drm_dp_dpcd_read(&intel_dp->aux, DP_EDP_DPCD_REV,
-						intel_dp->edp_dpcd, sizeof(intel_dp->edp_dpcd)) ==
-								sizeof(intel_dp->edp_dpcd)))
-			DRM_DEBUG_KMS("EDP DPCD : %*ph\n", (int) sizeof(intel_dp->edp_dpcd),
-					intel_dp->edp_dpcd);
+	drm_dp_dpcd_read(&intel_dp->aux, DP_PSR_SUPPORT,
+			 intel_dp->psr_dpcd,
+			 sizeof(intel_dp->psr_dpcd));
+	if (intel_dp->psr_dpcd[0] & DP_PSR_IS_SUPPORTED) {
+		dev_priv->psr.sink_support = true;
+		DRM_DEBUG_KMS("Detected EDP PSR Panel.\n");
 	}
 
-	DRM_DEBUG_KMS("Display Port TPS3 support: source %s, sink %s\n",
-		      yesno(intel_dp_source_supports_hbr2(intel_dp)),
-		      yesno(drm_dp_tps3_supported(intel_dp->dpcd)));
+	if (INTEL_GEN(dev_priv) >= 9 &&
+	    (intel_dp->psr_dpcd[0] & DP_PSR2_IS_SUPPORTED)) {
+		uint8_t frame_sync_cap;
+
+		dev_priv->psr.sink_support = true;
+		drm_dp_dpcd_read(&intel_dp->aux,
+				 DP_SINK_DEVICE_AUX_FRAME_SYNC_CAP,
+				 &frame_sync_cap, 1);
+		dev_priv->psr.aux_frame_sync = frame_sync_cap ? true : false;
+		/* PSR2 needs frame sync as well */
+		dev_priv->psr.psr2_support = dev_priv->psr.aux_frame_sync;
+		/* PSR2 is completely broken (b/35587162, b/36457321) */
+		dev_priv->psr.psr2_support = false;
+		DRM_DEBUG_KMS("PSR2 %s on sink",
+			      dev_priv->psr.psr2_support ? "supported" : "not supported");
+	}
+
+	/* Read the eDP Display control capabilities registers */
+	if ((intel_dp->dpcd[DP_EDP_CONFIGURATION_CAP] & DP_DPCD_DISPLAY_CONTROL_CAPABLE) &&
+	    drm_dp_dpcd_read(&intel_dp->aux, DP_EDP_DPCD_REV,
+			     intel_dp->edp_dpcd, sizeof(intel_dp->edp_dpcd) ==
+			     sizeof(intel_dp->edp_dpcd)))
+		DRM_DEBUG_KMS("EDP DPCD : %*ph\n", (int) sizeof(intel_dp->edp_dpcd),
+			      intel_dp->edp_dpcd);
 
 	/* Intermediate frequency support */
-	if (is_edp(intel_dp) && (intel_dp->edp_dpcd[0] >= 0x03)) { /* eDp v1.4 or higher */
+	if (intel_dp->edp_dpcd[0] >= 0x03) { /* eDp v1.4 or higher */
 		__le16 sink_rates[DP_MAX_SUPPORTED_RATES];
 		int i;
 
@@ -3623,7 +3606,36 @@ intel_dp_get_dpcd(struct intel_dp *intel_dp)
 		intel_dp->num_sink_rates = i;
 	}
 
-	intel_dp_print_rates(intel_dp);
+	return true;
+}
+
+
+static bool
+intel_dp_get_dpcd(struct intel_dp *intel_dp)
+{
+	if (!intel_dp_read_dpcd(intel_dp))
+		return false;
+
+	if (drm_dp_dpcd_read(&intel_dp->aux, DP_SINK_COUNT,
+			     &intel_dp->sink_count, 1) < 0)
+		return false;
+
+	/*
+	 * Sink count can change between short pulse hpd hence
+	 * a member variable in intel_dp will track any changes
+	 * between short pulse interrupts.
+	 */
+	intel_dp->sink_count = DP_GET_SINK_COUNT(intel_dp->sink_count);
+
+	/*
+	 * SINK_COUNT == 0 and DOWNSTREAM_PORT_PRESENT == 1 implies that
+	 * a dongle is present but no display. Unless we require to know
+	 * if a dongle is present or not, we don't need to update
+	 * downstream port information. So, an early return here saves
+	 * time from performing other operations which are not required.
+	 */
+	if (!is_edp(intel_dp) && !intel_dp->sink_count)
+		return false;
 
 	if (!drm_dp_is_branch(intel_dp->dpcd))
 		return true; /* native DP sink */
@@ -4405,11 +4417,17 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 	if (intel_encoder->type != INTEL_OUTPUT_EDP)
 		intel_encoder->type = INTEL_OUTPUT_DP;
 
+	DRM_DEBUG_KMS("Display Port TPS3 support: source %s, sink %s\n",
+		      yesno(intel_dp_source_supports_hbr2(intel_dp)),
+		      yesno(drm_dp_tps3_supported(intel_dp->dpcd)));
+
 	/* Set the max lane count for sink */
 	intel_dp->max_sink_lane_count = drm_dp_max_lane_count(intel_dp->dpcd);
 
 	/* Set the max link BW for sink */
 	intel_dp->max_sink_link_bw = intel_dp_max_link_bw(intel_dp);
+
+	intel_dp_print_rates(intel_dp);
 
 	intel_dp_read_desc(intel_dp);
 
@@ -5535,14 +5553,9 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 	pps_unlock(intel_dp);
 
 	/* Cache DPCD and EDID for edp. */
-	has_dpcd = intel_dp_get_dpcd(intel_dp);
+	has_dpcd = intel_edp_init_dpcd(intel_dp);
 
-	if (has_dpcd) {
-		if (intel_dp->dpcd[DP_DPCD_REV] >= 0x11)
-			dev_priv->no_aux_handshake =
-				intel_dp->dpcd[DP_MAX_DOWNSPREAD] &
-				DP_NO_AUX_HANDSHAKE_LINK_TRAINING;
-	} else {
+	if (!has_dpcd) {
 		/* if this fails, presume the device is a ghost */
 		DRM_INFO("failed to retrieve link info, disabling eDP\n");
 		goto out_vdd_off;
