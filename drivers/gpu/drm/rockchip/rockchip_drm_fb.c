@@ -463,7 +463,7 @@ rockchip_drm_framebuffer_init(struct drm_device *dev,
 
 void rockchip_drm_mode_config_init(struct drm_device *dev)
 {
-	unsigned long rotation_flags = BIT(DRM_ROTATE_0) | BIT(DRM_REFLECT_Y);
+	unsigned long rotation_flags = DRM_ROTATE_0 | DRM_REFLECT_Y;
 
 	dev->mode_config.min_width = 0;
 	dev->mode_config.min_height = 0;
