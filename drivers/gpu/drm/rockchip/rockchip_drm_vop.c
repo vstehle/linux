@@ -768,7 +768,7 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 	if (is_yuv_support(fb->pixel_format) && state->rotation)
 		return -EINVAL;
 
-	if (state->rotation && (!((state->rotation == BIT(DRM_REFLECT_Y)) || (state->rotation == BIT(DRM_ROTATE_0)))))
+	if (state->rotation && (!((state->rotation == DRM_REFLECT_Y) || (state->rotation == DRM_ROTATE_0))))
 		return -EINVAL;
 
 	if (fb->modifier[0] == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC) {
@@ -881,7 +881,7 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
 	offset += (src->y1 >> 16) * fb->pitches[0];
 	dma_addr = rk_obj->dma_addr + offset + fb->offsets[0];
 	/* For rotation, move dma_addr to the beginning of the last line. */
-	if (state->rotation == BIT(DRM_REFLECT_Y))
+	if (state->rotation == DRM_REFLECT_Y)
 		dma_addr += (actual_h - 1) * fb->pitches[0];
 
 	format = vop_convert_format(fb->pixel_format);
@@ -903,7 +903,7 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
 	VOP_WIN_SET(vop, win, format, format);
 	VOP_WIN_SET(vop, win, yrgb_vir, fb->pitches[0] >> 2);
 	VOP_WIN_SET(vop, win, yrgb_mst, dma_addr);
-	VOP_WIN_SET(vop, win, y_mir_en, state->rotation == BIT(DRM_REFLECT_Y));
+	VOP_WIN_SET(vop, win, y_mir_en, state->rotation == DRM_REFLECT_Y);
 
 	if (!win_index) {
 		VOP_YUV2YUV_SET(vop, win0_y2r_en, is_yuv);
