@@ -675,7 +675,7 @@ static int execlists_move_to_gpu(struct drm_i915_gem_request *req,
 	/* Unconditionally invalidate gpu caches and ensure that we do flush
 	 * any residual writes from the previous batch.
 	 */
-	return req->engine->emit_flush(req, I915_GEM_GPU_DOMAINS, 0);
+	return req->engine->emit_flush(req, EMIT_INVALIDATE);
 }
 
 int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request)
@@ -1001,9 +1001,7 @@ static int intel_logical_ring_workarounds_emit(struct drm_i915_gem_request *req)
 	if (w->count == 0)
 		return 0;
 
-	ret = req->engine->emit_flush(req,
-				      I915_GEM_GPU_DOMAINS,
-				      I915_GEM_GPU_DOMAINS);
+	ret = req->engine->emit_flush(req, EMIT_BARRIER);
 	if (ret)
 		return ret;
 
@@ -1020,9 +1018,7 @@ static int intel_logical_ring_workarounds_emit(struct drm_i915_gem_request *req)
 
 	intel_ring_advance(ring);
 
-	ret = req->engine->emit_flush(req,
-				      I915_GEM_GPU_DOMAINS,
-				      I915_GEM_GPU_DOMAINS);
+	ret = req->engine->emit_flush(req, EMIT_BARRIER);
 	if (ret)
 		return ret;
 
@@ -1590,9 +1586,7 @@ static void gen8_logical_ring_disable_irq(struct intel_engine_cs *engine)
 	I915_WRITE_IMR(engine, ~engine->irq_keep_mask);
 }
 
-static int gen8_emit_flush(struct drm_i915_gem_request *request,
-			   u32 invalidate_domains,
-			   u32 unused)
+static int gen8_emit_flush(struct drm_i915_gem_request *request, u32 mode)
 {
 	struct intel_ring *ring = request->ring;
 	u32 cmd;
@@ -1611,7 +1605,7 @@ static int gen8_emit_flush(struct drm_i915_gem_request *request,
 	 */
 	cmd |= MI_FLUSH_DW_STORE_INDEX | MI_FLUSH_DW_OP_STOREDW;
 
-	if (invalidate_domains & I915_GEM_GPU_DOMAINS) {
+	if (mode & EMIT_INVALIDATE) {
 		cmd |= MI_INVALIDATE_TLB;
 		if (request->engine->id == VCS)
 			cmd |= MI_INVALIDATE_BSD;
@@ -1629,8 +1623,7 @@ static int gen8_emit_flush(struct drm_i915_gem_request *request,
 }
 
 static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
-				  u32 invalidate_domains,
-				  u32 flush_domains)
+				  u32 mode)
 {
 	struct intel_ring *ring = request->ring;
 	struct intel_engine_cs *engine = request->engine;
@@ -1642,14 +1635,14 @@ static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
 
 	flags |= PIPE_CONTROL_CS_STALL;
 
-	if (flush_domains) {
+	if (mode & EMIT_FLUSH) {
 		flags |= PIPE_CONTROL_RENDER_TARGET_CACHE_FLUSH;
 		flags |= PIPE_CONTROL_DEPTH_CACHE_FLUSH;
 		flags |= PIPE_CONTROL_DC_FLUSH_ENABLE;
 		flags |= PIPE_CONTROL_FLUSH_ENABLE;
 	}
 
-	if (invalidate_domains) {
+	if (mode & EMIT_INVALIDATE) {
 		flags |= PIPE_CONTROL_TLB_INVALIDATE;
 		flags |= PIPE_CONTROL_INSTRUCTION_CACHE_INVALIDATE;
 		flags |= PIPE_CONTROL_TEXTURE_CACHE_INVALIDATE;
