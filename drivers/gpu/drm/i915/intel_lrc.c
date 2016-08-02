@@ -717,7 +717,7 @@ int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request
 			return ret;
 	}
 
-	request->ringbuf = ce->ringbuf;
+	request->ring = ce->ringbuf;
 
 	if (i915.enable_guc_submission) {
 		/*
@@ -773,11 +773,11 @@ err_unpin:
 static int
 intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 {
-	struct intel_ringbuffer *ringbuf = request->ringbuf;
+	struct intel_ringbuffer *ring = request->ring;
 	struct intel_engine_cs *engine = request->engine;
 
-	intel_ring_advance(ringbuf);
-	request->tail = ringbuf->tail;
+	intel_ring_advance(ring);
+	request->tail = ring->tail;
 
 	/*
 	 * Here we add two extra NOOPs as padding to avoid
@@ -785,9 +785,9 @@ intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 	 *
 	 * Caller must reserve WA_TAIL_DWORDS for us!
 	 */
-	intel_ring_emit(ringbuf, MI_NOOP);
-	intel_ring_emit(ringbuf, MI_NOOP);
-	intel_ring_advance(ringbuf);
+	intel_ring_emit(ring, MI_NOOP);
+	intel_ring_emit(ring, MI_NOOP);
+	intel_ring_advance(ring);
 
 	/* We keep the previous context alive until we retire the following
 	 * request. This ensures that any the context object is still pinned
@@ -824,7 +824,7 @@ int intel_execlists_submission(struct i915_execbuffer_params *params,
 	struct drm_device       *dev = params->dev;
 	struct intel_engine_cs *engine = params->engine;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct intel_ringbuffer *ringbuf = params->ctx->engine[engine->id].ringbuf;
+	struct intel_ringbuffer *ring = params->request->ring;
 	u64 exec_start;
 	int instp_mode;
 	u32 instp_mask;
@@ -836,7 +836,7 @@ int intel_execlists_submission(struct i915_execbuffer_params *params,
 	case I915_EXEC_CONSTANTS_REL_GENERAL:
 	case I915_EXEC_CONSTANTS_ABSOLUTE:
 	case I915_EXEC_CONSTANTS_REL_SURFACE:
-		if (instp_mode != 0 && engine != &dev_priv->engine[RCS]) {
+		if (instp_mode != 0 && engine->id != RCS) {
 			DRM_DEBUG("non-0 rel constants mode on non-RCS\n");
 			return -EINVAL;
 		}
@@ -865,17 +865,17 @@ int intel_execlists_submission(struct i915_execbuffer_params *params,
 	if (ret)
 		return ret;
 
-	if (engine == &dev_priv->engine[RCS] &&
+	if (engine->id == RCS &&
 	    instp_mode != dev_priv->relative_constants_mode) {
 		ret = intel_ring_begin(params->request, 4);
 		if (ret)
 			return ret;
 
-		intel_ring_emit(ringbuf, MI_NOOP);
-		intel_ring_emit(ringbuf, MI_LOAD_REGISTER_IMM(1));
-		intel_ring_emit_reg(ringbuf, INSTPM);
-		intel_ring_emit(ringbuf, instp_mask << 16 | instp_mode);
-		intel_ring_advance(ringbuf);
+		intel_ring_emit(ring, MI_NOOP);
+		intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));
+		intel_ring_emit_reg(ring, INSTPM);
+		intel_ring_emit(ring, instp_mask << 16 | instp_mode);
+		intel_ring_advance(ring);
 
 		dev_priv->relative_constants_mode = instp_mode;
 	}
@@ -1033,7 +1033,7 @@ static int intel_logical_ring_workarounds_emit(struct drm_i915_gem_request *req)
 {
 	int ret, i;
 	struct intel_engine_cs *engine = req->engine;
-	struct intel_ringbuffer *ringbuf = req->ringbuf;
+	struct intel_ringbuffer *ring = req->ring;
 	struct i915_workarounds *w = &req->i915->workarounds;
 
 	if (w->count == 0)
@@ -1048,14 +1048,14 @@ static int intel_logical_ring_workarounds_emit(struct drm_i915_gem_request *req)
 	if (ret)
 		return ret;
 
-	intel_ring_emit(ringbuf, MI_LOAD_REGISTER_IMM(w->count));
+	intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(w->count));
 	for (i = 0; i < w->count; i++) {
-		intel_ring_emit_reg(ringbuf, w->reg[i].addr);
-		intel_ring_emit(ringbuf, w->reg[i].value);
+		intel_ring_emit_reg(ring, w->reg[i].addr);
+		intel_ring_emit(ring, w->reg[i].value);
 	}
-	intel_ring_emit(ringbuf, MI_NOOP);
+	intel_ring_emit(ring, MI_NOOP);
 
-	intel_ring_advance(ringbuf);
+	intel_ring_advance(ring);
 
 	engine->gpu_caches_dirty = true;
 	ret = logical_ring_flush_all_caches(req);
@@ -1545,7 +1545,7 @@ static int gen9_init_render_ring(struct intel_engine_cs *engine)
 static int intel_logical_ring_emit_pdps(struct drm_i915_gem_request *req)
 {
 	struct i915_hw_ppgtt *ppgtt = req->ctx->ppgtt;
-	struct intel_ringbuffer *ring = req->ringbuf;
+	struct intel_ringbuffer *ring = req->ring;
 	struct intel_engine_cs *engine = req->engine;
 	const int num_lri_cmds = GEN8_LEGACY_PDPES * 2;
 	int i, ret;
@@ -1573,7 +1573,7 @@ static int intel_logical_ring_emit_pdps(struct drm_i915_gem_request *req)
 static int gen8_emit_bb_start(struct drm_i915_gem_request *req,
 			      u64 offset, unsigned dispatch_flags)
 {
-	struct intel_ringbuffer *ring = req->ringbuf;
+	struct intel_ringbuffer *ring = req->ring;
 	bool ppgtt = !(dispatch_flags & I915_DISPATCH_SECURE);
 	int ret;
 
@@ -1630,8 +1630,7 @@ static int gen8_emit_flush(struct drm_i915_gem_request *request,
 			   u32 invalidate_domains,
 			   u32 unused)
 {
-	struct intel_ringbuffer *ring = request->ringbuf;
-	struct intel_engine_cs *engine = ring->engine;
+	struct intel_ringbuffer *ring = request->ring;
 	uint32_t cmd;
 	int ret;
 
@@ -1650,7 +1649,7 @@ static int gen8_emit_flush(struct drm_i915_gem_request *request,
 
 	if (invalidate_domains & I915_GEM_GPU_DOMAINS) {
 		cmd |= MI_INVALIDATE_TLB;
-		if (engine->id == VCS)
+		if (request->engine->id == VCS)
 			cmd |= MI_INVALIDATE_BSD;
 	}
 
@@ -1669,7 +1668,7 @@ static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
 				  u32 invalidate_domains,
 				  u32 flush_domains)
 {
-	struct intel_ringbuffer *ring = request->ringbuf;
+	struct intel_ringbuffer *ring = request->ring;
 	struct intel_engine_cs *engine = request->engine;
 	u32 scratch_addr = engine->scratch.gtt_offset + 2 * CACHELINE_BYTES;
 	bool vf_flush_wa = false, dc_flush_wa = false;
@@ -1783,7 +1782,7 @@ static void bxt_a_seqno_barrier(struct intel_engine_cs *engine)
 
 static int gen8_emit_request(struct drm_i915_gem_request *request)
 {
-	struct intel_ringbuffer *ring = request->ringbuf;
+	struct intel_ringbuffer *ring = request->ring;
 	int ret;
 
 	ret = intel_ring_begin(request, 6 + WA_TAIL_DWORDS);
@@ -1806,7 +1805,7 @@ static int gen8_emit_request(struct drm_i915_gem_request *request)
 
 static int gen8_emit_request_render(struct drm_i915_gem_request *request)
 {
-	struct intel_ringbuffer *ring = request->ringbuf;
+	struct intel_ringbuffer *ring = request->ring;
 	int ret;
 
 	ret = intel_ring_begin(request, 8 + WA_TAIL_DWORDS);
