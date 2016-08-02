@@ -1418,7 +1418,7 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 	intel_runtime_pm_get(dev_priv);
 
 	for_each_engine_id(engine, dev_priv, id) {
-		acthd[id] = intel_ring_get_active_head(engine);
+		acthd[id] = intel_engine_get_active_head(engine);
 		seqno[id] = intel_engine_get_seqno(engine);
 	}
 
@@ -2035,12 +2035,11 @@ static int i915_gem_framebuffer_info(struct seq_file *m, void *data)
 	return 0;
 }
 
-static void describe_ctx_ringbuf(struct seq_file *m,
-				 struct intel_ringbuffer *ringbuf)
+static void describe_ctx_ring(struct seq_file *m, struct intel_ring *ring)
 {
 	seq_printf(m, " (ringbuffer, space: %d, head: %u, tail: %u, last head: %d)",
-		   ringbuf->space, ringbuf->head, ringbuf->tail,
-		   ringbuf->last_retired_head);
+		   ring->space, ring->head, ring->tail,
+		   ring->last_retired_head);
 }
 
 static int i915_context_status(struct seq_file *m, void *unused)
@@ -2085,7 +2084,7 @@ static int i915_context_status(struct seq_file *m, void *unused)
 			if (ce->state)
 				describe_obj(m, ce->state);
 			if (ce->ring)
-				describe_ctx_ringbuf(m, ce->ring);
+				describe_ctx_ring(m, ce->ring);
 			seq_putc(m, '\n');
 		}
 
