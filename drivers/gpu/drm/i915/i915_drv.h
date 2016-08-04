@@ -1662,7 +1662,7 @@ struct intel_pipe_crc {
 };
 
 struct i915_frontbuffer_tracking {
-	struct mutex lock;
+	spinlock_t lock;
 
 	/*
 	 * Tracking bits for delayed frontbuffer flushing du to gpu activity or
