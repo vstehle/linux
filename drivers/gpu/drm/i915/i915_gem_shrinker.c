@@ -169,7 +169,8 @@ i915_gem_shrink(struct drm_i915_private *dev_priv,
 			    !is_vmalloc_addr(obj->mapping))
 				continue;
 
-			if ((flags & I915_SHRINK_ACTIVE) == 0 && obj->active)
+			if ((flags & I915_SHRINK_ACTIVE) == 0 &&
+			    i915_gem_object_is_active(obj))
 				continue;
 
 			if (!can_release_pages(obj))
