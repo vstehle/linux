@@ -23,16 +23,6 @@
 #include <mali_kbase.h>
 #include <mali_kbase_sync.h>
 
-struct mali_sync_pt {
-	struct sync_pt sync_pt;
-	int result;
-};
-
-static struct mali_sync_pt *to_mali_sync_pt(struct sync_pt *sync_pt)
-{
-	return container_of(sync_pt, struct mali_sync_pt, sync_pt);
-}
-
 /* It doesn't quite prove it it is our fence, but at least we know it is
  * sw_sync fence.
  */
@@ -40,6 +30,9 @@ int kbase_sync_fence_is_ours(struct fence *fence)
 {
 	struct sync_pt *sync_pt;
 	if (!fence)
+		return false;
+
+	if (fence_is_array(fence))
 		return false;
 
 	sync_pt = fence_to_sync_pt(fence);
@@ -81,39 +74,36 @@ void kbase_sync_timeline_free(struct mali_sync_timeline *mtl)
 
 struct fence *kbase_fence_alloc(struct mali_sync_timeline *mtl)
 {
-	struct sync_pt *sync_pt;
-	struct mali_sync_pt *mpt;
+	struct sync_pt *pt;
 
 	/* Counter has to be incremented only if fence create succeeds.. */
 	mutex_lock(&mtl->counter_lock);
-	sync_pt = sync_pt_create(mtl->timeline, sizeof(struct mali_sync_pt), mtl->counter + 1);
+	pt = sync_pt_create(mtl->timeline, sizeof(struct sync_pt), mtl->counter + 1);
 
-	if (!sync_pt) {
+	if (!pt) {
 		mutex_unlock(&mtl->counter_lock);
 		return NULL;
 	}
 
 	mtl->counter++;
 	mutex_unlock(&mtl->counter_lock);
-	mpt = to_mali_sync_pt(sync_pt);
-	mpt->result = 0;
 
-	return &sync_pt->base;
+	return &pt->base;
 }
 
 void kbase_sync_signal_fence(struct fence *fence, int result)
 {
-	struct mali_sync_pt *mpt = to_mali_sync_pt(fence_to_sync_pt(fence));
+	struct sync_pt *pt = fence_to_sync_pt(fence);
 	struct sync_timeline *tl = fence_parent(fence);
 	unsigned long flags;
 	int diff;
 
-	mpt->result = result;
+	pt->base.status = result;
 
 	/* timeline.value is protected by child_list_lock */
 	spin_lock_irqsave(&tl->child_list_lock, flags);
 
-	diff = tl->value - (int)mpt->sync_pt.base.seqno;
+	diff = tl->value - (int)pt->base.seqno;
 
 	if (diff > 0) {
 		/* The timeline is already at or ahead of this point.
@@ -134,7 +124,7 @@ void kbase_sync_signal_fence(struct fence *fence, int result)
 	/* We set timeline value ourselves and just use sync_signal_timeline to
 	 * remove fences from the list
 	 */
-	tl->value = (int)mpt->sync_pt.base.seqno;
+	tl->value = (int)pt->base.seqno;
 	spin_unlock_irqrestore(&tl->child_list_lock, flags);
 	sync_timeline_signal(tl, 0);
 }

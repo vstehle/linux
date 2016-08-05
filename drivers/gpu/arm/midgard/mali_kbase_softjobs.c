@@ -179,17 +179,12 @@ static void complete_soft_job(struct kbase_jd_atom *katom)
 
 static enum base_jd_event_code kbase_fence_trigger(struct kbase_jd_atom *katom, int result)
 {
-	if (katom->sfile->num_fences != 1) {
-		/* Not exactly one item in the list - so it didn't (directly) come from us */
-		return BASE_JD_EVENT_JOB_CANCELLED;
-	}
-
-	if (!kbase_sync_fence_is_ours(katom->sfile->cbs[0].fence)) {
+	if (!kbase_sync_fence_is_ours(katom->sfile->fence)) {
 		/* Fence has a sync_pt which isn't ours! */
 		return BASE_JD_EVENT_JOB_CANCELLED;
 	}
 
-	kbase_sync_signal_fence(katom->sfile->cbs[0].fence, result);
+	kbase_sync_signal_fence(katom->sfile->fence, result);
 
 	return (result < 0) ? BASE_JD_EVENT_JOB_CANCELLED : BASE_JD_EVENT_DONE;
 }
@@ -217,9 +212,10 @@ static void kbase_file_wait_callback(struct sync_file *sfile, struct kbase_sync_
 	KBASE_DEBUG_ASSERT(NULL != kctx);
 
 	/* Propagate the fence status to the atom.
+	 * The status os only valid if fence is signaled, which is true in callback.
 	 * If negative then cancel this atom and its dependencies.
 	 */
-	if (atomic_read(&sfile->status) < 0)
+	if (sfile->fence->status < 0)
 		katom->event_code = BASE_JD_EVENT_JOB_CANCELLED;
 
 	/* To prevent a potential deadlock we schedule the work onto the job_done_wq workqueue
@@ -251,28 +247,28 @@ static int kbase_sync_file_wake_up_wq(wait_queue_t *curr, unsigned mode,
 static int kbase_sync_file_wait_async(struct sync_file *sfile,
 				      struct kbase_sync_file_waiter *waiter)
 {
-	int err = atomic_read(&sfile->status);
+	bool signaled;
 	unsigned long flags;
 
-	if (err < 0)
-		return err;
-
-	if (!err)
+	if (fence_is_signaled(sfile->fence)) {
+		if (sfile->fence->status < 0)
+			return sfile->fence->status;
 		return 1;
+	}
 
 	init_waitqueue_func_entry(&waiter->work, kbase_sync_file_wake_up_wq);
 	waiter->work.private = sfile;
 
 	spin_lock_irqsave(&sfile->wq.lock, flags);
-	err = atomic_read(&sfile->status);
-	if (err > 0)
+	signaled = fence_is_signaled(sfile->fence);
+	if (!signaled)
 		__add_wait_queue_tail(&sfile->wq, &waiter->work);
 	spin_unlock_irqrestore(&sfile->wq.lock, flags);
 
-	if (err < 0)
-		return err;
+	if (sfile->fence->status < 0)
+		return sfile->fence->status;
 
-	return !err;
+	return signaled;
 }
 
 static int kbase_sync_file_cancel_async(struct sync_file *sfile,
