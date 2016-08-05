@@ -56,12 +56,7 @@ int kbase_stream_create(const char *name, int *const out_fd);
 /*
  * Create a fence in a stream object
  */
-int kbase_stream_create_fence(int tl_fd);
-
-/*
- * Get sync file struct for fd, increment refcount.
- */
-struct sync_file *kbase_sync_file_fdget(int fd);
+int kbase_stream_create_fence(int tl_fd, struct sync_file **rsfile);
 
 /*
  * Validate a fd to be a valid fence

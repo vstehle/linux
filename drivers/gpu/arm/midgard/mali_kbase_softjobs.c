@@ -1245,17 +1245,10 @@ int kbase_prepare_soft_job(struct kbase_jd_atom *katom)
 			if (0 != copy_from_user(&fence, (__user void *)(uintptr_t) katom->jc, sizeof(fence)))
 				return -EINVAL;
 
-			fd = kbase_stream_create_fence(fence.basep.stream_fd);
+			fd = kbase_stream_create_fence(fence.basep.stream_fd, &katom->sfile);
 			if (fd < 0)
 				return -EINVAL;
 
-			katom->sfile = kbase_sync_file_fdget(fd);
-
-			if (katom->sfile == NULL) {
-				/* The only way the fence can be NULL is if userspace closed it for us.
-				 * So we don't need to clear it up */
-				return -EINVAL;
-			}
 			fence.basep.fd = fd;
 			if (0 != copy_to_user((__user void *)(uintptr_t) katom->jc, &fence, sizeof(fence))) {
 				katom->sfile = NULL;
@@ -1272,7 +1265,11 @@ int kbase_prepare_soft_job(struct kbase_jd_atom *katom)
 				return -EINVAL;
 
 			/* Get a reference to the fence object */
-			katom->sfile = kbase_sync_file_fdget(fence.basep.fd);
+			if (!kbase_fence_validate(fence.basep.fd)) {
+				struct file *file = fget(fence.basep.fd);
+				katom->sfile = file->private_data;
+			}
+
 			if (katom->sfile == NULL)
 				return -EINVAL;
 		}
