@@ -1681,7 +1681,9 @@ void intel_ddi_clk_select(struct intel_encoder *encoder,
 	}
 }
 
-static void intel_ddi_pre_enable(struct intel_encoder *intel_encoder)
+static void intel_ddi_pre_enable(struct intel_encoder *intel_encoder,
+				 struct intel_crtc_state *pipe_config,
+				 struct drm_connector_state *conn_state)
 {
 	struct drm_encoder *encoder = &intel_encoder->base;
 	struct drm_i915_private *dev_priv = to_i915(encoder->dev);
@@ -1733,7 +1735,9 @@ static void intel_ddi_pre_enable(struct intel_encoder *intel_encoder)
 	}
 }
 
-static void intel_ddi_post_disable(struct intel_encoder *intel_encoder)
+static void intel_ddi_post_disable(struct intel_encoder *intel_encoder,
+				   struct intel_crtc_state *old_crtc_state,
+				   struct drm_connector_state *old_conn_state)
 {
 	struct drm_encoder *encoder = &intel_encoder->base;
 	struct drm_device *dev = encoder->dev;
@@ -1742,6 +1746,8 @@ static void intel_ddi_post_disable(struct intel_encoder *intel_encoder)
 	int type = intel_encoder->type;
 	uint32_t val;
 	bool wait = false;
+
+	/* old_crtc_state and old_conn_state are NULL when called from DP_MST */
 
 	val = I915_READ(DDI_BUF_CTL(port));
 	if (val & DDI_BUF_CTL_ENABLE) {
@@ -1778,7 +1784,9 @@ static void intel_ddi_post_disable(struct intel_encoder *intel_encoder)
 	}
 }
 
-static void intel_enable_ddi(struct intel_encoder *intel_encoder)
+static void intel_enable_ddi(struct intel_encoder *intel_encoder,
+			     struct intel_crtc_state *pipe_config,
+			     struct drm_connector_state *conn_state)
 {
 	struct drm_encoder *encoder = &intel_encoder->base;
 	struct drm_crtc *crtc = encoder->crtc;
@@ -1816,7 +1824,9 @@ static void intel_enable_ddi(struct intel_encoder *intel_encoder)
 	}
 }
 
-static void intel_disable_ddi(struct intel_encoder *intel_encoder)
+static void intel_disable_ddi(struct intel_encoder *intel_encoder,
+			      struct intel_crtc_state *old_crtc_state,
+			      struct drm_connector_state *old_conn_state)
 {
 	struct drm_encoder *encoder = &intel_encoder->base;
 	struct drm_crtc *crtc = encoder->crtc;
@@ -2119,7 +2129,9 @@ bxt_ddi_phy_calc_lane_lat_optim_mask(struct intel_encoder *encoder,
 	}
 }
 
-static void bxt_ddi_pre_pll_enable(struct intel_encoder *encoder)
+static void bxt_ddi_pre_pll_enable(struct intel_encoder *encoder,
+				   struct intel_crtc_state *pipe_config,
+				   struct drm_connector_state *conn_state)
 {
 	struct intel_digital_port *dport = enc_to_dig_port(&encoder->base);
 	struct drm_i915_private *dev_priv = to_i915(dport->base.base.dev);
@@ -2208,10 +2220,11 @@ void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
 	udelay(600);
 }
 
-void intel_ddi_fdi_disable(struct drm_crtc *crtc)
+void intel_ddi_fdi_disable(struct intel_encoder *intel_encoder,
+			   struct intel_crtc_state *old_crtc_state,
+			   struct drm_connector_state *old_conn_state)
 {
-	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
-	struct intel_encoder *intel_encoder = intel_ddi_get_crtc_encoder(crtc);
+	struct drm_i915_private *dev_priv = to_i915(intel_encoder->base.dev);
 	uint32_t val;
 
 	/*
@@ -2224,7 +2237,7 @@ void intel_ddi_fdi_disable(struct drm_crtc *crtc)
 	val &= ~FDI_RX_ENABLE;
 	I915_WRITE(FDI_RX_CTL(PIPE_A), val);
 
-	intel_ddi_post_disable(intel_encoder);
+	intel_ddi_post_disable(intel_encoder, old_crtc_state, old_conn_state);
 
 	val = I915_READ(FDI_RX_MISC(PIPE_A));
 	val &= ~(FDI_RX_PWRDN_LANE1_MASK | FDI_RX_PWRDN_LANE0_MASK);
