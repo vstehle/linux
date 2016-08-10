@@ -445,7 +445,7 @@ static void reg_process_ht_flags_band(struct wiphy *wiphy,
 
 static void reg_process_ht_flags(struct wiphy *wiphy)
 {
-	enum ieee80211_band band;
+	enum nl80211_band band;
 
 	if (!wiphy)
 		return;
@@ -529,7 +529,7 @@ static void reg_process_self_managed_hints(void)
 	struct cfg80211_registered_device *rdev;
 	struct wiphy *wiphy;
 	const struct ieee80211_regdomain *regd;
-	enum ieee80211_band band;
+	enum nl80211_band band;
 	struct ieee80211_local *local;
 
 	ASSERT_RTNL();
