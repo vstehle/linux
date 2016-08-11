@@ -45,7 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
 #include <linux/sw_sync.h>
 #else
-#include <../drivers/staging/android/sync_debug.h>
+#include <../drivers/dma-buf/sync_debug.h>
 #endif
 #include <linux/file.h>
 #include <linux/fs.h>
