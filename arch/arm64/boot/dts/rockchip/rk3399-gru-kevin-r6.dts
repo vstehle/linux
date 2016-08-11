@@ -1,5 +1,5 @@
 /*
- * Google Gru-Kevin Rev 4 board device tree source
+ * Google Gru-Kevin Rev 6+ board device tree source
  *
  * Copyright 2016 Google, Inc
  *
@@ -47,63 +47,10 @@
 
 / {
 	model = "Google Kevin";
-	compatible = "google,kevin-rev4", "google,kevin",
-		     "google,gru", "rockchip,rk3399";
-};
-
-/* Adjust DVFS rails back to wider range */
-
-&ppvar_bigcpu {
-	regulator-min-microvolt = <800000>;
-	regulator-max-microvolt = <1500000>;
-};
-
-&ppvar_litcpu {
-	regulator-min-microvolt = <800000>;
-	regulator-max-microvolt = <1500000>;
-};
-
-&ppvar_gpu {
-	regulator-min-microvolt = <800000>;
-	regulator-max-microvolt = <1500000>;
-};
-
-&ppvar_centerlogic {
-	regulator-min-microvolt = <800000>;
-	regulator-max-microvolt = <1500000>;
-};
-
-/* HACK for -rev4 to bump up voltage to make factory test more stable.
- * issue:55602(issue:54814?)
- *
- * With the new OPPs of bit/lit cpu, it's now more stable when changing
- * frequencies from 2088M/1608M to 600M/408M. But after testing stressapptest
- * on 5pcs, there is 1/5 failed.
- *
- */
-
-&ppvar_bigcpu {
-	regulator-microvolt-offset = <50000>;
-};
-&ppvar_centerlogic {
-	regulator-microvolt-offset = <50000>;
-};
-&ppvar_litcpu {
-	regulator-microvolt-offset = <50000>;
-};
-
-/* No i2c-based TPM */
-&ap_i2c_tpm {
-	status = "disabled";
-	/delete-node/ tpm@20;
-};
-
-&spi0 {
-	status = "okay";
-
-	cr50@0 {
-		compatible = "google,cr50";
-		reg = <0>;
-		spi-max-frequency = <800000>; // TODO: review later
-	};
+	compatible = "google,kevin-rev15", "google,kevin-rev14",
+		     "google,kevin-rev13", "google,kevin-rev12",
+		     "google,kevin-rev11", "google,kevin-rev10",
+		     "google,kevin-rev9", "google,kevin-rev8",
+		     "google,kevin-rev7", "google,kevin-rev6",
+		     "google,kevin", "google,gru", "rockchip,rk3399";
 };
