@@ -1295,7 +1295,7 @@ static unsigned int drm_num_planes(struct drm_device *dev)
  * @plane: plane object to init
  * @possible_crtcs: bitmask of possible CRTCs
  * @funcs: callbacks for the new plane
- * @formats: array of supported formats (%DRM_FORMAT_*)
+ * @formats: array of supported formats (DRM_FORMAT\_\*)
  * @format_count: number of elements in @formats
  * @format_modifiers: array of struct drm_format modifiers
  * @format_modifier_count: number of elements in @format_modifiers
@@ -1429,7 +1429,7 @@ static void drm_plane_unregister_all(struct drm_device *dev)
  * @plane: plane object to init
  * @possible_crtcs: bitmask of possible CRTCs
  * @funcs: callbacks for the new plane
- * @formats: array of supported formats (%DRM_FORMAT_*)
+ * @formats: array of supported formats (DRM_FORMAT\_\*)
  * @format_count: number of elements in @formats
  * @is_primary: plane type (primary vs overlay)
  *
