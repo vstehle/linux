@@ -3887,4 +3887,10 @@ static inline bool __i915_request_irq_complete(struct drm_i915_gem_request *req)
 #define ptr_pack_bits(ptr, bits)					\
 	((typeof(ptr))((unsigned long)(ptr) | (bits)))
 
+#define fetch_and_zero(ptr) ({						\
+	typeof(*ptr) __T = *(ptr);					\
+	*(ptr) = (typeof(*ptr))0;					\
+	__T;								\
+})
+
 #endif
