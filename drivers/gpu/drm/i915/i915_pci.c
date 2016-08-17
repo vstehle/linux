@@ -273,6 +273,7 @@ static const struct intel_device_info intel_valleyview_d_info = {
 	.has_fpga_dbg = 1, \
 	.has_psr = 1, \
 	.has_resource_streamer = 1, \
+	.has_dp_mst = 1, \
 	.has_rc6p = 0 /* RC6p removed-by HSW */, \
 	.has_runtime_pm = 1
 
@@ -361,6 +362,7 @@ static const struct intel_device_info intel_broxton_info = {
 	.has_csr = 1,
 	.has_resource_streamer = 1,
 	.has_rc6 = 1,
+	.has_dp_mst = 1,
 	GEN_DEFAULT_PIPEOFFSETS,
 	IVB_CURSOR_OFFSETS,
 	BDW_COLORS,
