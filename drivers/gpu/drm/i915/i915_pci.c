@@ -202,6 +202,7 @@ static const struct intel_device_info intel_ironlake_m_info = {
 	.has_runtime_pm = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
 	.has_llc = 1, \
+	.has_rc6 = 1, \
 	GEN_DEFAULT_PIPEOFFSETS, \
 	CURSOR_OFFSETS
 
@@ -220,6 +221,7 @@ static const struct intel_device_info intel_sandybridge_m_info = {
 	.has_fbc = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
 	.has_llc = 1, \
+	.has_rc6 = 1, \
 	GEN_DEFAULT_PIPEOFFSETS, \
 	IVB_CURSOR_OFFSETS
 
@@ -244,6 +246,7 @@ static const struct intel_device_info intel_ivybridge_q_info = {
 	.gen = 7, .num_pipes = 2, \
 	.has_psr = 1, \
 	.has_runtime_pm = 1, \
+	.has_rc6 = 1, \
 	.need_gfx_hws = 1, .has_hotplug = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
 	.display_mmio_offset = VLV_DISPLAY_BASE, \
@@ -319,6 +322,7 @@ static const struct intel_device_info intel_cherryview_info = {
 	.has_psr = 1,
 	.has_runtime_pm = 1,
 	.has_resource_streamer = 1,
+	.has_rc6 = 1,
 	.display_mmio_offset = VLV_DISPLAY_BASE,
 	GEN_CHV_PIPEOFFSETS,
 	CURSOR_OFFSETS,
@@ -353,6 +357,7 @@ static const struct intel_device_info intel_broxton_info = {
 	.has_pooled_eu = 0,
 	.has_csr = 1,
 	.has_resource_streamer = 1,
+	.has_rc6 = 1,
 	GEN_DEFAULT_PIPEOFFSETS,
 	IVB_CURSOR_OFFSETS,
 	BDW_COLORS,
