@@ -223,18 +223,21 @@ static const struct intel_device_info intel_sandybridge_m_info = {
 static const struct intel_device_info intel_ivybridge_d_info = {
 	GEN7_FEATURES,
 	.is_ivybridge = 1,
+	.has_l3_dpf = 1,
 };
 
 static const struct intel_device_info intel_ivybridge_m_info = {
 	GEN7_FEATURES,
 	.is_ivybridge = 1,
 	.is_mobile = 1,
+	.has_l3_dpf = 1,
 };
 
 static const struct intel_device_info intel_ivybridge_q_info = {
 	GEN7_FEATURES,
 	.is_ivybridge = 1,
 	.num_pipes = 0, /* legal, last one wins */
+	.has_l3_dpf = 1,
 };
 
 #define VLV_FEATURES  \
@@ -281,6 +284,7 @@ static const struct intel_device_info intel_haswell_m_info = {
 	HSW_FEATURES,
 	.is_haswell = 1,
 	.is_mobile = 1,
+	.has_l3_dpf = 1,
 };
 
 #define BDW_FEATURES \
