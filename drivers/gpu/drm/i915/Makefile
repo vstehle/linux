@@ -9,6 +9,7 @@ subdir-ccflags-$(CONFIG_DRM_I915_WERROR) := -Werror
 # core driver code
 i915-y := i915_drv.o \
 	  i915_irq.o \
+	  i915_mm.o \
 	  i915_params.o \
 	  i915_pci.o \
           i915_suspend.o \
@@ -104,6 +105,6 @@ i915-y += dvo_ch7017.o \
 # virtual gpu code
 i915-y += i915_vgpu.o
 
-obj-$(CONFIG_DRM_I915)  += i915.o
+obj-$(CONFIG_DRM_I915) += i915.o
 
 CFLAGS_i915_trace_points.o := -I$(src)
