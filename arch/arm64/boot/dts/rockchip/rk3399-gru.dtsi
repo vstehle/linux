@@ -181,8 +181,8 @@
 		regulator-always-on;
 		regulator-boot-on;
 
-		regulator-min-microvolt = <795349>;
-		regulator-max-microvolt = <1318605>;
+		regulator-min-microvolt = <798674>;
+		regulator-max-microvolt = <1302172>;
 
 		settle-time-up-us = <200>;
 		slowest-decay-rate = <225>;
@@ -204,8 +204,8 @@
 		regulator-always-on;
 		regulator-boot-on;
 
-		regulator-min-microvolt = <800000>;
-		regulator-max-microvolt = <1300000>;
+		regulator-min-microvolt = <799065>;
+		regulator-max-microvolt = <1303738>;
 
 		settle-time-up-us = <200>;
 		slowest-decay-rate = <225>;
@@ -227,8 +227,8 @@
 		regulator-always-on;
 		regulator-boot-on;
 
-		regulator-min-microvolt = <793047>;
-		regulator-max-microvolt = <1226164>;
+		regulator-min-microvolt = <785782>;
+		regulator-max-microvolt = <1217729>;
 
 		settle-time-up-us = <200>;
 		slowest-decay-rate = <225>;
@@ -250,8 +250,8 @@
 		regulator-always-on;
 		regulator-boot-on;
 
-		regulator-min-microvolt = <807387>;
-		regulator-max-microvolt = <1045273>;
+		regulator-min-microvolt = <800069>;
+		regulator-max-microvolt = <1049692>;
 
 		settle-time-up-us = <200>;
 		slowest-decay-rate = <225>;
