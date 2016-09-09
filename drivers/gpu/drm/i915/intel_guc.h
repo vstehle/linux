@@ -76,11 +76,13 @@ struct i915_guc_client {
 	uint16_t doorbell_id;
 	uint16_t padding;		/* Maintain alignment		*/
 
+	spinlock_t wq_lock;
 	uint32_t wq_offset;
 	uint32_t wq_size;
 	uint32_t wq_tail;
 	uint32_t unused;		/* Was 'wq_head'		*/
 
+	uint32_t wq_rsvd;
 	uint32_t no_wq_space;
 	uint32_t q_fail;		/* No longer used		*/
 	uint32_t b_fail;
