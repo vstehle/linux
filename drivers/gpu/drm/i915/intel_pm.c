@@ -3846,8 +3846,6 @@ static void skl_compute_wm_results(struct drm_device *dev,
 		temp |= PLANE_WM_EN;
 
 	r->plane_trans[pipe][PLANE_CURSOR] = temp;
-
-	r->wm_linetime[pipe] = p_wm->linetime;
 }
 
 static void skl_ddb_entry_write(struct drm_i915_private *dev_priv,
@@ -4082,7 +4080,6 @@ skl_copy_wm_for_pipe(struct skl_wm_values *dst,
 		     struct skl_wm_values *src,
 		     enum pipe pipe)
 {
-	dst->wm_linetime[pipe] = src->wm_linetime[pipe];
 	memcpy(dst->plane[pipe], src->plane[pipe],
 	       sizeof(dst->plane[pipe]));
 	memcpy(dst->plane_trans[pipe], src->plane_trans[pipe],
@@ -4333,8 +4330,6 @@ static void skl_pipe_wm_get_hw_state(struct drm_crtc *crtc)
 
 	max_level = ilk_wm_max_level(dev_priv);
 
-	hw->wm_linetime[pipe] = I915_READ(PIPE_WM_LINETIME(pipe));
-
 	for (level = 0; level <= max_level; level++) {
 		for (i = 0; i < intel_num_planes(intel_crtc); i++)
 			hw->plane[pipe][i][level] =
@@ -4351,7 +4346,7 @@ static void skl_pipe_wm_get_hw_state(struct drm_crtc *crtc)
 
 	hw->dirty_pipes |= drm_crtc_mask(crtc);
 
-	active->linetime = hw->wm_linetime[pipe];
+	active->linetime = I915_READ(PIPE_WM_LINETIME(pipe));
 
 	for (level = 0; level <= max_level; level++) {
 		for (i = 0; i < intel_num_planes(intel_crtc); i++) {
