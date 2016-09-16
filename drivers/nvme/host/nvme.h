@@ -137,9 +137,9 @@ int nvme_identify_ns(struct nvme_dev *dev, unsigned nsid,
 		struct nvme_id_ns **id);
 int nvme_get_log_page(struct nvme_dev *dev, struct nvme_smart_log **log);
 int nvme_get_features(struct nvme_dev *dev, unsigned fid, unsigned nsid,
-			dma_addr_t dma_addr, u32 *result);
+		      void *buffer, size_t buflen, u32 *result);
 int nvme_set_features(struct nvme_dev *dev, unsigned fid, unsigned dword11,
-			dma_addr_t dma_addr, u32 *result);
+		      void *buffer, size_t buflen, u32 *result);
 
 struct sg_io_hdr;
 
