@@ -3036,6 +3036,7 @@ static void mwifiex_unregister_dev(struct mwifiex_adapter *adapter)
 		mwifiex_pcie_delete_rxbd_ring(adapter);
 		mwifiex_pcie_delete_txbd_ring(adapter);
 		card->cmdrsp_buf = NULL;
+		card->adapter = NULL;
 	}
 }
 
