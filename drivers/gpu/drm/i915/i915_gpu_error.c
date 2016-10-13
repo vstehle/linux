@@ -708,7 +708,7 @@ unwind:
 	dst = NULL;
 
 out:
-	ggtt->base.clear_range(&ggtt->base, slot, PAGE_SIZE, true);
+	ggtt->base.clear_range(&ggtt->base, slot, PAGE_SIZE);
 	return dst;
 }
 
