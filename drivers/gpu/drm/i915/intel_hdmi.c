@@ -1258,6 +1258,7 @@ intel_hdmi_mode_valid(struct drm_connector *connector,
 {
 	struct intel_hdmi *hdmi = intel_attached_hdmi(connector);
 	struct drm_device *dev = intel_hdmi_to_dev(hdmi);
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	enum drm_mode_status status;
 	int clock;
 	int max_dotclk = to_i915(connector->dev)->max_dotclk_freq;
@@ -1280,7 +1281,7 @@ intel_hdmi_mode_valid(struct drm_connector *connector,
 	status = hdmi_port_clock_valid(hdmi, clock, true);
 
 	/* if we can't do 8bpc we may still be able to do 12bpc */
-	if (!HAS_GMCH_DISPLAY(dev) && status != MODE_OK)
+	if (!HAS_GMCH_DISPLAY(dev_priv) && status != MODE_OK)
 		status = hdmi_port_clock_valid(hdmi, clock * 3 / 2, true);
 
 	return status;
@@ -1296,7 +1297,7 @@ static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state)
 	int count = 0, count_hdmi = 0;
 	int i;
 
-	if (HAS_GMCH_DISPLAY(dev))
+	if (HAS_GMCH_DISPLAY(to_i915(dev)))
 		return false;
 
 	state = crtc_state->base.state;
