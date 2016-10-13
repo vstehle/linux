@@ -287,7 +287,6 @@ static int guc_ucode_xfer_dma(struct drm_i915_private *dev_priv,
 static int guc_ucode_xfer(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
-	struct drm_device *dev = &dev_priv->drm;
 	struct i915_vma *vma;
 	int ret;
 
@@ -330,7 +329,7 @@ static int guc_ucode_xfer(struct drm_i915_private *dev_priv)
 	else
 		I915_WRITE(GEN9_GT_PM_CONFIG, GT_DOORBELL_ENABLE);
 
-	if (IS_GEN9(dev)) {
+	if (IS_GEN9(dev_priv)) {
 		/* DOP Clock Gating Enable for GuC clocks */
 		I915_WRITE(GEN7_MISCCPCTL, (GEN8_DOP_CLOCK_GATE_GUC_ENABLE |
 					    I915_READ(GEN7_MISCCPCTL)));

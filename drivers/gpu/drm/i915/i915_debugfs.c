@@ -4560,7 +4560,7 @@ static void wm_latency_show(struct seq_file *m, const uint16_t wm[8])
 	else if (IS_VALLEYVIEW(dev_priv))
 		num_levels = 1;
 	else
-		num_levels = ilk_wm_max_level(dev) + 1;
+		num_levels = ilk_wm_max_level(dev_priv) + 1;
 
 	drm_modeset_lock_all(dev);
 
@@ -4676,7 +4676,7 @@ static ssize_t wm_latency_write(struct file *file, const char __user *ubuf,
 	else if (IS_VALLEYVIEW(dev_priv))
 		num_levels = 1;
 	else
-		num_levels = ilk_wm_max_level(dev) + 1;
+		num_levels = ilk_wm_max_level(dev_priv) + 1;
 
 	if (len >= sizeof(tmp))
 		return -EINVAL;
