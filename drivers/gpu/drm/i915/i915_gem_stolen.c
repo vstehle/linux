@@ -115,7 +115,7 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 		pci_read_config_dword(pdev, INTEL_BSM, &bsm);
 
 		base = bsm & INTEL_BSM_MASK;
-	} else if (IS_I865G(dev)) {
+	} else if (IS_I865G(dev_priv)) {
 		u16 toud = 0;
 
 		/*
@@ -143,7 +143,7 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 		tom = tmp * MB(32);
 
 		base = tom - tseg_size - ggtt->stolen_size;
-	} else if (IS_845G(dev)) {
+	} else if (IS_845G(dev_priv)) {
 		u32 tseg_size = 0;
 		u32 tom;
 		u8 tmp;
@@ -167,7 +167,7 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 		tom = tmp * MB(32);
 
 		base = tom - tseg_size - ggtt->stolen_size;
-	} else if (IS_I830(dev)) {
+	} else if (IS_I830(dev_priv)) {
 		u32 tseg_size = 0;
 		u32 tom;
 		u8 tmp;
