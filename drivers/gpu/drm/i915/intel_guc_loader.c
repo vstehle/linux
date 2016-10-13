@@ -664,7 +664,7 @@ void intel_guc_init(struct drm_device *dev)
 
 	if (!HAS_GUC_UCODE(dev)) {
 		fw_path = NULL;
-	} else if (IS_SKYLAKE(dev)) {
+	} else if (IS_SKYLAKE(dev_priv)) {
 		fw_path = I915_SKL_GUC_UCODE;
 		guc_fw->guc_fw_major_wanted = 6;
 		guc_fw->guc_fw_minor_wanted = 1;
