@@ -152,7 +152,7 @@ describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 		   obj->base.size / 1024,
 		   obj->base.read_domains,
 		   obj->base.write_domain);
-	for_each_engine_id(engine, dev_priv, id)
+	for_each_engine(engine, dev_priv, id)
 		seq_printf(m, "%x ",
 			   i915_gem_active_get_seqno(&obj->last_read[id],
 						     &obj->base.dev->struct_mutex));
@@ -325,11 +325,12 @@ static void print_batch_pool_stats(struct seq_file *m,
 	struct drm_i915_gem_object *obj;
 	struct file_stats stats;
 	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 	int j;
 
 	memset(&stats, 0, sizeof(stats));
 
-	for_each_engine(engine, dev_priv) {
+	for_each_engine(engine, dev_priv, id) {
 		for (j = 0; j < ARRAY_SIZE(engine->batch_pool.cache_list); j++) {
 			list_for_each_entry(obj,
 					    &engine->batch_pool.cache_list[j],
@@ -598,6 +599,7 @@ static int i915_gem_batch_pool_info(struct seq_file *m, void *data)
 	struct drm_device *dev = &dev_priv->drm;
 	struct drm_i915_gem_object *obj;
 	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 	int total = 0;
 	int ret, j;
 
@@ -605,7 +607,7 @@ static int i915_gem_batch_pool_info(struct seq_file *m, void *data)
 	if (ret)
 		return ret;
 
-	for_each_engine(engine, dev_priv) {
+	for_each_engine(engine, dev_priv, id) {
 		for (j = 0; j < ARRAY_SIZE(engine->batch_pool.cache_list); j++) {
 			int count;
 
@@ -657,8 +659,9 @@ static int i915_gem_request_info(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
 	struct drm_device *dev = &dev_priv->drm;
-	struct intel_engine_cs *engine;
 	struct drm_i915_gem_request *req;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 	int ret, any;
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
@@ -666,7 +669,7 @@ static int i915_gem_request_info(struct seq_file *m, void *data)
 		return ret;
 
 	any = 0;
-	for_each_engine(engine, dev_priv) {
+	for_each_engine(engine, dev_priv, id) {
 		int count;
 
 		count = 0;
@@ -713,6 +716,7 @@ static int i915_gem_seqno_info(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 	int ret;
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
@@ -720,7 +724,7 @@ static int i915_gem_seqno_info(struct seq_file *m, void *data)
 		return ret;
 	intel_runtime_pm_get(dev_priv);
 
-	for_each_engine(engine, dev_priv)
+	for_each_engine(engine, dev_priv, id)
 		i915_ring_seqno_info(m, engine);
 
 	intel_runtime_pm_put(dev_priv);
@@ -735,6 +739,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 	int ret, i, pipe;
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
@@ -906,7 +911,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 		seq_printf(m, "Graphics Interrupt mask:		%08x\n",
 			   I915_READ(GTIMR));
 	}
-	for_each_engine(engine, dev_priv) {
+	for_each_engine(engine, dev_priv, id) {
 		if (INTEL_GEN(dev_priv) >= 6) {
 			seq_printf(m,
 				   "Graphics Interrupt mask (%s):	%08x\n",
@@ -955,7 +960,7 @@ static int i915_hws_info(struct seq_file *m, void *data)
 	const u32 *hws;
 	int i;
 
-	engine = &dev_priv->engine[(uintptr_t)node->info_ent->data];
+	engine = dev_priv->engine[(uintptr_t)node->info_ent->data];
 	hws = engine->status_page.page_addr;
 	if (hws == NULL)
 		return 0;
@@ -1335,7 +1340,7 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 
 	intel_runtime_pm_get(dev_priv);
 
-	for_each_engine_id(engine, dev_priv, id) {
+	for_each_engine(engine, dev_priv, id) {
 		acthd[id] = intel_engine_get_active_head(engine);
 		seqno[id] = intel_engine_get_seqno(engine);
 	}
@@ -1351,7 +1356,7 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 	} else
 		seq_printf(m, "Hangcheck inactive\n");
 
-	for_each_engine_id(engine, dev_priv, id) {
+	for_each_engine(engine, dev_priv, id) {
 		struct intel_breadcrumbs *b = &engine->breadcrumbs;
 		struct rb_node *rb;
 
@@ -1950,6 +1955,7 @@ static int i915_context_status(struct seq_file *m, void *unused)
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_engine_cs *engine;
 	struct i915_gem_context *ctx;
+	enum intel_engine_id id;
 	int ret;
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
@@ -1976,7 +1982,7 @@ static int i915_context_status(struct seq_file *m, void *unused)
 		seq_putc(m, ctx->remap_slice ? 'R' : 'r');
 		seq_putc(m, '\n');
 
-		for_each_engine(engine, dev_priv) {
+		for_each_engine(engine, dev_priv, id) {
 			struct intel_context *ce = &ctx->engine[engine->id];
 
 			seq_printf(m, "%s: ", engine->name);
@@ -2043,6 +2049,7 @@ static int i915_dump_lrc(struct seq_file *m, void *unused)
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_engine_cs *engine;
 	struct i915_gem_context *ctx;
+	enum intel_engine_id id;
 	int ret;
 
 	if (!i915.enable_execlists) {
@@ -2055,7 +2062,7 @@ static int i915_dump_lrc(struct seq_file *m, void *unused)
 		return ret;
 
 	list_for_each_entry(ctx, &dev_priv->context_list, link)
-		for_each_engine(engine, dev_priv)
+		for_each_engine(engine, dev_priv, id)
 			i915_dump_lrc_obj(m, ctx, engine);
 
 	mutex_unlock(&dev->struct_mutex);
@@ -2164,14 +2171,15 @@ static int per_file_ctx(int id, void *ptr, void *data)
 static void gen8_ppgtt_info(struct seq_file *m,
 			    struct drm_i915_private *dev_priv)
 {
-	struct intel_engine_cs *engine;
 	struct i915_hw_ppgtt *ppgtt = dev_priv->mm.aliasing_ppgtt;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 	int i;
 
 	if (!ppgtt)
 		return;
 
-	for_each_engine(engine, dev_priv) {
+	for_each_engine(engine, dev_priv, id) {
 		seq_printf(m, "%s\n", engine->name);
 		for (i = 0; i < 4; i++) {
 			u64 pdp = I915_READ(GEN8_RING_PDP_UDW(engine, i));
@@ -2186,11 +2194,12 @@ static void gen6_ppgtt_info(struct seq_file *m,
 			    struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 
 	if (IS_GEN6(dev_priv))
 		seq_printf(m, "GFX_MODE: 0x%08x\n", I915_READ(GFX_MODE));
 
-	for_each_engine(engine, dev_priv) {
+	for_each_engine(engine, dev_priv, id) {
 		seq_printf(m, "%s\n", engine->name);
 		if (IS_GEN7(dev_priv))
 			seq_printf(m, "GFX_MODE: 0x%08x\n",
@@ -2257,9 +2266,10 @@ out_put:
 static int count_irq_waiters(struct drm_i915_private *i915)
 {
 	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 	int count = 0;
 
-	for_each_engine(engine, i915)
+	for_each_engine(engine, i915, id)
 		count += intel_engine_has_waiter(engine);
 
 	return count;
@@ -2423,7 +2433,7 @@ static void i915_guc_client_info(struct seq_file *m,
 	seq_printf(m, "\tFailed doorbell: %u\n", client->b_fail);
 	seq_printf(m, "\tLast submission result: %d\n", client->retcode);
 
-	for_each_engine_id(engine, dev_priv, id) {
+	for_each_engine(engine, dev_priv, id) {
 		u64 submissions = client->submissions[id];
 		tot += submissions;
 		seq_printf(m, "\tSubmissions: %llu %s\n",
@@ -2462,7 +2472,7 @@ static int i915_guc_info(struct seq_file *m, void *data)
 	seq_printf(m, "GuC last action error code: %d\n", guc.action_err);
 
 	seq_printf(m, "\nGuC submissions:\n");
-	for_each_engine_id(engine, dev_priv, id) {
+	for_each_engine(engine, dev_priv, id) {
 		u64 submissions = guc.submissions[id];
 		total += submissions;
 		seq_printf(m, "\t%-24s: %10llu, last seqno 0x%08x\n",
@@ -3083,8 +3093,9 @@ static int i915_engine_info(struct seq_file *m, void *unused)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
 	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 
-	for_each_engine(engine, dev_priv) {
+	for_each_engine(engine, dev_priv, id) {
 		struct intel_breadcrumbs *b = &engine->breadcrumbs;
 		struct drm_i915_gem_request *rq;
 		struct rb_node *rb;
@@ -3232,7 +3243,7 @@ static int i915_semaphore_status(struct seq_file *m, void *unused)
 		page = i915_gem_object_get_page(dev_priv->semaphore->obj, 0);
 
 		seqno = (uint64_t *)kmap_atomic(page);
-		for_each_engine_id(engine, dev_priv, id) {
+		for_each_engine(engine, dev_priv, id) {
 			uint64_t offset;
 
 			seq_printf(m, "%s\n", engine->name);
@@ -3257,7 +3268,7 @@ static int i915_semaphore_status(struct seq_file *m, void *unused)
 		kunmap_atomic(seqno);
 	} else {
 		seq_puts(m, "  Last signal:");
-		for_each_engine(engine, dev_priv)
+		for_each_engine(engine, dev_priv, id)
 			for (j = 0; j < num_rings; j++)
 				seq_printf(m, "0x%08x\n",
 					   I915_READ(engine->semaphore.mbox.signal[j]));
@@ -3265,7 +3276,7 @@ static int i915_semaphore_status(struct seq_file *m, void *unused)
 	}
 
 	seq_puts(m, "\nSync seqno:\n");
-	for_each_engine(engine, dev_priv) {
+	for_each_engine(engine, dev_priv, id) {
 		for (j = 0; j < num_rings; j++)
 			seq_printf(m, "  0x%08x ",
 				   engine->semaphore.sync_seqno[j]);
@@ -3321,7 +3332,7 @@ static int i915_wa_registers(struct seq_file *m, void *unused)
 	intel_runtime_pm_get(dev_priv);
 
 	seq_printf(m, "Workarounds applied: %d\n", workarounds->count);
-	for_each_engine_id(engine, dev_priv, id)
+	for_each_engine(engine, dev_priv, id)
 		seq_printf(m, "HW whitelist count for %s: %d\n",
 			   engine->name, workarounds->hw_whitelist_count[id]);
 	for (i = 0; i < workarounds->count; ++i) {
