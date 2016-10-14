@@ -65,7 +65,7 @@ static void sti_atomic_complete(struct sti_private *private,
 	drm_atomic_helper_wait_for_vblanks(drm, state);
 
 	drm_atomic_helper_cleanup_planes(drm, state);
-	drm_atomic_state_free(state);
+	drm_atomic_state_put(state);
 }
 
 static void sti_atomic_work(struct work_struct *work)

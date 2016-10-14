@@ -62,7 +62,7 @@ static void tegra_atomic_complete(struct tegra_drm *tegra,
 	drm_atomic_helper_wait_for_vblanks(drm, state);
 
 	drm_atomic_helper_cleanup_planes(drm, state);
-	drm_atomic_state_free(state);
+	drm_atomic_state_put(state);
 }
 
 static void tegra_atomic_work(struct work_struct *work)

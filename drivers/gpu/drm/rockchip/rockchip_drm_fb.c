@@ -377,7 +377,7 @@ rockchip_atomic_commit_complete(struct rockchip_atomic_commit *commit)
 	/* If enabling dmc, enable it after mode set changes take effect. */
 	rockchip_drm_check_and_unblock_dmcfreq(commit);
 
-	drm_atomic_state_free(state);
+	drm_atomic_state_put(state);
 }
 
 void rockchip_drm_atomic_work(struct kthread_work *work)
@@ -430,6 +430,7 @@ static int rockchip_drm_atomic_commit(struct drm_device *dev,
 	commit->dev = dev;
 	commit->state = state;
 
+	drm_atomic_state_get(state);
 	if (nonblock)
 		queue_kthread_work(&commit->worker, &commit->work);
 	else

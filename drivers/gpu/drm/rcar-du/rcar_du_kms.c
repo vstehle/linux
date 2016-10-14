@@ -462,7 +462,7 @@ static void rcar_du_atomic_complete(struct rcar_du_commit *commit)
 
 	drm_atomic_helper_cleanup_planes(dev, old_state);
 
-	drm_atomic_state_free(old_state);
+	drm_atomic_state_put(old_state);
 
 	/* Complete the commit, wake up any waiter. */
 	spin_lock(&rcdu->commit.wait.lock);

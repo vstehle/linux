@@ -111,7 +111,7 @@ static void exynos_atomic_commit_complete(struct exynos_atomic_commit *commit)
 
 	drm_atomic_helper_cleanup_planes(dev, state);
 
-	drm_atomic_state_free(state);
+	drm_atomic_state_put(state);
 
 	spin_lock(&priv->lock);
 	priv->pending &= ~commit->crtcs;

@@ -281,6 +281,7 @@ static int mtk_atomic_commit(struct drm_device *drm,
 
 	drm_atomic_helper_swap_state(state, true);
 
+	drm_atomic_state_get(state);
 	if (async)
 		mtk_atomic_schedule(drm, state);
 	else
