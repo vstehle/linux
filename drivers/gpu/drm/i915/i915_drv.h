@@ -2580,9 +2580,9 @@ struct drm_i915_cmd_table {
 		BUILD_BUG(); \
 	__p; \
 })
-#define INTEL_INFO(p) 	(&__I915__(p)->info)
-#define INTEL_GEN(p)	(INTEL_INFO(p)->gen)
+#define INTEL_INFO(p)	(&__I915__(p)->info)
 
+#define INTEL_GEN(dev_priv)	((dev_priv)->info.gen)
 #define INTEL_DEVID(dev_priv)	((dev_priv)->info.device_id)
 
 #define REVID_FOREVER		0xff
