@@ -131,7 +131,7 @@ static int rk_98090_headset_init(struct snd_soc_component *component)
 	return ts3a227e_enable_jack_detect(component, &headset_jack);
 }
 
-static struct snd_soc_ops rk_aif1_ops = {
+static const struct snd_soc_ops rk_aif1_ops = {
 	.hw_params = rk_aif1_hw_params,
 };
 

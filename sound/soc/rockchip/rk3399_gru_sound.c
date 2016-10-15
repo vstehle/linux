@@ -229,7 +229,6 @@ static int rockchip_sound_da7219_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
-
 static int rockchip_sound_cdndp_hw_params(struct snd_pcm_substream *substream,
 					  struct snd_pcm_hw_params *params)
 {
@@ -288,19 +287,19 @@ static int rockchip_sound_cdndp_init(struct snd_soc_pcm_runtime *runtime)
 	return hdmi_codec_set_jack_detect(codec, &cdn_dp_card_jack);
 }
 
-static struct snd_soc_ops rockchip_sound_max98357a_ops = {
+static const struct snd_soc_ops rockchip_sound_max98357a_ops = {
 	.hw_params = rockchip_sound_max98357a_hw_params,
 };
 
-static struct snd_soc_ops rockchip_sound_rt5514_ops = {
+static const struct snd_soc_ops rockchip_sound_rt5514_ops = {
 	.hw_params = rockchip_sound_rt5514_hw_params,
 };
 
-static struct snd_soc_ops rockchip_sound_da7219_ops = {
+static const struct snd_soc_ops rockchip_sound_da7219_ops = {
 	.hw_params = rockchip_sound_da7219_hw_params,
 };
 
-static struct snd_soc_ops rockchip_sound_cdndp_ops = {
+static const struct snd_soc_ops rockchip_sound_cdndp_ops = {
 	.hw_params = rockchip_sound_cdndp_hw_params,
 };
 
