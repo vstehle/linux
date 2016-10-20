@@ -221,7 +221,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 		dev->clk_freq = acpi_speed;
 
 	if (has_acpi_companion(&pdev->dev))
-		dw_i2c_acpi_configure(pdev, &clk_freq);
+		dw_i2c_acpi_configure(pdev, &dev->clk_freq);
 
 	/*
 	 * Only standard mode at 100kHz, fast mode at 400kHz,
