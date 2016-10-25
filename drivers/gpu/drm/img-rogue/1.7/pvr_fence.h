@@ -46,7 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if !defined(__PVR_FENCE_H__)
 #define __PVR_FENCE_H__
 
-#include <linux/fence.h>
+#include <linux/dma-fence.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
@@ -108,16 +108,16 @@ struct pvr_fence_context {
  * @cb: foreign fence callback to set the sync to signalled
  */
 struct pvr_fence {
-	struct fence base;
+	struct dma_fence base;
 	struct pvr_fence_context *fctx;
 	const char *name;
 
-	struct fence *fence;
+	struct dma_fence *fence;
 	struct PVRSRV_CLIENT_SYNC_PRIM *sync;
 
 	struct list_head fence_head;
 	struct list_head signal_head;
-	struct fence_cb cb;
+	struct dma_fence_cb cb;
 };
 
 enum pvr_fence_sync_val {
@@ -126,22 +126,22 @@ enum pvr_fence_sync_val {
 	PVR_FENCE_SYNC_VAL_DONE = 0xDEADDEAD,
 };
 
-extern const struct fence_ops pvr_fence_ops;
-extern const struct fence_ops pvr_fence_foreign_ops;
+extern const struct dma_fence_ops pvr_fence_ops;
+extern const struct dma_fence_ops pvr_fence_foreign_ops;
 
 static inline bool is_our_fence(struct pvr_fence_context *fctx,
-				struct fence *fence)
+				struct dma_fence *fence)
 {
 	return (fence->context == fctx->fence_context);
 }
 
-static inline bool is_pvr_fence(struct fence *fence)
+static inline bool is_pvr_fence(struct dma_fence *fence)
 {
 	return ((fence->ops == &pvr_fence_ops) ||
 		(fence->ops == &pvr_fence_foreign_ops));
 }
 
-static inline struct pvr_fence *to_pvr_fence(struct fence *fence)
+static inline struct pvr_fence *to_pvr_fence(struct dma_fence *fence)
 {
 	if (is_pvr_fence(fence))
 		return container_of(fence, struct pvr_fence, base);
@@ -156,7 +156,7 @@ void pvr_fence_context_destroy(struct pvr_fence_context *fctx);
 struct pvr_fence *pvr_fence_create(struct pvr_fence_context *fctx,
 				   const char *name);
 struct pvr_fence *pvr_fence_create_from_fence(struct pvr_fence_context *fctx,
-					      struct fence *fence,
+					      struct dma_fence *fence,
 					      const char *name);
 void pvr_fence_destroy(struct pvr_fence *pvr_fence);
 int pvr_fence_sync_sw_signal(struct pvr_fence *pvr_fence);
@@ -188,15 +188,15 @@ int pvr_fence_sync_sw_signal(struct pvr_fence *pvr_fence);
 
 #if defined(PVR_FENCE_DEBUG)
 #define PVR_FENCE_TRACE(f, fmt, ...)					\
-	FENCE_ERR(f, "(PVR) " fmt, ## __VA_ARGS__)
+	DMA_FENCE_ERR(f, "(PVR) " fmt, ## __VA_ARGS__)
 #else
 #define PVR_FENCE_TRACE(f, fmt, ...)
 #endif
 
 #define PVR_FENCE_WARN(f, fmt, ...)					\
-	FENCE_WARN(f, "(PVR) " fmt, ## __VA_ARGS__)
+	DMA_FENCE_WARN(f, "(PVR) " fmt, ## __VA_ARGS__)
 
 #define PVR_FENCE_ERR(f, fmt, ...)					\
-	FENCE_ERR(f, "(PVR) " fmt, ## __VA_ARGS__)
+	DMA_FENCE_ERR(f, "(PVR) " fmt, ## __VA_ARGS__)
 
 #endif /* !defined(__PVR_FENCE_H__) */

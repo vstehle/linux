@@ -27,7 +27,7 @@
  */
 
 #include <linux/debugfs.h>
-#include <linux/fence.h>
+#include <linux/dma-fence.h>
 #include <linux/fs.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -536,7 +536,7 @@ int drm_dev_init(struct drm_device *dev,
 		goto err_setunique;
 
 #ifdef CONFIG_DRM_DMA_SYNC
-	dev->atomic_in_fence_context = fence_context_alloc(1);
+	dev->atomic_in_fence_context = dma_fence_context_alloc(1);
 	atomic_set(&dev->atomic_in_fence_seqno, 0);
 #endif
 

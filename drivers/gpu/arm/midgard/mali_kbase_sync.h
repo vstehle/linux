@@ -68,7 +68,7 @@ int kbase_stream_create_fence(int tl_fd, struct sync_file **rsfile);
 int kbase_fence_validate(int fd);
 
 /* Returns true if the specified fence is allocated by Mali */
-int kbase_sync_fence_is_ours(struct fence *fence);
+int kbase_sync_fence_is_ours(struct dma_fence *fence);
 
 /* Allocates a timeline for Mali
  *
@@ -86,7 +86,7 @@ void kbase_sync_timeline_free(struct mali_sync_timeline *mtl);
  *
  * Sync points must be triggered in *exactly* the same order as they are allocated.
  */
-struct fence *kbase_fence_alloc(struct mali_sync_timeline *mtl);
+struct dma_fence *kbase_fence_alloc(struct mali_sync_timeline *mtl);
 
 /* Signals a particular sync point
  *
@@ -97,6 +97,6 @@ struct fence *kbase_fence_alloc(struct mali_sync_timeline *mtl);
  *
  * result can be negative to indicate error, any other value is interpreted as success.
  */
-void kbase_sync_signal_fence(struct fence *fence, int result);
+void kbase_sync_signal_fence(struct dma_fence *fence, int result);
 
 #endif

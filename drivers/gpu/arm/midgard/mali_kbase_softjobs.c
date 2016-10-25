@@ -200,7 +200,7 @@ static void kbase_fence_wait_worker(struct work_struct *data)
 	complete_soft_job(katom);
 }
 
-static void kbase_fence_callback(struct fence *fence, struct fence_cb *cb)
+static void kbase_fence_callback(struct dma_fence *fence, struct dma_fence_cb *cb)
 {
 	struct kbase_jd_atom *katom = container_of(cb, struct kbase_jd_atom, fence_cb);
 	struct kbase_context *kctx;
@@ -230,22 +230,22 @@ static void kbase_fence_callback(struct fence *fence, struct fence_cb *cb)
 }
 
 static int kbase_sync_file_wait_async(struct sync_file *sfile,
-				      struct fence_cb *cb)
+				      struct dma_fence_cb *cb)
 {
-	if (fence_is_signaled(sfile->fence)) {
+	if (dma_fence_is_signaled(sfile->fence)) {
 		if (sfile->fence->status < 0)
 			return sfile->fence->status;
 		return 1;
 	}
 
-	fence_add_callback(sfile->fence, cb, kbase_fence_callback);
+	dma_fence_add_callback(sfile->fence, cb, kbase_fence_callback);
 	return false;
 }
 
 static int kbase_sync_file_cancel_async(struct sync_file *sfile,
-					struct fence_cb *cb)
+					struct dma_fence_cb *cb)
 {
-	if (!fence_remove_callback(sfile->fence, cb))
+	if (!dma_fence_remove_callback(sfile->fence, cb))
 		return -ENOENT;
 	else
 		return 0;

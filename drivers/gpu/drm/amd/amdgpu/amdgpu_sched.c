@@ -28,13 +28,13 @@
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
 
-static struct fence *amdgpu_sched_dependency(struct amd_sched_job *sched_job)
+static struct dma_fence *amdgpu_sched_dependency(struct amd_sched_job *sched_job)
 {
 	struct amdgpu_job *job = to_amdgpu_job(sched_job);
 	return amdgpu_sync_get_fence(&job->ibs->sync);
 }
 
-static struct fence *amdgpu_sched_run_job(struct amd_sched_job *sched_job)
+static struct dma_fence *amdgpu_sched_run_job(struct amd_sched_job *sched_job)
 {
 	struct amdgpu_fence *fence = NULL;
 	struct amdgpu_job *job;
@@ -53,7 +53,7 @@ static struct fence *amdgpu_sched_run_job(struct amd_sched_job *sched_job)
 	}
 
 	fence = job->ibs[job->num_ibs - 1].fence;
-	fence_get(&fence->base);
+	dma_fence_get(&fence->base);
 
 err:
 	if (job->free_job)
@@ -74,7 +74,7 @@ int amdgpu_sched_ib_submit_kernel_helper(struct amdgpu_device *adev,
 					 unsigned num_ibs,
 					 int (*free_job)(struct amdgpu_job *),
 					 void *owner,
-					 struct fence **f)
+					 struct dma_fence **f)
 {
 	int r = 0;
 	if (amdgpu_enable_scheduler) {
@@ -89,7 +89,7 @@ int amdgpu_sched_ib_submit_kernel_helper(struct amdgpu_device *adev,
 			kfree(job);
 			return -ENOMEM;
 		}
-		*f = fence_get(&job->base.s_fence->base);
+		*f = dma_fence_get(&job->base.s_fence->base);
 
 		job->adev = adev;
 		job->ibs = ibs;
@@ -101,7 +101,7 @@ int amdgpu_sched_ib_submit_kernel_helper(struct amdgpu_device *adev,
 		r = amdgpu_ib_schedule(adev, num_ibs, ibs, owner);
 		if (r)
 			return r;
-		*f = fence_get(&ibs[num_ibs - 1].fence->base);
+		*f = dma_fence_get(&ibs[num_ibs - 1].fence->base);
 	}
 
 	return 0;

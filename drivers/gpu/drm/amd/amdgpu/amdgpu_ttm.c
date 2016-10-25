@@ -228,7 +228,7 @@ static int amdgpu_move_blit(struct ttm_buffer_object *bo,
 	struct amdgpu_device *adev;
 	struct amdgpu_ring *ring;
 	uint64_t old_start, new_start;
-	struct fence *fence;
+	struct dma_fence *fence;
 	int r;
 
 	adev = amdgpu_get_adev(bo->bdev);
@@ -271,7 +271,7 @@ static int amdgpu_move_blit(struct ttm_buffer_object *bo,
 	/* FIXME: handle copy error */
 	r = ttm_bo_move_accel_cleanup(bo, fence,
 				      evict, no_wait_gpu, new_mem);
-	fence_put(fence);
+	dma_fence_put(fence);
 	return r;
 }
 
@@ -1012,7 +1012,7 @@ int amdgpu_copy_buffer(struct amdgpu_ring *ring,
 		       uint64_t dst_offset,
 		       uint32_t byte_count,
 		       struct reservation_object *resv,
-		       struct fence **fence)
+		       struct dma_fence **fence)
 {
 	struct amdgpu_device *adev = ring->adev;
 	uint32_t max_bytes;

@@ -240,7 +240,7 @@ int amdgpu_uvd_suspend(struct amdgpu_device *adev)
 	for (i = 0; i < AMDGPU_MAX_UVD_HANDLES; ++i) {
 		uint32_t handle = atomic_read(&adev->uvd.handles[i]);
 		if (handle != 0) {
-			struct fence *fence;
+			struct dma_fence *fence;
 
 			amdgpu_uvd_note_usage(adev);
 
@@ -250,8 +250,8 @@ int amdgpu_uvd_suspend(struct amdgpu_device *adev)
 				continue;
 			}
 
-			fence_wait(fence, false);
-			fence_put(fence);
+			dma_fence_wait(fence, false);
+			dma_fence_put(fence);
 
 			adev->uvd.filp[i] = NULL;
 			atomic_set(&adev->uvd.handles[i], 0);
@@ -296,7 +296,7 @@ void amdgpu_uvd_free_handles(struct amdgpu_device *adev, struct drm_file *filp)
 	for (i = 0; i < AMDGPU_MAX_UVD_HANDLES; ++i) {
 		uint32_t handle = atomic_read(&adev->uvd.handles[i]);
 		if (handle != 0 && adev->uvd.filp[i] == filp) {
-			struct fence *fence;
+			struct dma_fence *fence;
 
 			amdgpu_uvd_note_usage(adev);
 
@@ -306,8 +306,8 @@ void amdgpu_uvd_free_handles(struct amdgpu_device *adev, struct drm_file *filp)
 				continue;
 			}
 
-			fence_wait(fence, false);
-			fence_put(fence);
+			dma_fence_wait(fence, false);
+			dma_fence_put(fence);
 
 			adev->uvd.filp[i] = NULL;
 			atomic_set(&adev->uvd.handles[i], 0);
@@ -838,13 +838,13 @@ static int amdgpu_uvd_free_job(
 
 static int amdgpu_uvd_send_msg(struct amdgpu_ring *ring,
 			       struct amdgpu_bo *bo,
-			       struct fence **fence)
+			       struct dma_fence **fence)
 {
 	struct ttm_validate_buffer tv;
 	struct ww_acquire_ctx ticket;
 	struct list_head head;
 	struct amdgpu_ib *ib = NULL;
-	struct fence *f = NULL;
+	struct dma_fence *f = NULL;
 	struct amdgpu_device *adev = ring->adev;
 	uint64_t addr;
 	int i, r;
@@ -897,9 +897,9 @@ static int amdgpu_uvd_send_msg(struct amdgpu_ring *ring,
 	ttm_eu_fence_buffer_objects(&ticket, &head, f);
 
 	if (fence)
-		*fence = fence_get(f);
+		*fence = dma_fence_get(f);
 	amdgpu_bo_unref(&bo);
-	fence_put(f);
+	dma_fence_put(f);
 	if (amdgpu_enable_scheduler)
 		return 0;
 
@@ -919,7 +919,7 @@ err:
    crash the vcpu so just try to emmit a dummy create/destroy msg to
    avoid this */
 int amdgpu_uvd_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
-			      struct fence **fence)
+			      struct dma_fence **fence)
 {
 	struct amdgpu_device *adev = ring->adev;
 	struct amdgpu_bo *bo;
@@ -968,7 +968,7 @@ int amdgpu_uvd_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
 }
 
 int amdgpu_uvd_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
-			       struct fence **fence)
+			       struct dma_fence **fence)
 {
 	struct amdgpu_device *adev = ring->adev;
 	struct amdgpu_bo *bo;

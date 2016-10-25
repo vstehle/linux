@@ -57,7 +57,8 @@ struct pvr_buffer_sync_context {
 };
 
 struct pvr_buffer_sync_check_data {
-	struct fence_cb base;
+	struct dma_fence_cb base;
+
 
 	u32 nr_fences;
 	struct pvr_fence **fences;
@@ -179,7 +180,7 @@ pvr_buffer_sync_pmrs_fence_count(u32 nr_pmrs, struct _PMR_ **pmrs,
 {
 	struct reservation_object *resv;
 	struct reservation_object_list *resv_list;
-	struct fence *fence;
+	struct dma_fence *fence;
 	u32 fence_count = 0;
 	bool exclusive;
 	int i;
@@ -214,7 +215,7 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 	struct pvr_buffer_sync_check_data *data;
 	struct reservation_object *resv;
 	struct reservation_object_list *resv_list;
-	struct fence *fence;
+	struct dma_fence *fence;
 	u32 fence_count;
 	bool exclusive;
 	int i, j;
@@ -257,7 +258,7 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 			if (!data->fences[data->nr_fences - 1]) {
 				data->nr_fences--;
 				PVR_FENCE_TRACE(fence, "waiting on exclusive fence\n");
-				WARN_ON(fence_wait(fence, true) <= 0);
+				WARN_ON(dma_fence_wait(fence, true) <= 0);
 			}
 		}
 
@@ -272,7 +273,7 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 				if (!data->fences[data->nr_fences - 1]) {
 					data->nr_fences--;
 					PVR_FENCE_TRACE(fence, "waiting on non-exclusive fence\n");
-					WARN_ON(fence_wait(fence, true) <= 0);
+					WARN_ON(dma_fence_wait(fence, true) <= 0);
 				}
 			}
 		}
@@ -304,7 +305,7 @@ pvr_buffer_sync_check_fences_destroy(struct pvr_buffer_sync_check_data *data)
 }
 
 static void
-pvr_buffer_sync_check_data_cleanup(struct fence *fence, struct fence_cb *cb)
+pvr_buffer_sync_check_data_cleanup(struct dma_fence *fence, struct dma_fence_cb *cb)
 {
 	struct pvr_buffer_sync_check_data *data =
 		container_of(cb, struct pvr_buffer_sync_check_data, base);
@@ -551,9 +552,9 @@ pvr_buffer_sync_append_start(struct pvr_buffer_sync_context *ctx,
 	 * Note: we take an additional reference on the update fence in case
 	 * it signals before we can add it to a reservation object.
 	 */
-	fence_get(&data->update_fence->base);
+	dma_fence_get(&data->update_fence->base);
 
-	err = fence_add_callback(&data->update_fence->base, &check_data->base,
+	err = dma_fence_add_callback(&data->update_fence->base, &check_data->base,
 				 pvr_buffer_sync_check_data_cleanup);
 	if (err) {
 		/*
@@ -622,7 +623,7 @@ pvr_buffer_sync_append_finish(struct pvr_buffer_sync_append_data *data)
 	 * objects we can safely drop the extra reference we took in
 	 * pvr_buffer_sync_append_start.
 	 */
-	fence_put(&data->update_fence->base);
+	dma_fence_put(&data->update_fence->base);
 
 	pvr_buffer_sync_pmrs_unlock(&data->ctx->acquire_ctx,
 				    data->nr_pmrs,
@@ -651,7 +652,7 @@ pvr_buffer_sync_append_abort(struct pvr_buffer_sync_append_data *data)
 	 * reference taken in pvr_buffer_sync_append_start.
 	 */
 	pvr_fence_sync_sw_signal(data->update_fence);
-	fence_put(&data->update_fence->base);
+	dma_fence_put(&data->update_fence->base);
 	pvr_buffer_sync_pmrs_unlock(&data->ctx->acquire_ctx,
 				    data->nr_pmrs,
 				    data->pmrs);
@@ -695,7 +696,7 @@ pvr_buffer_sync_wait(struct pvr_buffer_sync_context *ctx,
 {
 	struct reservation_object *resv;
 	struct reservation_object_list *resv_list = NULL;
-	struct fence *fence, *wait_fence = NULL;
+	struct dma_fence *fence, *wait_fence = NULL;
 	unsigned seq;
 	int i;
 	long lerr;
@@ -719,8 +720,8 @@ retry:
 		for (i = 0; i < resv_list->shared_count; i++) {
 			fence = rcu_dereference(resv_list->shared[i]);
 			if (is_our_fence(ctx->fence_ctx, fence) &&
-			    !test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-				wait_fence = fence_get_rcu(fence);
+			    !test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+				wait_fence = dma_fence_get_rcu(fence);
 				if (!wait_fence)
 					goto unlock_retry;
 				break;
@@ -735,8 +736,8 @@ retry:
 			goto unlock_retry;
 
 		if (fence &&
-		    !test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-			wait_fence = fence_get_rcu(fence);
+		    !test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+			wait_fence = dma_fence_get_rcu(fence);
 			if (!wait_fence)
 				goto unlock_retry;
 		}
@@ -744,12 +745,12 @@ retry:
 	rcu_read_unlock();
 
 	if (wait_fence) {
-		if (fence_is_signaled(wait_fence))
+		if (dma_fence_is_signaled(wait_fence))
 			lerr = timeout;
 		else
-			lerr = fence_wait_timeout(wait_fence, intr, timeout);
+			lerr = dma_fence_wait_timeout(wait_fence, intr, timeout);
 
-		fence_put(wait_fence);
+		dma_fence_put(wait_fence);
 		if (!lerr)
 			return -EBUSY;
 		else if (lerr < 0)

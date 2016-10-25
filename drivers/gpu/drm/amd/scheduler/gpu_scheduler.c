@@ -136,7 +136,7 @@ int amd_sched_entity_init(struct amd_gpu_scheduler *sched,
 		return r;
 
 	atomic_set(&entity->fence_seq, 0);
-	entity->fence_context = fence_context_alloc(1);
+	entity->fence_context = dma_fence_context_alloc(1);
 
 	/* Add the entity to the run queue */
 	amd_sched_rq_add_entity(rq, entity);
@@ -219,24 +219,24 @@ void amd_sched_entity_fini(struct amd_gpu_scheduler *sched,
 	kfifo_free(&entity->job_queue);
 }
 
-static void amd_sched_entity_wakeup(struct fence *f, struct fence_cb *cb)
+static void amd_sched_entity_wakeup(struct dma_fence *f, struct dma_fence_cb *cb)
 {
 	struct amd_sched_entity *entity =
 		container_of(cb, struct amd_sched_entity, cb);
 	entity->dependency = NULL;
-	fence_put(f);
+	dma_fence_put(f);
 	amd_sched_wakeup(entity->sched);
 }
 
 static bool amd_sched_entity_add_dependency_cb(struct amd_sched_entity *entity)
 {
 	struct amd_gpu_scheduler *sched = entity->sched;
-	struct fence * fence = entity->dependency;
+	struct dma_fence * fence = entity->dependency;
 	struct amd_sched_fence *s_fence;
 
 	if (fence->context == entity->fence_context) {
 		/* We can ignore fences from ourself */
-		fence_put(entity->dependency);
+		dma_fence_put(entity->dependency);
 		return false;
 	}
 
@@ -245,7 +245,7 @@ static bool amd_sched_entity_add_dependency_cb(struct amd_sched_entity *entity)
 		/* Fence is from the same scheduler */
 		if (test_bit(AMD_SCHED_FENCE_SCHEDULED_BIT, &fence->flags)) {
 			/* Ignore it when it is already scheduled */
-			fence_put(entity->dependency);
+			dma_fence_put(entity->dependency);
 			return false;
 		}
 
@@ -255,11 +255,11 @@ static bool amd_sched_entity_add_dependency_cb(struct amd_sched_entity *entity)
 		return true;
 	}
 
-	if (!fence_add_callback(entity->dependency, &entity->cb,
+	if (!dma_fence_add_callback(entity->dependency, &entity->cb,
 				amd_sched_entity_wakeup))
 		return true;
 
-	fence_put(entity->dependency);
+	dma_fence_put(entity->dependency);
 	return false;
 }
 
@@ -361,7 +361,7 @@ amd_sched_select_entity(struct amd_gpu_scheduler *sched)
 	return entity;
 }
 
-static void amd_sched_process_job(struct fence *f, struct fence_cb *cb)
+static void amd_sched_process_job(struct dma_fence *f, struct dma_fence_cb *cb)
 {
 	struct amd_sched_fence *s_fence =
 		container_of(cb, struct amd_sched_fence, cb);
@@ -377,7 +377,7 @@ static void amd_sched_process_job(struct fence *f, struct fence_cb *cb)
 		spin_unlock_irqrestore(&sched->fence_list_lock, flags);
 	}
 	trace_amd_sched_process_job(s_fence);
-	fence_put(&s_fence->base);
+	dma_fence_put(&s_fence->base);
 	wake_up_interruptible(&sched->wake_up_worker);
 }
 
@@ -397,7 +397,7 @@ static void amd_sched_fence_work_func(struct work_struct *work)
 		DRM_ERROR("  fence no %d\n", entity->base.seqno);
 		cancel_delayed_work(&entity->dwork);
 		list_del_init(&entity->list);
-		fence_put(&entity->base);
+		dma_fence_put(&entity->base);
 	}
 	spin_unlock_irqrestore(&sched->fence_list_lock, flags);
 }
@@ -416,7 +416,7 @@ static int amd_sched_main(void *param)
 		struct amd_sched_entity *entity;
 		struct amd_sched_fence *s_fence;
 		struct amd_sched_job *sched_job;
-		struct fence *fence;
+		struct dma_fence *fence;
 		unsigned long flags;
 
 		wait_event_interruptible(sched->wake_up_worker,
@@ -444,13 +444,13 @@ static int amd_sched_main(void *param)
 		fence = sched->ops->run_job(sched_job);
 		amd_sched_fence_scheduled(s_fence);
 		if (fence) {
-			r = fence_add_callback(fence, &s_fence->cb,
+			r = dma_fence_add_callback(fence, &s_fence->cb,
 					       amd_sched_process_job);
 			if (r == -ENOENT)
 				amd_sched_process_job(fence, &s_fence->cb);
 			else if (r)
 				DRM_ERROR("fence add callback failed (%d)\n", r);
-			fence_put(fence);
+			dma_fence_put(fence);
 		} else {
 			DRM_ERROR("Failed to run job!\n");
 			amd_sched_process_job(NULL, &s_fence->cb);

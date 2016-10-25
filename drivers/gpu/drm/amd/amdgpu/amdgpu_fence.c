@@ -110,7 +110,7 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, void *owner,
 	(*fence)->seq = ++ring->fence_drv.sync_seq[ring->idx];
 	(*fence)->ring = ring;
 	(*fence)->owner = owner;
-	fence_init(&(*fence)->base, &amdgpu_fence_ops,
+	dma_fence_init(&(*fence)->base, &amdgpu_fence_ops,
 		&ring->fence_drv.fence_queue.lock,
 		adev->fence_context + ring->idx,
 		(*fence)->seq);
@@ -659,12 +659,12 @@ void amdgpu_fence_driver_force_completion(struct amdgpu_device *adev)
  * Common fence implementation
  */
 
-static const char *amdgpu_fence_get_driver_name(struct fence *fence)
+static const char *amdgpu_fence_get_driver_name(struct dma_fence *fence)
 {
 	return "amdgpu";
 }
 
-static const char *amdgpu_fence_get_timeline_name(struct fence *f)
+static const char *amdgpu_fence_get_timeline_name(struct dma_fence *f)
 {
 	struct amdgpu_fence *fence = to_amdgpu_fence(f);
 	return (const char *)fence->ring->name;
@@ -678,7 +678,7 @@ static const char *amdgpu_fence_get_timeline_name(struct fence *f)
  * Test the fence sequence number if it is already signaled. If it isn't
  * signaled start fence processing. Returns True if the fence is signaled.
  */
-static bool amdgpu_fence_is_signaled(struct fence *f)
+static bool amdgpu_fence_is_signaled(struct dma_fence *f)
 {
 	struct amdgpu_fence *fence = to_amdgpu_fence(f);
 	struct amdgpu_ring *ring = fence->ring;
@@ -717,16 +717,16 @@ static int amdgpu_fence_check_signaled(wait_queue_t *wait, unsigned mode, int fl
 	 */
 	seq = atomic64_read(&fence->ring->fence_drv.last_seq);
 	if (seq >= fence->seq) {
-		ret = fence_signal_locked(&fence->base);
+		ret = dma_fence_signal_locked(&fence->base);
 		if (!ret)
-			FENCE_TRACE(&fence->base, "signaled from irq context\n");
+			DMA_FENCE_TRACE(&fence->base, "signaled from irq context\n");
 		else
-			FENCE_TRACE(&fence->base, "was already signaled\n");
+			DMA_FENCE_TRACE(&fence->base, "was already signaled\n");
 
 		__remove_wait_queue(&fence->ring->fence_drv.fence_queue, &fence->fence_wake);
-		fence_put(&fence->base);
+		dma_fence_put(&fence->base);
 	} else
-		FENCE_TRACE(&fence->base, "pending\n");
+		DMA_FENCE_TRACE(&fence->base, "pending\n");
 	return 0;
 }
 
@@ -738,7 +738,7 @@ static int amdgpu_fence_check_signaled(wait_queue_t *wait, unsigned mode, int fl
  * to fence_queue that checks if this fence is signaled, and if so it
  * signals the fence and removes itself.
  */
-static bool amdgpu_fence_enable_signaling(struct fence *f)
+static bool amdgpu_fence_enable_signaling(struct dma_fence *f)
 {
 	struct amdgpu_fence *fence = to_amdgpu_fence(f);
 	struct amdgpu_ring *ring = fence->ring;
@@ -750,25 +750,25 @@ static bool amdgpu_fence_enable_signaling(struct fence *f)
 	fence->fence_wake.private = NULL;
 	fence->fence_wake.func = amdgpu_fence_check_signaled;
 	__add_wait_queue(&ring->fence_drv.fence_queue, &fence->fence_wake);
-	fence_get(f);
+	dma_fence_get(f);
 	if (!timer_pending(&ring->fence_drv.fallback_timer))
 		amdgpu_fence_schedule_fallback(ring);
-	FENCE_TRACE(&fence->base, "armed on ring %i!\n", ring->idx);
+	DMA_FENCE_TRACE(&fence->base, "armed on ring %i!\n", ring->idx);
 	return true;
 }
 
-static void amdgpu_fence_release(struct fence *f)
+static void amdgpu_fence_release(struct dma_fence *f)
 {
 	struct amdgpu_fence *fence = to_amdgpu_fence(f);
 	kmem_cache_free(amdgpu_fence_slab, fence);
 }
 
-const struct fence_ops amdgpu_fence_ops = {
+const struct dma_fence_ops amdgpu_fence_ops = {
 	.get_driver_name = amdgpu_fence_get_driver_name,
 	.get_timeline_name = amdgpu_fence_get_timeline_name,
 	.enable_signaling = amdgpu_fence_enable_signaling,
 	.signaled = amdgpu_fence_is_signaled,
-	.wait = fence_default_wait,
+	.wait = dma_fence_default_wait,
 	.release = amdgpu_fence_release,
 };
 

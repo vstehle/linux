@@ -42,7 +42,7 @@ struct amd_sched_fence *amd_sched_fence_create(struct amd_sched_entity *s_entity
 	spin_lock_init(&fence->lock);
 
 	seq = atomic_inc_return(&s_entity->fence_seq);
-	fence_init(&fence->base, &amd_sched_fence_ops, &fence->lock,
+	dma_fence_init(&fence->base, &amd_sched_fence_ops, &fence->lock,
 		   s_entity->fence_context, seq);
 
 	return fence;
@@ -50,16 +50,16 @@ struct amd_sched_fence *amd_sched_fence_create(struct amd_sched_entity *s_entity
 
 void amd_sched_fence_signal(struct amd_sched_fence *fence)
 {
-	int ret = fence_signal(&fence->base);
+	int ret = dma_fence_signal(&fence->base);
 	if (!ret)
-		FENCE_TRACE(&fence->base, "signaled from irq context\n");
+		DMA_FENCE_TRACE(&fence->base, "signaled from irq context\n");
 	else
-		FENCE_TRACE(&fence->base, "was already signaled\n");
+		DMA_FENCE_TRACE(&fence->base, "was already signaled\n");
 }
 
 void amd_sched_fence_scheduled(struct amd_sched_fence *s_fence)
 {
-	struct fence_cb *cur, *tmp;
+	struct dma_fence_cb *cur, *tmp;
 
 	set_bit(AMD_SCHED_FENCE_SCHEDULED_BIT, &s_fence->base.flags);
 	list_for_each_entry_safe(cur, tmp, &s_fence->scheduled_cb, node) {
@@ -68,33 +68,33 @@ void amd_sched_fence_scheduled(struct amd_sched_fence *s_fence)
 	}
 }
 
-static const char *amd_sched_fence_get_driver_name(struct fence *fence)
+static const char *amd_sched_fence_get_driver_name(struct dma_fence *fence)
 {
 	return "amd_sched";
 }
 
-static const char *amd_sched_fence_get_timeline_name(struct fence *f)
+static const char *amd_sched_fence_get_timeline_name(struct dma_fence *f)
 {
 	struct amd_sched_fence *fence = to_amd_sched_fence(f);
 	return (const char *)fence->sched->name;
 }
 
-static bool amd_sched_fence_enable_signaling(struct fence *f)
+static bool amd_sched_fence_enable_signaling(struct dma_fence *f)
 {
 	return true;
 }
 
-static void amd_sched_fence_release(struct fence *f)
+static void amd_sched_fence_release(struct dma_fence *f)
 {
 	struct amd_sched_fence *fence = to_amd_sched_fence(f);
 	kmem_cache_free(sched_fence_slab, fence);
 }
 
-const struct fence_ops amd_sched_fence_ops = {
+const struct dma_fence_ops amd_sched_fence_ops = {
 	.get_driver_name = amd_sched_fence_get_driver_name,
 	.get_timeline_name = amd_sched_fence_get_timeline_name,
 	.enable_signaling = amd_sched_fence_enable_signaling,
 	.signaled = NULL,
-	.wait = fence_default_wait,
+	.wait = dma_fence_default_wait,
 	.release = amd_sched_fence_release,
 };

@@ -74,7 +74,7 @@ int kbase_stream_create(const char *name, int *const out_fd)
 int kbase_stream_create_fence(int tl_fd, struct sync_file **rsfile)
 {
 	struct mali_sync_timeline *mtl;
-	struct fence *fence;
+	struct dma_fence *fence;
 	struct sync_file *sfile;
 
 	int fd;
@@ -99,7 +99,7 @@ int kbase_stream_create_fence(int tl_fd, struct sync_file **rsfile)
 
 	sfile = sync_file_create(fence);
 	if (!sfile) {
-		fence_put(fence);
+		dma_fence_put(fence);
 		fd = -EFAULT;
 		goto out;
 	}
@@ -128,11 +128,11 @@ int kbase_stream_create_fence(int tl_fd, struct sync_file **rsfile)
 
 int kbase_fence_validate(int fd)
 {
-	struct fence *fence = sync_file_get_fence(fd);
+	struct dma_fence *fence = sync_file_get_fence(fd);
 	if (!fence)
 		return -EINVAL;
 
-	fence_put(fence);
+	dma_fence_put(fence);
 	return 0;
 }
 

@@ -366,11 +366,11 @@ static int amdgpu_vce_free_job(
  * Open up a stream for HW test
  */
 int amdgpu_vce_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
-			      struct fence **fence)
+			      struct dma_fence **fence)
 {
 	const unsigned ib_size_dw = 1024;
 	struct amdgpu_ib *ib = NULL;
-	struct fence *f = NULL;
+	struct dma_fence *f = NULL;
 	struct amdgpu_device *adev = ring->adev;
 	uint64_t dummy;
 	int i, r;
@@ -431,8 +431,8 @@ int amdgpu_vce_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
 	if (r)
 		goto err;
 	if (fence)
-		*fence = fence_get(f);
-	fence_put(f);
+		*fence = dma_fence_get(f);
+	dma_fence_put(f);
 	if (amdgpu_enable_scheduler)
 		return 0;
 err:
@@ -452,11 +452,11 @@ err:
  * Close up a stream for HW test or if userspace failed to do so
  */
 int amdgpu_vce_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
-			       struct fence **fence)
+			       struct dma_fence **fence)
 {
 	const unsigned ib_size_dw = 1024;
 	struct amdgpu_ib *ib = NULL;
-	struct fence *f = NULL;
+	struct dma_fence *f = NULL;
 	struct amdgpu_device *adev = ring->adev;
 	uint64_t dummy;
 	int i, r;
@@ -498,8 +498,8 @@ int amdgpu_vce_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
 	if (r)
 		goto err;
 	if (fence)
-		*fence = fence_get(f);
-	fence_put(f);
+		*fence = dma_fence_get(f);
+	dma_fence_put(f);
 	if (amdgpu_enable_scheduler)
 		return 0;
 err:
@@ -850,7 +850,7 @@ int amdgpu_vce_ring_test_ring(struct amdgpu_ring *ring)
  */
 int amdgpu_vce_ring_test_ib(struct amdgpu_ring *ring)
 {
-	struct fence *fence = NULL;
+	struct dma_fence *fence = NULL;
 	int r;
 
 	/* skip vce ring1 ib test for now, since it's not reliable */
@@ -869,13 +869,13 @@ int amdgpu_vce_ring_test_ib(struct amdgpu_ring *ring)
 		goto error;
 	}
 
-	r = fence_wait(fence, false);
+	r = dma_fence_wait(fence, false);
 	if (r) {
 		DRM_ERROR("amdgpu: fence wait failed (%d).\n", r);
 	} else {
 		DRM_INFO("ib test on ring %d succeeded\n", ring->idx);
 	}
 error:
-	fence_put(fence);
+	dma_fence_put(fence);
 	return r;
 }

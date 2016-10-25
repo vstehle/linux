@@ -46,7 +46,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if !defined(__PVR_FENCE_H__)
 #define __PVR_FENCE_H__
 
-#include "pvr_linux_fence.h"
+//#include "pvr_linux_fence.h"
+#include <linux/dma-fence.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>

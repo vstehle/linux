@@ -276,7 +276,7 @@ static int reservation_sync(struct kbase_jd_atom *katom,
 	struct ww_acquire_ctx ww_ctx;
 	int ret = 0;
 	unsigned int r;
-	struct fence *fence;
+	struct dma_fence *fence;
 
 	katom->dep_satisfied = false;
 	fence = drm_sw_fence_new(katom->kctx->jctx.fence_context,
@@ -1730,7 +1730,7 @@ int kbase_jd_init(struct kbase_context *kctx)
 	}
 #endif				/* CONFIG_KDS */
 #ifdef CONFIG_DRM_DMA_SYNC
-	kctx->jctx.fence_context = fence_context_alloc(1);
+	kctx->jctx.fence_context = dma_fence_context_alloc(1);
 	atomic_set(&kctx->jctx.fence_seqno, 0);
 #endif
 #if (defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)) && defined(CONFIG_SW_SYNC)

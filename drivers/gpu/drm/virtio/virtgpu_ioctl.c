@@ -171,7 +171,7 @@ static int virtio_gpu_execbuffer(struct drm_device *dev,
 	/* fence the command bo */
 	virtio_gpu_unref_list(&validate_list);
 	drm_free_large(buflist);
-	fence_put(&fence->f);
+	dma_fence_put(&fence->f);
 	return 0;
 
 out_unresv:
@@ -311,7 +311,7 @@ static int virtio_gpu_resource_create_ioctl(struct drm_device *dev, void *data,
 		drm_gem_object_release(obj);
 		if (vgdev->has_virgl_3d) {
 			virtio_gpu_unref_list(&validate_list);
-			fence_put(&fence->f);
+			dma_fence_put(&fence->f);
 		}
 		return ret;
 	}
@@ -322,13 +322,13 @@ static int virtio_gpu_resource_create_ioctl(struct drm_device *dev, void *data,
 
 	if (vgdev->has_virgl_3d) {
 		virtio_gpu_unref_list(&validate_list);
-		fence_put(&fence->f);
+		dma_fence_put(&fence->f);
 	}
 	return 0;
 fail_unref:
 	if (vgdev->has_virgl_3d) {
 		virtio_gpu_unref_list(&validate_list);
-		fence_put(&fence->f);
+		dma_fence_put(&fence->f);
 	}
 //fail_obj:
 //	drm_gem_object_handle_unreference_unlocked(obj);
@@ -396,7 +396,7 @@ static int virtio_gpu_transfer_from_host_ioctl(struct drm_device *dev,
 	reservation_object_add_excl_fence(qobj->tbo.resv,
 					  &fence->f);
 
-	fence_put(&fence->f);
+	dma_fence_put(&fence->f);
 out_unres:
 	virtio_gpu_object_unreserve(qobj);
 out:
@@ -444,7 +444,7 @@ static int virtio_gpu_transfer_to_host_ioctl(struct drm_device *dev, void *data,
 			 args->level, &box, &fence);
 		reservation_object_add_excl_fence(qobj->tbo.resv,
 						  &fence->f);
-		fence_put(&fence->f);
+		dma_fence_put(&fence->f);
 	}
 
 out_unres:

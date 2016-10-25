@@ -34,7 +34,7 @@
 
 struct amdgpu_sync_entry {
 	struct hlist_node	node;
-	struct fence		*fence;
+	struct dma_fence		*fence;
 };
 
 /**
@@ -58,7 +58,7 @@ void amdgpu_sync_create(struct amdgpu_sync *sync)
 	sync->last_vm_update = NULL;
 }
 
-static bool amdgpu_sync_same_dev(struct amdgpu_device *adev, struct fence *f)
+static bool amdgpu_sync_same_dev(struct amdgpu_device *adev, struct dma_fence *f)
 {
 	struct amdgpu_fence *a_fence = to_amdgpu_fence(f);
 	struct amd_sched_fence *s_fence = to_amd_sched_fence(f);
@@ -76,7 +76,7 @@ static bool amdgpu_sync_same_dev(struct amdgpu_device *adev, struct fence *f)
 	return false;
 }
 
-static bool amdgpu_sync_test_owner(struct fence *f, void *owner)
+static bool amdgpu_sync_test_owner(struct dma_fence *f, void *owner)
 {
 	struct amdgpu_fence *a_fence = to_amdgpu_fence(f);
 	struct amd_sched_fence *s_fence = to_amd_sched_fence(f);
@@ -87,13 +87,13 @@ static bool amdgpu_sync_test_owner(struct fence *f, void *owner)
 	return false;
 }
 
-static void amdgpu_sync_keep_later(struct fence **keep, struct fence *fence)
+static void amdgpu_sync_keep_later(struct dma_fence **keep, struct dma_fence *fence)
 {
-	if (*keep && fence_is_later(*keep, fence))
+	if (*keep && dma_fence_is_later(*keep, fence))
 		return;
 
-	fence_put(*keep);
-	*keep = fence_get(fence);
+	dma_fence_put(*keep);
+	*keep = dma_fence_get(fence);
 }
 
 /**
@@ -104,7 +104,7 @@ static void amdgpu_sync_keep_later(struct fence **keep, struct fence *fence)
  *
  */
 int amdgpu_sync_fence(struct amdgpu_device *adev, struct amdgpu_sync *sync,
-		      struct fence *f)
+		      struct dma_fence *f)
 {
 	struct amdgpu_sync_entry *e;
 	struct amdgpu_fence *fence;
@@ -131,7 +131,7 @@ int amdgpu_sync_fence(struct amdgpu_device *adev, struct amdgpu_sync *sync,
 			return -ENOMEM;
 
 		hash_add(sync->fences, &e->node, f->context);
-		e->fence = fence_get(f);
+		e->fence = dma_fence_get(f);
 		return 0;
 	}
 
@@ -140,7 +140,7 @@ int amdgpu_sync_fence(struct amdgpu_device *adev, struct amdgpu_sync *sync,
 	return 0;
 }
 
-static void *amdgpu_sync_get_owner(struct fence *f)
+static void *amdgpu_sync_get_owner(struct dma_fence *f)
 {
 	struct amdgpu_fence *a_fence = to_amdgpu_fence(f);
 	struct amd_sched_fence *s_fence = to_amd_sched_fence(f);
@@ -167,7 +167,7 @@ int amdgpu_sync_resv(struct amdgpu_device *adev,
 		     void *owner)
 {
 	struct reservation_object_list *flist;
-	struct fence *f;
+	struct dma_fence *f;
 	void *fence_owner;
 	unsigned i;
 	int r = 0;
@@ -212,11 +212,11 @@ int amdgpu_sync_resv(struct amdgpu_device *adev,
 	return r;
 }
 
-struct fence *amdgpu_sync_get_fence(struct amdgpu_sync *sync)
+struct dma_fence *amdgpu_sync_get_fence(struct amdgpu_sync *sync)
 {
 	struct amdgpu_sync_entry *e;
 	struct hlist_node *tmp;
-	struct fence *f;
+	struct dma_fence *f;
 	int i;
 
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
@@ -226,10 +226,10 @@ struct fence *amdgpu_sync_get_fence(struct amdgpu_sync *sync)
 		hash_del(&e->node);
 		kfree(e);
 
-		if (!fence_is_signaled(f))
+		if (!dma_fence_is_signaled(f))
 			return f;
 
-		fence_put(f);
+		dma_fence_put(f);
 	}
 	return NULL;
 }
@@ -241,12 +241,12 @@ int amdgpu_sync_wait(struct amdgpu_sync *sync)
 	int i, r;
 
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
-		r = fence_wait(e->fence, false);
+		r = dma_fence_wait(e->fence, false);
 		if (r)
 			return r;
 
 		hash_del(&e->node);
-		fence_put(e->fence);
+		dma_fence_put(e->fence);
 		kfree(e);
 	}
 
@@ -254,11 +254,11 @@ int amdgpu_sync_wait(struct amdgpu_sync *sync)
 		return 0;
 
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
-		struct fence *fence = sync->sync_to[i];
+		struct dma_fence *fence = sync->sync_to[i];
 		if (!fence)
 			continue;
 
-		r = fence_wait(fence, false);
+		r = dma_fence_wait(fence, false);
 		if (r)
 			return r;
 	}
@@ -304,7 +304,7 @@ int amdgpu_sync_rings(struct amdgpu_sync *sync,
 		}
 
 		if (amdgpu_enable_scheduler || !amdgpu_enable_semaphores) {
-			r = fence_wait(sync->sync_to[i], true);
+			r = dma_fence_wait(sync->sync_to[i], true);
 			if (r)
 				return r;
 			continue;
@@ -312,7 +312,7 @@ int amdgpu_sync_rings(struct amdgpu_sync *sync,
 
 		if (count >= AMDGPU_NUM_SYNCS) {
 			/* not enough room, wait manually */
-			r = fence_wait(&fence->base, false);
+			r = dma_fence_wait(&fence->base, false);
 			if (r)
 				return r;
 			continue;
@@ -332,7 +332,7 @@ int amdgpu_sync_rings(struct amdgpu_sync *sync,
 		if (!amdgpu_semaphore_emit_signal(other, semaphore)) {
 			/* signaling wasn't successful wait manually */
 			amdgpu_ring_undo(other);
-			r = fence_wait(&fence->base, false);
+			r = dma_fence_wait(&fence->base, false);
 			if (r)
 				return r;
 			continue;
@@ -342,7 +342,7 @@ int amdgpu_sync_rings(struct amdgpu_sync *sync,
 		if (!amdgpu_semaphore_emit_wait(ring, semaphore)) {
 			/* waiting wasn't successful wait manually */
 			amdgpu_ring_undo(other);
-			r = fence_wait(&fence->base, false);
+			r = dma_fence_wait(&fence->base, false);
 			if (r)
 				return r;
 			continue;
@@ -366,7 +366,7 @@ int amdgpu_sync_rings(struct amdgpu_sync *sync,
  */
 void amdgpu_sync_free(struct amdgpu_device *adev,
 		      struct amdgpu_sync *sync,
-		      struct fence *fence)
+		      struct dma_fence *fence)
 {
 	struct amdgpu_sync_entry *e;
 	struct hlist_node *tmp;
@@ -374,7 +374,7 @@ void amdgpu_sync_free(struct amdgpu_device *adev,
 
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
 		hash_del(&e->node);
-		fence_put(e->fence);
+		dma_fence_put(e->fence);
 		kfree(e);
 	}
 
@@ -382,7 +382,7 @@ void amdgpu_sync_free(struct amdgpu_device *adev,
 		amdgpu_semaphore_free(adev, &sync->semaphores[i], fence);
 
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i)
-		fence_put(sync->sync_to[i]);
+		dma_fence_put(sync->sync_to[i]);
 
-	fence_put(sync->last_vm_update);
+	dma_fence_put(sync->last_vm_update);
 }

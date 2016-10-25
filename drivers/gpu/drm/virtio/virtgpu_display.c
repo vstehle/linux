@@ -87,7 +87,7 @@ static int virtio_gpu_crtc_cursor_set(struct drm_crtc *crtc,
 	if (!ret) {
 		reservation_object_add_excl_fence(qobj->tbo.resv,
 						  &fence->f);
-		fence_put(&fence->f);
+		dma_fence_put(&fence->f);
 		virtio_gpu_object_unreserve(qobj);
 		virtio_gpu_object_wait(qobj, false);
 	}

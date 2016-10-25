@@ -355,11 +355,11 @@ struct kbase_jd_atom {
 #endif				/* CONFIG_KDS */
 #ifdef CONFIG_DRM_DMA_SYNC
 	struct drm_reservation_cb rcb;
-	struct fence *rendered_fence;
+	struct dma_fence *rendered_fence;
 #endif				/* CONFIG_DRM_DMA_SYNC */
 #ifdef CONFIG_SW_SYNC
 	struct sync_file *sfile;
-	struct fence_cb fence_cb;
+	struct dma_fence_cb fence_cb;
 #endif				/* CONFIG_SW_SYNC */
 
 	/* Note: refer to kbasep_js_atom_retained_state, which will take a copy of some of the following members */

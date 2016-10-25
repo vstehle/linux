@@ -632,7 +632,7 @@ void ttm_bo_kunmap(struct ttm_bo_kmap_obj *map)
 EXPORT_SYMBOL(ttm_bo_kunmap);
 
 int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
-			      struct fence *fence,
+			      struct dma_fence *fence,
 			      bool evict,
 			      bool no_wait_gpu,
 			      struct ttm_mem_reg *new_mem)
@@ -694,3 +694,4 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 	return 0;
 }
 EXPORT_SYMBOL(ttm_bo_move_accel_cleanup);
+

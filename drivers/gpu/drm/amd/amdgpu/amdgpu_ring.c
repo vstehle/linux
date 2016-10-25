@@ -444,7 +444,7 @@ void amdgpu_ring_fini(struct amdgpu_ring *ring)
  * Extract the ring a fence belongs to. Handles both scheduler as
  * well as hardware fences.
  */
-struct amdgpu_ring *amdgpu_ring_from_fence(struct fence *f)
+struct amdgpu_ring *amdgpu_ring_from_fence(struct dma_fence *f)
 {
 	struct amdgpu_fence *a_fence;
 	struct amd_sched_fence *s_fence;

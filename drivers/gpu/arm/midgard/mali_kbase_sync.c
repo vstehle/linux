@@ -26,16 +26,16 @@
 /* It doesn't quite prove it it is our fence, but at least we know it is
  * sw_sync fence.
  */
-int kbase_sync_fence_is_ours(struct fence *fence)
+int kbase_sync_fence_is_ours(struct dma_fence *fence)
 {
 	struct sync_pt *sync_pt;
 	if (!fence)
 		return false;
 
-	if (fence_is_array(fence))
+	if (dma_fence_is_array(fence))
 		return false;
 
-	sync_pt = fence_to_sync_pt(fence);
+	sync_pt = dma_fence_to_sync_pt(fence);
 	if (!sync_pt)
 		return false;
 
@@ -72,7 +72,7 @@ void kbase_sync_timeline_free(struct mali_sync_timeline *mtl)
 	kfree(mtl);
 }
 
-struct fence *kbase_fence_alloc(struct mali_sync_timeline *mtl)
+struct dma_fence *kbase_fence_alloc(struct mali_sync_timeline *mtl)
 {
 	struct sync_pt *pt;
 
@@ -91,10 +91,10 @@ struct fence *kbase_fence_alloc(struct mali_sync_timeline *mtl)
 	return &pt->base;
 }
 
-void kbase_sync_signal_fence(struct fence *fence, int result)
+void kbase_sync_signal_fence(struct dma_fence *fence, int result)
 {
-	struct sync_pt *pt = fence_to_sync_pt(fence);
-	struct sync_timeline *tl = fence_parent(fence);
+	struct sync_pt *pt = dma_fence_to_sync_pt(fence);
+	struct sync_timeline *tl = dma_fence_parent(fence);
 	unsigned long flags;
 	int diff;
 

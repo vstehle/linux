@@ -25,9 +25,9 @@
 #define _GPU_SCHEDULER_H_
 
 #include <linux/kfifo.h>
-#include <linux/fence.h>
+#include <linux/dma-fence.h>
 
-#define AMD_SCHED_FENCE_SCHEDULED_BIT	FENCE_FLAG_USER_BITS
+#define AMD_SCHED_FENCE_SCHEDULED_BIT	DMA_FENCE_FLAG_USER_BITS
 
 struct amd_gpu_scheduler;
 struct amd_sched_rq;
@@ -52,8 +52,8 @@ struct amd_sched_entity {
 	atomic_t			fence_seq;
 	uint64_t                        fence_context;
 
-	struct fence			*dependency;
-	struct fence_cb			cb;
+	struct dma_fence			*dependency;
+	struct dma_fence_cb			cb;
 };
 
 /**
@@ -68,8 +68,8 @@ struct amd_sched_rq {
 };
 
 struct amd_sched_fence {
-	struct fence                    base;
-	struct fence_cb                 cb;
+	struct dma_fence                    base;
+	struct dma_fence_cb                 cb;
 	struct list_head		scheduled_cb;
 	struct amd_gpu_scheduler	*sched;
 	spinlock_t			lock;
@@ -84,8 +84,8 @@ struct amd_sched_job {
 	struct amd_sched_fence          *s_fence;
 };
 
-extern const struct fence_ops amd_sched_fence_ops;
-static inline struct amd_sched_fence *to_amd_sched_fence(struct fence *f)
+extern const struct dma_fence_ops amd_sched_fence_ops;
+static inline struct amd_sched_fence *to_amd_sched_fence(struct dma_fence *f)
 {
 	struct amd_sched_fence *__f = container_of(f, struct amd_sched_fence, base);
 
@@ -100,8 +100,8 @@ static inline struct amd_sched_fence *to_amd_sched_fence(struct fence *f)
  * these functions should be implemented in driver side
 */
 struct amd_sched_backend_ops {
-	struct fence *(*dependency)(struct amd_sched_job *sched_job);
-	struct fence *(*run_job)(struct amd_sched_job *sched_job);
+	struct dma_fence *(*dependency)(struct amd_sched_job *sched_job);
+	struct dma_fence *(*run_job)(struct amd_sched_job *sched_job);
 };
 
 /**

@@ -629,7 +629,7 @@ static int cik_sdma_ring_test_ib(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	struct amdgpu_ib ib;
-	struct fence *f = NULL;
+	struct dma_fence *f = NULL;
 	unsigned i;
 	unsigned index;
 	int r;
@@ -664,7 +664,7 @@ static int cik_sdma_ring_test_ib(struct amdgpu_ring *ring)
 	if (r)
 		goto err1;
 
-	r = fence_wait(f, false);
+	r = dma_fence_wait(f, false);
 	if (r) {
 		DRM_ERROR("amdgpu: fence wait failed (%d).\n", r);
 		goto err1;
@@ -685,7 +685,7 @@ static int cik_sdma_ring_test_ib(struct amdgpu_ring *ring)
 	}
 
 err1:
-	fence_put(f);
+	dma_fence_put(f);
 	amdgpu_ib_free(adev, &ib);
 err0:
 	amdgpu_wb_free(adev, index);
