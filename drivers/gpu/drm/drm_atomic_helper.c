@@ -31,8 +31,8 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_sync_helper.h>
-#include <linux/fence.h>
-#include <linux/fence-array.h>
+#include <linux/dma-fence.h>
+#include <linux/dma-fence-array.h>
 
 #include "drm_crtc_internal.h"
 
@@ -1023,7 +1023,7 @@ EXPORT_SYMBOL(drm_atomic_helper_commit_modeset_enables);
  * drm_atomic_helper_swap_state() so it uses the current plane state (and
  * just uses the atomic state to find the changed planes)
  *
- * Returns zero if success or < 0 if fence_wait() fails.
+ * Returns zero if success or < 0 if dma_fence_wait() fails.
  */
 int drm_atomic_helper_wait_for_fences(struct drm_device *dev,
 				      struct drm_atomic_state *state,
@@ -1047,11 +1047,11 @@ int drm_atomic_helper_wait_for_fences(struct drm_device *dev,
 		 * still interrupt the operation. Instead of blocking until the
 		 * timer expires, make the wait interruptible.
 		 */
-		ret = fence_wait(plane_state->fence, pre_swap);
+		ret = dma_fence_wait(plane_state->fence, pre_swap);
 		if (ret)
 			return ret;
 
-		fence_put(plane_state->fence);
+		dma_fence_put(plane_state->fence);
 		plane_state->fence = NULL;
 	}
 
@@ -1315,8 +1315,8 @@ static int drm_atomic_add_implicit_fences(struct drm_device *dev,
 	struct reservation_object **resvs;
 	unsigned int num_resvs = 0;
 	struct ww_acquire_ctx ctx;
-	struct fence *in_fence;
-	struct fence **in_fences = NULL;
+	struct dma_fence *in_fence;
+	struct dma_fence **in_fences = NULL;
 	int num_in_fences = 0;
 
 	resvs = kzalloc(nplanes * 4 * sizeof(*resvs), GFP_KERNEL);
@@ -1345,16 +1345,16 @@ static int drm_atomic_add_implicit_fences(struct drm_device *dev,
 		goto err_resvs;
 	}
 
-	in_fences = kzalloc(num_resvs * sizeof(struct fence *), GFP_KERNEL);
+	in_fences = kzalloc(num_resvs * sizeof(struct dma_fence *), GFP_KERNEL);
 	if (!in_fences) {
 		ret = -ENOMEM;
 		goto err_mutex;
 	}
 	for (i = 0; i < num_resvs; i++) {
-		struct fence *exclusive;
+		struct dma_fence *exclusive;
 		exclusive = reservation_object_get_excl(resvs[i]);
-		if (exclusive && !fence_is_signaled(exclusive))
-			in_fences[num_in_fences++] = fence_get(exclusive);
+		if (exclusive && !dma_fence_is_signaled(exclusive))
+			in_fences[num_in_fences++] = dma_fence_get(exclusive);
 	}
 
 	/* No fences at all, skip the rest. */
@@ -1363,10 +1363,10 @@ static int drm_atomic_add_implicit_fences(struct drm_device *dev,
 
 	/* Just one fence, no need to pack it in the array. */
 	if (num_in_fences == 1)
-		in_fence = fence_get(in_fences[0]);
+		in_fence = dma_fence_get(in_fences[0]);
 	else
 		in_fence =
-			(struct fence *)fence_array_create(num_in_fences,
+			(struct dma_fence *)dma_fence_array_create(num_in_fences,
 				in_fences,
 				dev->atomic_in_fence_context,
 				atomic_add_return(1, &dev->atomic_in_fence_seqno),
@@ -1381,10 +1381,10 @@ static int drm_atomic_add_implicit_fences(struct drm_device *dev,
 		/* If fb is not changing or new fb is NULL. */
 		if (plane->state->fb == plane_state->fb || !plane_state->fb)
 			continue;
-		plane_state->fence = fence_get(in_fence);
+		plane_state->fence = dma_fence_get(in_fence);
 	}
 
-	fence_put(in_fence);
+	dma_fence_put(in_fence);
 
 	/* Fence array took ownership of in_fences array and fences therein. */
 	if (num_in_fences > 1)
@@ -1392,7 +1392,7 @@ static int drm_atomic_add_implicit_fences(struct drm_device *dev,
 
 err_in_fences_ref:
 	for (i = 0; i < num_in_fences; i++)
-		fence_put(in_fences[i]);
+		dma_fence_put(in_fences[i]);
 
 err_in_fences:
 	kfree(in_fences);
@@ -3159,7 +3159,7 @@ void __drm_atomic_helper_plane_destroy_state(struct drm_plane *plane,
 	if (state->fb)
 		drm_framebuffer_unreference(state->fb);
 	if (state->fence)
-		fence_put(state->fence);
+		dma_fence_put(state->fence);
 }
 EXPORT_SYMBOL(__drm_atomic_helper_plane_destroy_state);
 
