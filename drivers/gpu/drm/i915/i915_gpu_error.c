@@ -896,7 +896,7 @@ static void error_record_engine_waiters(struct intel_engine_cs *engine,
 	if (RB_EMPTY_ROOT(&b->waiters))
 		return;
 
-	if (!spin_trylock(&b->lock)) {
+	if (!spin_trylock_irq(&b->lock)) {
 		ee->waiters = ERR_PTR(-EDEADLK);
 		return;
 	}
@@ -904,7 +904,7 @@ static void error_record_engine_waiters(struct intel_engine_cs *engine,
 	count = 0;
 	for (rb = rb_first(&b->waiters); rb != NULL; rb = rb_next(rb))
 		count++;
-	spin_unlock(&b->lock);
+	spin_unlock_irq(&b->lock);
 
 	waiter = NULL;
 	if (count)
@@ -914,7 +914,7 @@ static void error_record_engine_waiters(struct intel_engine_cs *engine,
 	if (!waiter)
 		return;
 
-	if (!spin_trylock(&b->lock)) {
+	if (!spin_trylock_irq(&b->lock)) {
 		kfree(waiter);
 		ee->waiters = ERR_PTR(-EDEADLK);
 		return;
@@ -932,7 +932,7 @@ static void error_record_engine_waiters(struct intel_engine_cs *engine,
 		if (++ee->num_waiters == count)
 			break;
 	}
-	spin_unlock(&b->lock);
+	spin_unlock_irq(&b->lock);
 }
 
 static void error_record_engine_registers(struct drm_i915_error_state *error,
