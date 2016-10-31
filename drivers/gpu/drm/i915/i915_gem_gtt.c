@@ -704,6 +704,16 @@ static int gen8_48b_mm_switch(struct i915_hw_ppgtt *ppgtt,
 	return gen8_write_pdp(req, 0, px_dma(&ppgtt->pml4));
 }
 
+/* PDE TLBs are a pain to invalidate on GEN8+. When we modify
+ * the page table structures, we mark them dirty so that
+ * context switching/execlist queuing code takes extra steps
+ * to ensure that tlbs are flushed.
+ */
+static void mark_tlbs_dirty(struct i915_hw_ppgtt *ppgtt)
+{
+	ppgtt->pd_dirty_rings = INTEL_INFO(ppgtt->base.dev)->ring_mask;
+}
+
 /* Removes entries from a single page table, releasing it if it's empty.
  * Caller can use the return value to update higher-level entries.
  */
@@ -805,6 +815,8 @@ static bool gen8_ppgtt_clear_pdp(struct i915_address_space *vm,
 			}
 		}
 	}
+
+	mark_tlbs_dirty(ppgtt);
 
 	if (USES_FULL_48BIT_PPGTT(vm->dev) &&
 	    bitmap_empty(pdp->used_pdpes, I915_PDPES_PER_PDP(vm->dev))) {
@@ -1278,16 +1290,6 @@ int __must_check alloc_gen8_temp_bitmaps(unsigned long **new_pds,
 err_out:
 	free_gen8_temp_bitmaps(pds, pts);
 	return -ENOMEM;
-}
-
-/* PDE TLBs are a pain to invalidate on GEN8+. When we modify
- * the page table structures, we mark them dirty so that
- * context switching/execlist queuing code takes extra steps
- * to ensure that tlbs are flushed.
- */
-static void mark_tlbs_dirty(struct i915_hw_ppgtt *ppgtt)
-{
-	ppgtt->pd_dirty_rings = INTEL_INFO(ppgtt->base.dev)->ring_mask;
 }
 
 static int gen8_alloc_va_range_3lvl(struct i915_address_space *vm,
