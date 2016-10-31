@@ -1034,7 +1034,7 @@ bool intel_crtc_active(struct intel_crtc *crtc)
 enum transcoder intel_pipe_to_cpu_transcoder(struct drm_i915_private *dev_priv,
 					     enum pipe pipe)
 {
-	struct intel_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+	struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
 
 	return crtc->config->cpu_transcoder;
 }
@@ -1780,7 +1780,8 @@ void vlv_wait_port_ready(struct drm_i915_private *dev_priv,
 static void ironlake_enable_pch_transcoder(struct drm_i915_private *dev_priv,
 					   enum pipe pipe)
 {
-	struct intel_crtc *intel_crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+	struct intel_crtc *intel_crtc = intel_get_crtc_for_pipe(dev_priv,
+								pipe);
 	i915_reg_t reg;
 	uint32_t val, pipeconf_val;
 
@@ -11655,7 +11656,7 @@ static bool pageflip_finished(struct intel_crtc *crtc,
 void intel_finish_page_flip_cs(struct drm_i915_private *dev_priv, int pipe)
 {
 	struct drm_device *dev = &dev_priv->drm;
-	struct intel_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+	struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
 	struct intel_flip_work *work;
 	unsigned long flags;
 
@@ -11681,7 +11682,7 @@ void intel_finish_page_flip_cs(struct drm_i915_private *dev_priv, int pipe)
 void intel_finish_page_flip_mmio(struct drm_i915_private *dev_priv, int pipe)
 {
 	struct drm_device *dev = &dev_priv->drm;
-	struct intel_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+	struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
 	struct intel_flip_work *work;
 	unsigned long flags;
 
@@ -12111,7 +12112,7 @@ static bool __pageflip_stall_check_cs(struct drm_i915_private *dev_priv,
 void intel_check_page_flip(struct drm_i915_private *dev_priv, int pipe)
 {
 	struct drm_device *dev = &dev_priv->drm;
-	struct intel_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+	struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
 	struct intel_flip_work *work;
 
 	WARN_ON(!in_interrupt());
@@ -14159,7 +14160,8 @@ static void intel_atomic_wait_for_vblanks(struct drm_device *dev,
 		return;
 
 	for_each_pipe(dev_priv, pipe) {
-		struct intel_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+		struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv,
+								  pipe);
 
 		if (!((1 << pipe) & crtc_mask))
 			continue;
@@ -14174,7 +14176,8 @@ static void intel_atomic_wait_for_vblanks(struct drm_device *dev,
 	}
 
 	for_each_pipe(dev_priv, pipe) {
-		struct intel_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+		struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv,
+								  pipe);
 		long lret;
 
 		if (!((1 << pipe) & crtc_mask))
@@ -16848,7 +16851,7 @@ static void intel_modeset_readout_hw_state(struct drm_device *dev)
 		pipe = 0;
 
 		if (encoder->get_hw_state(encoder, &pipe)) {
-			crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+			crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
 
 			encoder->base.crtc = &crtc->base;
 			crtc->config->output_types |= 1 << encoder->type;
@@ -16950,7 +16953,7 @@ intel_modeset_setup_hw_state(struct drm_device *dev)
 	}
 
 	for_each_pipe(dev_priv, pipe) {
-		crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+		crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
 
 		intel_sanitize_crtc(crtc);
 		intel_dump_pipe_config(crtc, crtc->config,
