@@ -66,9 +66,7 @@ static const struct file_operations vc4_drm_fops = {
 	.mmap = drm_gem_cma_mmap,
 	.poll = drm_poll,
 	.read = drm_read,
-#ifdef CONFIG_COMPAT
 	.compat_ioctl = drm_compat_ioctl,
-#endif
 	.llseek = noop_llseek,
 };
 
