@@ -1447,7 +1447,7 @@ static void i915_gem_object_bump_inactive_ggtt(struct drm_i915_gem_object *obj)
 
 	i915 = to_i915(obj->base.dev);
 	list = obj->bind_count ? &i915->mm.bound_list : &i915->mm.unbound_list;
-	list_move_tail(&obj->global_list, list);
+	list_move_tail(&obj->global_link, list);
 }
 
 /**
@@ -2965,7 +2965,7 @@ int i915_vma_unbind(struct i915_vma *vma)
 	/* Since the unbound list is global, only move to that list if
 	 * no more VMAs exist. */
 	if (--obj->bind_count == 0)
-		list_move_tail(&obj->global_list,
+		list_move_tail(&obj->global_link,
 			       &to_i915(obj->base.dev)->mm.unbound_list);
 
 	/* And finally now the object is completely decoupled from this vma,
@@ -3162,7 +3162,7 @@ search_free:
 	}
 	GEM_BUG_ON(!i915_gem_valid_gtt_space(vma, obj->cache_level));
 
-	list_move_tail(&obj->global_list, &dev_priv->mm.bound_list);
+	list_move_tail(&obj->global_link, &dev_priv->mm.bound_list);
 	list_move_tail(&vma->vm_link, &vma->vm->inactive_list);
 	obj->bind_count++;
 
@@ -4137,7 +4137,7 @@ void i915_gem_object_init(struct drm_i915_gem_object *obj,
 {
 	mutex_init(&obj->mm.lock);
 
-	INIT_LIST_HEAD(&obj->global_list);
+	INIT_LIST_HEAD(&obj->global_link);
 	INIT_LIST_HEAD(&obj->userfault_link);
 	INIT_LIST_HEAD(&obj->obj_exec_link);
 	INIT_LIST_HEAD(&obj->vma_list);
@@ -4284,7 +4284,7 @@ static void __i915_gem_free_objects(struct drm_i915_private *i915,
 		GEM_BUG_ON(!list_empty(&obj->vma_list));
 		GEM_BUG_ON(!RB_EMPTY_ROOT(&obj->vma_tree));
 
-		list_del(&obj->global_list);
+		list_del(&obj->global_link);
 	}
 	intel_runtime_pm_put(i915);
 	mutex_unlock(&i915->drm.struct_mutex);

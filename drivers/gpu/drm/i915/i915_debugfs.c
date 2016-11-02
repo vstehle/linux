@@ -219,7 +219,7 @@ static int i915_gem_stolen_list_info(struct seq_file *m, void *data)
 		return ret;
 
 	total_obj_size = total_gtt_size = count = 0;
-	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_list) {
+	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_link) {
 		if (obj->stolen == NULL)
 			continue;
 
@@ -229,7 +229,7 @@ static int i915_gem_stolen_list_info(struct seq_file *m, void *data)
 		total_gtt_size += i915_gem_obj_total_ggtt_size(obj);
 		count++;
 	}
-	list_for_each_entry(obj, &dev_priv->mm.unbound_list, global_list) {
+	list_for_each_entry(obj, &dev_priv->mm.unbound_list, global_link) {
 		if (obj->stolen == NULL)
 			continue;
 
@@ -392,7 +392,7 @@ static int i915_gem_object_info(struct seq_file *m, void *data)
 	size = count = 0;
 	mapped_size = mapped_count = 0;
 	purgeable_size = purgeable_count = 0;
-	list_for_each_entry(obj, &dev_priv->mm.unbound_list, global_list) {
+	list_for_each_entry(obj, &dev_priv->mm.unbound_list, global_link) {
 		size += obj->base.size;
 		++count;
 
@@ -409,7 +409,7 @@ static int i915_gem_object_info(struct seq_file *m, void *data)
 	seq_printf(m, "%u unbound objects, %llu bytes\n", count, size);
 
 	size = count = dpy_size = dpy_count = 0;
-	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_list) {
+	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_link) {
 		size += obj->base.size;
 		++count;
 
@@ -495,7 +495,7 @@ static int i915_gem_gtt_info(struct seq_file *m, void *data)
 		return ret;
 
 	total_obj_size = total_gtt_size = count = 0;
-	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_list) {
+	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_link) {
 		if (show_pin_display_only && !obj->pin_display)
 			continue;
 
