@@ -3195,7 +3195,7 @@ static void gen5_gt_irq_postinstall(struct drm_device *dev)
 		 * RPS interrupts will get enabled/disabled on demand when RPS
 		 * itself is enabled/disabled.
 		 */
-		if (HAS_VEBOX(dev))
+		if (HAS_VEBOX(dev_priv))
 			pm_irqs |= PM_VEBOX_USER_INTERRUPT;
 
 		dev_priv->pm_irq_mask = 0xffffffff;
