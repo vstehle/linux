@@ -360,7 +360,7 @@ static bool intel_fb_initial_config(struct drm_fb_helper *fb_helper,
 				    struct drm_fb_offset *offsets,
 				    bool *enabled, int width, int height)
 {
-	struct drm_device *dev = fb_helper->dev;
+	struct drm_i915_private *dev_priv = to_i915(fb_helper->dev);
 	int i, j;
 	bool *save_enabled;
 	bool fallback = true;
@@ -511,7 +511,7 @@ retry:
 	 * fbdev helper library.
 	 */
 	if (num_connectors_enabled != num_connectors_detected &&
-	    num_connectors_enabled < INTEL_INFO(dev)->num_pipes) {
+	    num_connectors_enabled < INTEL_INFO(dev_priv)->num_pipes) {
 		DRM_DEBUG_KMS("fallback: Not all outputs enabled\n");
 		DRM_DEBUG_KMS("Enabled: %i, detected: %i\n", num_connectors_enabled,
 			      num_connectors_detected);
@@ -699,11 +699,11 @@ static void intel_fbdev_suspend_worker(struct work_struct *work)
 
 int intel_fbdev_init(struct drm_device *dev)
 {
-	struct intel_fbdev *ifbdev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_fbdev *ifbdev;
 	int ret;
 
-	if (WARN_ON(INTEL_INFO(dev)->num_pipes == 0))
+	if (WARN_ON(INTEL_INFO(dev_priv)->num_pipes == 0))
 		return -ENODEV;
 
 	ifbdev = kzalloc(sizeof(struct intel_fbdev), GFP_KERNEL);
@@ -716,7 +716,7 @@ int intel_fbdev_init(struct drm_device *dev)
 		ifbdev->preferred_bpp = 32;
 
 	ret = drm_fb_helper_init(dev, &ifbdev->helper,
-				 INTEL_INFO(dev)->num_pipes, 4);
+				 INTEL_INFO(dev_priv)->num_pipes, 4);
 	if (ret) {
 		kfree(ifbdev);
 		return ret;
