@@ -852,9 +852,8 @@ static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 	return true;
 }
 
-static bool intel_fbc_can_choose(struct intel_crtc *crtc)
+static bool intel_fbc_can_enable(struct drm_i915_private *dev_priv)
 {
-	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	struct intel_fbc *fbc = &dev_priv->fbc;
 	bool enable_by_default = IS_HASWELL(dev_priv) ||
 				 IS_BROADWELL(dev_priv);
@@ -878,6 +877,14 @@ static bool intel_fbc_can_choose(struct intel_crtc *crtc)
 		fbc->no_fbc_reason = "underrun detected";
 		return false;
 	}
+
+	return true;
+}
+
+static bool intel_fbc_can_choose(struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+	struct intel_fbc *fbc = &dev_priv->fbc;
 
 	if (fbc_on_pipe_a_only(dev_priv) && crtc->pipe != PIPE_A) {
 		fbc->no_fbc_reason = "no enabled pipes can have FBC";
@@ -1087,6 +1094,9 @@ void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
 	}
 	/* This atomic commit doesn't involve the CRTC currently tied to FBC. */
 	if (!fbc_crtc_present && fbc->crtc != NULL)
+		goto out;
+
+	if (!intel_fbc_can_enable(dev_priv))
 		goto out;
 
 	/* Simply choose the first CRTC that is compatible and has a visible
