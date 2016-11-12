@@ -477,10 +477,11 @@ struct drm_framebuffer *evdi_fb_user_fb_create(
 
 	info = drm_format_info(mode_cmd->pixel_format);
 	if (!info || !info->depth) {
-		char *format_name = drm_get_format_name(mode_cmd->pixel_format);
+		struct drm_format_name_buf format_name;
 
-		DRM_DEBUG_KMS("unsupported pixel format %s\n", format_name);
-		kfree(format_name);
+		DRM_DEBUG_KMS("unsupported pixel format %s\n",
+			     drm_get_format_name(mode_cmd->pixel_format,
+						&format_name));
 
 		bpp = 0;
 	}
