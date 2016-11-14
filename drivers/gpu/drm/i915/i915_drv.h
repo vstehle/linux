@@ -920,6 +920,7 @@ struct i915_gem_context {
 #define CONTEXT_NO_ERROR_CAPTURE	BIT(1)
 	unsigned hw_id;
 	u32 user_handle;
+	int priority; /* greater priorities are serviced first */
 
 	u32 ggtt_alignment;
 
