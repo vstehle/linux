@@ -633,8 +633,9 @@ static void print_request(struct seq_file *m,
 			  struct drm_i915_gem_request *rq,
 			  const char *prefix)
 {
-	seq_printf(m, "%s%x [%x:%x] @ %d: %s\n", prefix,
+	seq_printf(m, "%s%x [%x:%x] prio=%d @ %dms: %s\n", prefix,
 		   rq->global_seqno, rq->ctx->hw_id, rq->fence.seqno,
+		   rq->priotree.priority,
 		   jiffies_to_msecs(jiffies - rq->emitted_jiffies),
 		   rq->timeline->common->name);
 }
