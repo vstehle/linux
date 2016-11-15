@@ -1397,6 +1397,9 @@ static inline unsigned int intel_dp_unused_lane_mask(int lane_count)
 	return ~((1 << lane_count) - 1) & 0xf;
 }
 
+int intel_dp_link_required(int pixel_clock, int bpp);
+int intel_dp_max_data_rate(int max_link_clock, int max_lanes);
+
 /* intel_dp_aux_backlight.c */
 int intel_dp_aux_init_backlight_funcs(struct intel_connector *intel_connector);
 
