@@ -3158,6 +3158,7 @@ void __drm_atomic_helper_plane_destroy_state(struct drm_plane *plane,
 {
 	if (state->fb)
 		drm_framebuffer_unreference(state->fb);
+
 	if (state->fence)
 		dma_fence_put(state->fence);
 }
