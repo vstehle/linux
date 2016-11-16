@@ -2816,10 +2816,8 @@ static void gen8_disable_vblank(struct drm_device *dev, unsigned int pipe)
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
 }
 
-static void ibx_irq_reset(struct drm_device *dev)
+static void ibx_irq_reset(struct drm_i915_private *dev_priv)
 {
-	struct drm_i915_private *dev_priv = to_i915(dev);
-
 	if (HAS_PCH_NOP(dev_priv))
 		return;
 
@@ -2849,12 +2847,10 @@ static void ibx_irq_pre_postinstall(struct drm_device *dev)
 	POSTING_READ(SDEIER);
 }
 
-static void gen5_gt_irq_reset(struct drm_device *dev)
+static void gen5_gt_irq_reset(struct drm_i915_private *dev_priv)
 {
-	struct drm_i915_private *dev_priv = to_i915(dev);
-
 	GEN5_IRQ_RESET(GT);
-	if (INTEL_INFO(dev)->gen >= 6)
+	if (INTEL_GEN(dev_priv) >= 6)
 		GEN5_IRQ_RESET(GEN6_PM);
 }
 
@@ -2919,9 +2915,9 @@ static void ironlake_irq_reset(struct drm_device *dev)
 	if (IS_GEN7(dev_priv))
 		I915_WRITE(GEN7_ERR_INT, 0xffffffff);
 
-	gen5_gt_irq_reset(dev);
+	gen5_gt_irq_reset(dev_priv);
 
-	ibx_irq_reset(dev);
+	ibx_irq_reset(dev_priv);
 }
 
 static void valleyview_irq_preinstall(struct drm_device *dev)
@@ -2931,7 +2927,7 @@ static void valleyview_irq_preinstall(struct drm_device *dev)
 	I915_WRITE(VLV_MASTER_IER, 0);
 	POSTING_READ(VLV_MASTER_IER);
 
-	gen5_gt_irq_reset(dev);
+	gen5_gt_irq_reset(dev_priv);
 
 	spin_lock_irq(&dev_priv->irq_lock);
 	if (dev_priv->display_irqs_enabled)
@@ -2967,7 +2963,7 @@ static void gen8_irq_reset(struct drm_device *dev)
 	GEN5_IRQ_RESET(GEN8_PCU_);
 
 	if (HAS_PCH_SPLIT(dev_priv))
-		ibx_irq_reset(dev);
+		ibx_irq_reset(dev_priv);
 }
 
 void gen8_irq_power_well_post_enable(struct drm_i915_private *dev_priv,
@@ -3190,7 +3186,7 @@ static void gen5_gt_irq_postinstall(struct drm_device *dev)
 
 	GEN5_IRQ_INIT(GT, dev_priv->gt_irq_mask, gt_irqs);
 
-	if (INTEL_INFO(dev)->gen >= 6) {
+	if (INTEL_GEN(dev_priv) >= 6) {
 		/*
 		 * RPS interrupts will get enabled/disabled on demand when RPS
 		 * itself is enabled/disabled.
@@ -3208,7 +3204,7 @@ static int ironlake_irq_postinstall(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	u32 display_mask, extra_mask;
 
-	if (INTEL_INFO(dev)->gen >= 7) {
+	if (INTEL_GEN(dev_priv) >= 7) {
 		display_mask = (DE_MASTER_IRQ_CONTROL | DE_GSE_IVB |
 				DE_PCH_EVENT_IVB | DE_PLANEC_FLIP_DONE_IVB |
 				DE_PLANEB_FLIP_DONE_IVB |
@@ -3429,7 +3425,7 @@ static void valleyview_irq_uninstall(struct drm_device *dev)
 	I915_WRITE(VLV_MASTER_IER, 0);
 	POSTING_READ(VLV_MASTER_IER);
 
-	gen5_gt_irq_reset(dev);
+	gen5_gt_irq_reset(dev_priv);
 
 	I915_WRITE(HWSTAM, 0xffffffff);
 
