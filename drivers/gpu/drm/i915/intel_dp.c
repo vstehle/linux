@@ -3539,7 +3539,7 @@ intel_dp_get_dpcd(struct intel_dp *intel_dp)
 			DRM_DEBUG_KMS("Detected EDP PSR Panel.\n");
 		}
 
-		if (INTEL_INFO(dev)->gen >= 9 &&
+		if (INTEL_INFO(dev_priv)->gen >= 9 &&
 			(intel_dp->psr_dpcd[0] & DP_PSR2_IS_SUPPORTED)) {
 			uint8_t frame_sync_cap;
 
