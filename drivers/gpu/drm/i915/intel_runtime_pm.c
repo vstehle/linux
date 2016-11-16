@@ -1073,7 +1073,7 @@ static void vlv_display_power_well_init(struct drm_i915_private *dev_priv)
 
 	intel_hpd_init(dev_priv);
 
-	i915_redisable_vga_power_on(&dev_priv->drm);
+	i915_redisable_vga_power_on(dev_priv);
 
 	intel_pps_unlock_regs_wa(dev_priv);
 }
