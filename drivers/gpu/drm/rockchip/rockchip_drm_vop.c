@@ -771,7 +771,7 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 	if (state->rotation && (!((state->rotation == DRM_REFLECT_Y) || (state->rotation == DRM_ROTATE_0))))
 		return -EINVAL;
 
-	if (fb->modifier[0] == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC) {
+	if (fb->modifier == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC) {
 		struct vop *vop = to_vop(crtc);
 
 		if (!vop->data->afbdc) {
@@ -888,7 +888,7 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
 
 	spin_lock(&vop->reg_lock);
 
-	if (fb->modifier[0] == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC) {
+	if (fb->modifier == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC) {
 		int afbdc_format = vop_convert_afbdc_format(fb->pixel_format);
 
 		VOP_AFBDC_SET(vop, format, afbdc_format | 1 << 4);
