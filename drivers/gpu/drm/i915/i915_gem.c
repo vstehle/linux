@@ -2721,7 +2721,7 @@ void i915_gem_reset(struct drm_i915_private *dev_priv)
 	for_each_engine(engine, dev_priv, id)
 		i915_gem_reset_engine(engine);
 
-	i915_gem_restore_fences(&dev_priv->drm);
+	i915_gem_restore_fences(dev_priv);
 
 	if (dev_priv->gt.awake) {
 		intel_sanitize_gt_powersave(dev_priv);
@@ -4419,7 +4419,6 @@ i915_gem_cleanup_engines(struct drm_device *dev)
 void
 i915_gem_load_init_fences(struct drm_i915_private *dev_priv)
 {
-	struct drm_device *dev = &dev_priv->drm;
 	int i;
 
 	if (INTEL_INFO(dev_priv)->gen >= 7 && !IS_VALLEYVIEW(dev_priv) &&
@@ -4443,9 +4442,9 @@ i915_gem_load_init_fences(struct drm_i915_private *dev_priv)
 		fence->id = i;
 		list_add_tail(&fence->link, &dev_priv->mm.fence_list);
 	}
-	i915_gem_restore_fences(dev);
+	i915_gem_restore_fences(dev_priv);
 
-	i915_gem_detect_bit_6_swizzle(dev);
+	i915_gem_detect_bit_6_swizzle(dev_priv);
 }
 
 int
