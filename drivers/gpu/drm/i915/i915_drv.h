@@ -992,7 +992,7 @@ struct intel_fbc {
 
 		struct {
 			u64 ilk_ggtt_offset;
-			uint32_t pixel_format;
+			const struct drm_format_info *format;
 			unsigned int stride;
 			int fence_reg;
 			unsigned int tiling_mode;
@@ -1008,7 +1008,7 @@ struct intel_fbc {
 
 		struct {
 			u64 ggtt_offset;
-			uint32_t pixel_format;
+			const struct drm_format_info *format;
 			unsigned int stride;
 			int fence_reg;
 		} fb;
