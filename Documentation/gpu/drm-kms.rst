@@ -345,6 +345,18 @@ Blending and Z-Position properties
 .. kernel-doc:: drivers/gpu/drm/drm_blend.c
    :export:
 
+Tile Group Property
+-------------------
+
+.. kernel-doc:: drivers/gpu/drm/drm_connector.c
+   :doc: Tile group
+
+Explicit Fencing Properties
+---------------------------
+
+.. kernel-doc:: drivers/gpu/drm/drm_atomic.c
+   :doc: explicit fencing properties
+
 Existing KMS Properties
 -----------------------
 
