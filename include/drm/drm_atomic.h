@@ -403,7 +403,7 @@ int drm_atomic_debugfs_cleanup(struct drm_minor *minor);
 	     (__i)++)							\
 		for_each_if (plane_state)
 static inline bool
-drm_atomic_crtc_needs_modeset(struct drm_crtc_state *state)
+drm_atomic_crtc_needs_modeset(const struct drm_crtc_state *state)
 {
 	return state->mode_changed || state->active_changed ||
 	       state->connectors_changed;
