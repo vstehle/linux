@@ -413,7 +413,7 @@ int drm_atomic_debugfs_cleanup(struct drm_minor *minor);
  * combines these three to compute the overall need for a modeset for @state.
  */
 static inline bool
-drm_atomic_crtc_needs_modeset(struct drm_crtc_state *state)
+drm_atomic_crtc_needs_modeset(const struct drm_crtc_state *state)
 {
 	return state->mode_changed || state->active_changed ||
 	       state->connectors_changed;
