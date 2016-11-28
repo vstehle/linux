@@ -415,6 +415,13 @@ backport_cfg80211_vendor_event_alloc(struct wiphy *wiphy,
 #define cfg80211_vendor_event_alloc backport_cfg80211_vendor_event_alloc
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,6,0)
+static inline void page_ref_inc(struct page *page)
+{
+	atomic_inc(&page->_count);
+}
+#endif /* < 4.6 */
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,7,0)
 /* We don't really care much about alignment, since nl80211 isn't using
  * this for hot paths. So just implement it using nla_put_u64().
