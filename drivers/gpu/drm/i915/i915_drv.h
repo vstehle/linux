@@ -820,6 +820,7 @@ struct intel_device_info {
 	u16 device_id;
 	u8 num_pipes;
 	u8 num_sprites[I915_MAX_PIPES];
+	u8 num_scalers[I915_MAX_PIPES];
 	u8 gen;
 	u16 gen_mask;
 	u8 ring_mask; /* Rings supported by the HW */
