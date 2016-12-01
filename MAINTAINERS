@@ -5708,6 +5708,14 @@ F:	arch/x86/include/asm/intel_telemetry.h
 F:	drivers/platform/x86/intel_telemetry_pltdrv.c
 F:	drivers/platform/x86/intel_telemetry_debugfs.c
 
+INTEL PMC CORE DRIVER
+M:	Rajneesh Bhardwaj <rajneesh.bhardwaj@intel.com>
+M:	Vishwanath Somayaji <vishwanath.somayaji@intel.com>
+L:	platform-driver-x86@vger.kernel.org
+S:	Maintained
+F:	arch/x86/include/asm/pmc_core.h
+F:	drivers/platform/x86/intel_pmc_core*
+
 IOC3 ETHERNET DRIVER
 M:	Ralf Baechle <ralf@linux-mips.org>
 L:	linux-mips@linux-mips.org
