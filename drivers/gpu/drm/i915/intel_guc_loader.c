@@ -518,6 +518,7 @@ fail:
 
 static void guc_fw_fetch(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 {
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct pci_dev *pdev = dev->pdev;
 	struct drm_i915_gem_object *obj;
 	const struct firmware *fw;
@@ -606,7 +607,7 @@ static void guc_fw_fetch(struct drm_device *dev, struct intel_guc_fw *guc_fw)
 			guc_fw->guc_fw_major_wanted, guc_fw->guc_fw_minor_wanted);
 
 	mutex_lock(&dev->struct_mutex);
-	obj = i915_gem_object_create_from_data(dev, fw->data, fw->size);
+	obj = i915_gem_object_create_from_data(dev_priv, fw->data, fw->size);
 	mutex_unlock(&dev->struct_mutex);
 	if (IS_ERR_OR_NULL(obj)) {
 		err = obj ? PTR_ERR(obj) : -ENOMEM;
