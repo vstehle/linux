@@ -2264,6 +2264,8 @@ struct drm_i915_private {
 	/* perform PHY state sanity checks? */
 	bool chv_phy_assert[2];
 
+	bool ipc_enabled;
+
 	struct intel_encoder *dig_port_map[I915_MAX_PORTS];
 
 	/*
