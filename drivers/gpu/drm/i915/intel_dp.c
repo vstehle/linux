@@ -156,7 +156,7 @@ static u8 intel_dp_max_lane_count(struct intel_dp *intel_dp)
 	u8 source_max, sink_max;
 
 	source_max = intel_dig_port->max_lanes;
-	sink_max = drm_dp_max_lane_count(intel_dp->dpcd);
+	sink_max = intel_dp->max_sink_lane_count;
 
 	return min(source_max, sink_max);
 }
@@ -213,7 +213,7 @@ intel_dp_sink_rates(struct intel_dp *intel_dp, const int **sink_rates)
 
 	*sink_rates = default_rates;
 
-	return (intel_dp_max_link_bw(intel_dp) >> 3) + 1;
+	return (intel_dp->max_sink_link_bw >> 3) + 1;
 }
 
 static int
@@ -4372,6 +4372,12 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 
 	if (intel_encoder->type != INTEL_OUTPUT_EDP)
 		intel_encoder->type = INTEL_OUTPUT_DP;
+
+	/* Set the max lane count for sink */
+	intel_dp->max_sink_lane_count = drm_dp_max_lane_count(intel_dp->dpcd);
+
+	/* Set the max link BW for sink */
+	intel_dp->max_sink_link_bw = intel_dp_max_link_bw(intel_dp);
 
 	intel_dp_read_desc(intel_dp);
 
