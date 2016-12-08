@@ -1666,3 +1666,19 @@ const u8 *bp_cfg80211_find_ie_match(u8 eid, const u8 *ies, int len,
 #define IEEE80211_RADIOTAP_TIMESTAMP_FLAG_32BIT			0x01
 #define IEEE80211_RADIOTAP_TIMESTAMP_FLAG_ACCURACY		0x02
 #endif /* IEEE80211_RADIOTAP_TIMESTAMP_UNIT_MASK */
+
+#if CFG80211_VERSION < KERNEL_VERSION(4,10,0)
+static inline void cfg80211_abandon_assoc(struct net_device *dev,
+					  struct cfg80211_bss *bss)
+{
+	/*
+	 * We can't really do anything better - we used to leak in
+	 * this scenario forever, and we can't backport the cfg80211
+	 * function since it needs access to the *internal* BSS to
+	 * remove the pinning (internal_bss->hold).
+	 * Just warn, and hope that ChromeOS will pick up the fix
+	 * from upstream at which point we can remove this inline.
+	 */
+	WARN_ONCE(1, "BSS entry for %pM leaked\n", bss->bssid);
+}
+#endif
