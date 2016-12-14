@@ -523,7 +523,7 @@ static int vmw_stdu_crtc_set_config(struct drm_mode_set *set)
 		 */
 		if (stdu->content_fb_type == SEPARATE_DMA) {
 
-			switch (new_fb->bits_per_pixel) {
+			switch (new_fb->format->cpp[0] * 8) {
 			case 32:
 				content_srf.format = SVGA3D_X8R8G8B8;
 				break;

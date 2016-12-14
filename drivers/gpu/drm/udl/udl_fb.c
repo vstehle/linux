@@ -113,7 +113,7 @@ static void udlfb_dpy_deferred_io(struct fb_info *info,
 	/* walk the written page list and render each to device */
 	list_for_each_entry(cur, &fbdefio->pagelist, lru) {
 
-		if (udl_render_hline(dev, (ufbdev->ufb.base.bits_per_pixel / 8),
+		if (udl_render_hline(dev, (ufbdev->ufb.base.format->cpp[0] / 8),
 				     &urb, (char *) info->fix.smem_start,
 				     &cmd, cur->index << PAGE_SHIFT,
 				     cur->index << PAGE_SHIFT, PAGE_SIZE, NULL,
@@ -152,7 +152,7 @@ int udl_handle_damage(struct udl_framebuffer *fb, int x, int y,
 	int bytes_identical = 0;
 	struct urb *urb;
 	int aligned_x;
-	int bpp = (fb->base.bits_per_pixel / 8);
+	int bpp = fb->base.format->cpp[0];
 	int x2, y2;
 	bool store_for_later = false;
 	unsigned long flags;

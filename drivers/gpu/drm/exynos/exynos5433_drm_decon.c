@@ -216,7 +216,7 @@ static void decon_win_set_pixfmt(struct decon_context *ctx, unsigned int win,
 		return;
 	}
 
-	DRM_DEBUG_KMS("bpp = %u\n", fb->bits_per_pixel);
+	DRM_DEBUG_KMS("bpp = %u\n", fb->format->cpp[0] * 8);
 
 	/*
 	 * In case of exynos, setting dma-burst to 16Word causes permanent
@@ -262,7 +262,7 @@ static void decon_update_plane(struct exynos_drm_crtc *crtc,
 	struct decon_context *ctx = crtc->ctx;
 	struct drm_plane_state *state = plane->base.state;
 	unsigned int win = plane->zpos;
-	unsigned int bpp = state->fb->bits_per_pixel >> 3;
+	unsigned int bpp = state->fb->format->cpp[0];
 	unsigned int pitch = state->fb->pitches[0];
 	u32 val;
 

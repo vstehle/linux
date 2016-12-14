@@ -3231,7 +3231,7 @@ void r100_bandwidth_update(struct radeon_device *rdev)
 			rdev->mode_info.crtcs[0]->base.primary->fb;
 
 		mode1 = &rdev->mode_info.crtcs[0]->base.mode;
-		pixel_bytes1 = fb->bits_per_pixel / 8;
+		pixel_bytes1 = fb->format->cpp[0];
 	}
 	if (!(rdev->flags & RADEON_SINGLE_CRTC)) {
 		if (rdev->mode_info.crtcs[1]->base.enabled) {
@@ -3239,7 +3239,7 @@ void r100_bandwidth_update(struct radeon_device *rdev)
 				rdev->mode_info.crtcs[1]->base.primary->fb;
 
 			mode2 = &rdev->mode_info.crtcs[1]->base.mode;
-			pixel_bytes2 = fb->bits_per_pixel / 8;
+			pixel_bytes2 = fb->format->cpp[0];
 		}
 	}
 
