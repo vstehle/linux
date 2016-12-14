@@ -947,7 +947,7 @@ int drm_mode_page_flip_ioctl(struct drm_device *dev,
 	}
 	*/
 	
-	if (crtc->primary->fb->bits_per_pixel != fb->bits_per_pixel) {
+	if (crtc->primary->fb->format->cpp[0] != fb->format->cpp[0]) {
 		DRM_DEBUG_KMS("Page flip is not allowed to change bpp.\n");
 		ret = -EINVAL;
 		goto out;
