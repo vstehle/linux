@@ -287,7 +287,7 @@ evdi_framebuffer_init(struct drm_device *dev,
 		      struct evdi_gem_object *obj)
 {
 	ufb->obj = obj;
-	drm_helper_mode_fill_fb_struct(&ufb->base, mode_cmd);
+	drm_helper_mode_fill_fb_struct(dev, &ufb->base, mode_cmd);
 	return drm_framebuffer_init(dev, &ufb->base, &evdifb_funcs);
 }
 
