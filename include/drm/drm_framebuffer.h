@@ -184,10 +184,6 @@ struct drm_framebuffer {
 	 */
 	int flags;
 	/**
-	 * @pixel_format: DRM FOURCC code describing the pixel format.
-	 */
-	uint32_t pixel_format; /* fourcc format */
-	/**
 	 * @filp_head: Placed on struct &drm_file fbs list_head, protected by
 	 * fbs_lock in the same structure.
 	 */
