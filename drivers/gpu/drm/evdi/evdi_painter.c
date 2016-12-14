@@ -354,7 +354,7 @@ void evdi_painter_mode_changed_notify(struct evdi_device *evdi,
 	struct evdi_painter *painter = evdi->painter;
 
 	int bits_per_pixel = fb->format->cpp[0];
-	uint32_t pixel_format = fb->pixel_format;
+	uint32_t pixel_format = fb->format->format;
 
 	EVDI_DEBUG(
 		"(dev=%d) Notifying mode changed: %dx%d@%d; bpp %d; ",

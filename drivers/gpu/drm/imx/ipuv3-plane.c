@@ -158,7 +158,7 @@ int ipu_plane_mode_set(struct ipu_plane *ipu_plane, struct drm_crtc *crtc,
 	 */
 	if (ipu_plane->enabled) {
 		if (src_w != ipu_plane->w || src_h != ipu_plane->h ||
-		    fb->pixel_format != ipu_plane->base.fb->pixel_format)
+		    fb->format->format != ipu_plane->base.fb->format->format)
 			return -EINVAL;
 
 		return ipu_plane_set_base(ipu_plane, fb, src_x, src_y);

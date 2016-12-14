@@ -439,10 +439,10 @@ static void sti_gdp_atomic_update(struct drm_plane *drm_plane,
 	/* build the top field */
 	top_field->gam_gdp_agc = GAM_GDP_AGC_FULL_RANGE;
 	top_field->gam_gdp_ctl = WAIT_NEXT_VSYNC;
-	format = sti_gdp_fourcc2format(fb->pixel_format);
+	format = sti_gdp_fourcc2format(fb->format->format);
 	if (format == -1) {
 		DRM_ERROR("Format not supported by GDP %.4s\n",
-			  (char *)&fb->pixel_format);
+			  (char *)&fb->format->format);
 		return;
 	}
 	top_field->gam_gdp_ctl |= format;
@@ -456,7 +456,7 @@ static void sti_gdp_atomic_update(struct drm_plane *drm_plane,
 	}
 
 	DRM_DEBUG_DRIVER("drm FB:%d format:%.4s phys@:0x%lx\n", fb->base.id,
-			 (char *)&fb->pixel_format,
+			 (char *)&fb->format->format,
 			 (unsigned long)cma_obj->paddr);
 
 	/* pixel memory location */

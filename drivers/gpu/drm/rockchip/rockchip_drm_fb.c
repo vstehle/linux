@@ -83,7 +83,7 @@ static int rockchip_drm_get_reservations(struct drm_framebuffer *fb,
 					  struct reservation_object **resvs,
 					  unsigned int *num_resvs)
 {
-	int num_planes = drm_format_num_planes(fb->pixel_format);
+	int num_planes = drm_format_num_planes(fb->format->format);
 	int i;
 
 	if (num_planes <= 0) {

@@ -363,7 +363,7 @@ static int tilcdc_crtc_mode_set(struct drm_crtc *crtc,
 		reg |= LCDC_TFT_ALT_ENABLE;
 	if (priv->rev == 2) {
 
-		switch (crtc->primary->fb->pixel_format) {
+		switch (crtc->primary->fb->format->format) {
 		case DRM_FORMAT_BGR565:
 		case DRM_FORMAT_RGB565:
 			break;
