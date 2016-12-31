@@ -141,7 +141,7 @@ void i915_gem_context_free(struct kref *ctx_ref)
 
 	lockdep_assert_held(&ctx->i915->drm.struct_mutex);
 	trace_i915_context_free(ctx);
-	GEM_BUG_ON(!ctx->closed);
+	GEM_BUG_ON(!i915_gem_context_is_closed(ctx));
 
 	i915_ppgtt_put(ctx->ppgtt);
 
@@ -228,8 +228,7 @@ static void i915_ppgtt_close(struct i915_address_space *vm)
 
 static void context_close(struct i915_gem_context *ctx)
 {
-	GEM_BUG_ON(ctx->closed);
-	ctx->closed = true;
+	i915_gem_context_set_closed(ctx);
 	if (ctx->ppgtt)
 		i915_ppgtt_close(&ctx->ppgtt->base);
 	ctx->file_priv = ERR_PTR(-EBADF);
@@ -329,7 +328,7 @@ __create_hw_context(struct drm_i915_private *dev_priv,
 	 * is no remap info, it will be a NOP. */
 	ctx->remap_slice = ALL_L3_SLICES(dev_priv);
 
-	ctx->bannable = true;
+	i915_gem_context_set_bannable(ctx);
 	ctx->ring_size = 4 * PAGE_SIZE;
 	ctx->desc_template = GEN8_CTX_ADDRESSING_MODE(dev_priv) <<
 			     GEN8_CTX_ADDRESSING_MODE_SHIFT;
@@ -433,6 +432,7 @@ int i915_gem_context_init(struct drm_i915_private *dev_priv)
 		return PTR_ERR(ctx);
 	}
 
+	i915_gem_context_clear_bannable(ctx);
 	ctx->priority = I915_PRIORITY_MIN; /* lowest priority; idle task */
 	dev_priv->kernel_context = ctx;
 
@@ -1005,10 +1005,10 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 			args->value = to_i915(dev)->ggtt.base.total;
 		break;
 	case I915_CONTEXT_PARAM_NO_ERROR_CAPTURE:
-		args->value = !!(ctx->flags & CONTEXT_NO_ERROR_CAPTURE);
+		args->value = i915_gem_context_no_error_capture(ctx);
 		break;
 	case I915_CONTEXT_PARAM_BANNABLE:
-		args->value = ctx->bannable;
+		args->value = i915_gem_context_is_bannable(ctx);
 		break;
 	default:
 		ret = -EINVAL;
@@ -1050,22 +1050,22 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 		}
 		break;
 	case I915_CONTEXT_PARAM_NO_ERROR_CAPTURE:
-		if (args->size) {
+		if (args->size)
 			ret = -EINVAL;
-		} else {
-			if (args->value)
-				ctx->flags |= CONTEXT_NO_ERROR_CAPTURE;
-			else
-				ctx->flags &= ~CONTEXT_NO_ERROR_CAPTURE;
-		}
+		else if (args->value)
+			i915_gem_context_set_no_error_capture(ctx);
+		else
+			i915_gem_context_clear_no_error_capture(ctx);
 		break;
 	case I915_CONTEXT_PARAM_BANNABLE:
 		if (args->size)
 			ret = -EINVAL;
 		else if (!capable(CAP_SYS_ADMIN) && !args->value)
 			ret = -EPERM;
+		else if (args->value)
+			i915_gem_context_set_bannable(ctx);
 		else
-			ctx->bannable = args->value;
+			i915_gem_context_clear_bannable(ctx);
 		break;
 	default:
 		ret = -EINVAL;
