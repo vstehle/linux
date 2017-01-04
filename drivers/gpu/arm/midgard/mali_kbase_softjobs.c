@@ -215,7 +215,7 @@ static void kbase_fence_callback(struct dma_fence *fence, struct dma_fence_cb *c
 	 * The status os only valid if fence is signaled, which is true in callback.
 	 * If negative then cancel this atom and its dependencies.
 	 */
-	if (fence->status < 0)
+	if (fence->error < 0)
 		katom->event_code = BASE_JD_EVENT_JOB_CANCELLED;
 
 	/* To prevent a potential deadlock we schedule the work onto the job_done_wq workqueue
@@ -233,8 +233,8 @@ static int kbase_sync_file_wait_async(struct sync_file *sfile,
 				      struct dma_fence_cb *cb)
 {
 	if (dma_fence_is_signaled(sfile->fence)) {
-		if (sfile->fence->status < 0)
-			return sfile->fence->status;
+		if (sfile->fence->error < 0)
+			return sfile->fence->error;
 		return 1;
 	}
 

@@ -98,7 +98,7 @@ void kbase_sync_signal_fence(struct dma_fence *fence, int result)
 	unsigned long flags;
 	int diff;
 
-	pt->base.status = result;
+	pt->base.error = result;
 
 	/* timeline.value is protected by child_list_lock */
 	spin_lock_irqsave(&tl->child_list_lock, flags);
