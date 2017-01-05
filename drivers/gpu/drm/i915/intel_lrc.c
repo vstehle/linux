@@ -784,6 +784,7 @@ static int execlists_context_pin(struct intel_engine_cs *engine,
 		if (ret)
 			goto err;
 	}
+	GEM_BUG_ON(!ce->state);
 
 	flags = PIN_GLOBAL;
 	if (ctx->ggtt_offset_bias)
