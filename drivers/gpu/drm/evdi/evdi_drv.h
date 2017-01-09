@@ -19,6 +19,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_rect.h>
 # include <drm/drm_gem.h>
+#include <drm/drm_cache.h>
 #include "evdi_debug.h"
 
 #define DRIVER_NAME   "evdi"
