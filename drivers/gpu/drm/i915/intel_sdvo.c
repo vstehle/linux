@@ -2180,12 +2180,15 @@ done:
 static int
 intel_sdvo_connector_register(struct drm_connector *connector)
 {
+	struct drm_device *dev = connector->dev;
 	struct intel_sdvo *sdvo = intel_attached_sdvo(connector);
 	int ret;
 
 	ret = intel_connector_register(connector);
 	if (ret)
 		return ret;
+
+	intel_i2c_register(dev, connector, sdvo->ddc_bus);
 
 	return sysfs_create_link(&connector->kdev->kobj,
 				 &sdvo->ddc.dev.kobj,
@@ -2396,9 +2399,6 @@ intel_sdvo_connector_init(struct intel_sdvo_connector *connector,
 	connector->base.get_hw_state = intel_sdvo_connector_get_hw_state;
 
 	intel_connector_attach_encoder(&connector->base, &encoder->base);
-
-	intel_i2c_register(encoder->base.base.dev, &connector->base.base,
-			   encoder->ddc_bus);
 
 	return 0;
 }

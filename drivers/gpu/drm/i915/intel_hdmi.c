@@ -1760,6 +1760,16 @@ static void chv_hdmi_pre_enable(struct intel_encoder *encoder)
 	chv_phy_release_cl2_override(encoder);
 }
 
+static int intel_hdmi_connector_register(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
+
+	intel_i2c_register(dev, connector, intel_hdmi->ddc_bus);
+
+	return intel_connector_register(connector);
+}
+
 static void intel_hdmi_destroy(struct drm_connector *connector)
 {
 	kfree(to_intel_connector(connector)->detect_edid);
@@ -1774,7 +1784,7 @@ static const struct drm_connector_funcs intel_hdmi_connector_funcs = {
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = intel_hdmi_set_property,
 	.atomic_get_property = intel_connector_atomic_get_property,
-	.late_register = intel_connector_register,
+	.late_register = intel_hdmi_connector_register,
 	.early_unregister = intel_connector_unregister,
 	.destroy = intel_hdmi_destroy,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
@@ -1928,8 +1938,6 @@ void intel_hdmi_init_connector(struct intel_digital_port *intel_dig_port,
 
 	intel_connector_attach_encoder(intel_connector, intel_encoder);
 	intel_hdmi->attached_connector = intel_connector;
-
-	intel_i2c_register(dev, connector, intel_hdmi->ddc_bus);
 
 	/* For G4X desktop chip, PEG_BAND_GAP_DATA 3:0 must first be written
 	 * 0xd.  Failure to do so will result in spurious interrupts being

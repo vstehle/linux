@@ -714,6 +714,16 @@ static int intel_crt_set_property(struct drm_connector *connector,
 	return 0;
 }
 
+static int intel_crt_connector_register(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	intel_i2c_register(dev, connector, dev_priv->vbt.crt_ddc_pin);
+
+	return intel_connector_register(connector);
+}
+
 static void intel_crt_reset(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
@@ -744,7 +754,7 @@ static const struct drm_connector_funcs intel_crt_connector_funcs = {
 	.dpms = drm_atomic_helper_connector_dpms,
 	.detect = intel_crt_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
-	.late_register = intel_connector_register,
+	.late_register = intel_crt_connector_register,
 	.early_unregister = intel_connector_unregister,
 	.destroy = intel_crt_destroy,
 	.set_property = intel_crt_set_property,
@@ -880,8 +890,6 @@ void intel_crt_init(struct drm_device *dev)
 	intel_connector->get_hw_state = intel_connector_get_hw_state;
 
 	drm_connector_helper_add(connector, &intel_crt_connector_helper_funcs);
-
-	intel_i2c_register(dev, connector, dev_priv->vbt.crt_ddc_pin);
 
 	if (!I915_HAS_HOTPLUG(dev))
 		intel_connector->polled = DRM_CONNECTOR_POLL_CONNECT;
