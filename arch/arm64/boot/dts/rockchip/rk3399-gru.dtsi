@@ -946,6 +946,9 @@ ap_i2c_audio: &i2c8 {
 			#extcon-cells = <0>;
 		};
 
+		pdupdate {
+			compatible = "google,cros-ec-pd-update";
+		};
 	};
 };
 
