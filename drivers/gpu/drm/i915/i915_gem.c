@@ -3609,8 +3609,7 @@ i915_gem_object_unpin_from_display_plane(struct i915_vma *vma)
 		vma->display_alignment = 0;
 
 	/* Bump the LRU to try and avoid premature eviction whilst flipping  */
-	if (!i915_vma_is_active(vma))
-		list_move_tail(&vma->vm_link, &vma->vm->inactive_list);
+	i915_gem_object_bump_inactive_ggtt(vma->obj);
 
 	i915_vma_unpin(vma);
 }
