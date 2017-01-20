@@ -1112,12 +1112,11 @@ static void bxt_de_pll_enable(struct drm_i915_private *dev_priv, int vco)
 	dev_priv->cdclk_pll.vco = vco;
 }
 
-static void bxt_set_cdclk(struct drm_i915_private *dev_priv, int cdclk)
+static void bxt_set_cdclk(struct drm_i915_private *dev_priv,
+			  int cdclk, int vco)
 {
 	u32 val, divider;
-	int vco, ret;
-
-	vco = bxt_de_pll_vco(dev_priv, cdclk);
+	int ret;
 
 	DRM_DEBUG_DRIVER("Changing CDCLK to %d kHz (VCO %d kHz)\n",
 			 cdclk, vco);
@@ -1249,6 +1248,8 @@ sanitize:
  */
 void bxt_init_cdclk(struct drm_i915_private *dev_priv)
 {
+	int cdclk, vco;
+
 	bxt_sanitize_cdclk(dev_priv);
 
 	if (dev_priv->cdclk_freq != 0 && dev_priv->cdclk_pll.vco != 0)
@@ -1259,7 +1260,10 @@ void bxt_init_cdclk(struct drm_i915_private *dev_priv)
 	 * - The initial CDCLK needs to be read from VBT.
 	 *   Need to make this change after VBT has changes for BXT.
 	 */
-	bxt_set_cdclk(dev_priv, bxt_calc_cdclk(0));
+	cdclk = bxt_calc_cdclk(0);
+	vco = bxt_de_pll_vco(dev_priv, cdclk);
+
+	bxt_set_cdclk(dev_priv, cdclk, vco);
 }
 
 /**
@@ -1271,7 +1275,7 @@ void bxt_init_cdclk(struct drm_i915_private *dev_priv)
  */
 void bxt_uninit_cdclk(struct drm_i915_private *dev_priv)
 {
-	bxt_set_cdclk(dev_priv, dev_priv->cdclk_pll.ref);
+	bxt_set_cdclk(dev_priv, dev_priv->cdclk_pll.ref, 0);
 }
 
 static int bdw_adjust_min_pipe_pixel_rate(struct intel_crtc_state *crtc_state,
@@ -1480,12 +1484,15 @@ static int bxt_modeset_calc_cdclk(struct drm_atomic_state *state)
 
 static void bxt_modeset_commit_cdclk(struct drm_atomic_state *old_state)
 {
-	struct drm_device *dev = old_state->dev;
+	struct drm_i915_private *dev_priv = to_i915(old_state->dev);
 	struct intel_atomic_state *old_intel_state =
 		to_intel_atomic_state(old_state);
 	unsigned int req_cdclk = old_intel_state->dev_cdclk;
+	unsigned int req_vco;
 
-	bxt_set_cdclk(to_i915(dev), req_cdclk);
+	req_vco = bxt_de_pll_vco(dev_priv, req_cdclk);
+
+	bxt_set_cdclk(dev_priv, req_cdclk, req_vco);
 }
 
 static int intel_compute_max_dotclk(struct drm_i915_private *dev_priv)
