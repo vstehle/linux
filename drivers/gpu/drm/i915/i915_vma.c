@@ -90,7 +90,7 @@ vma_create(struct drm_i915_gem_object *obj,
 	vma->obj = obj;
 	vma->size = obj->base.size;
 
-	if (view) {
+	if (view && view->type != I915_GGTT_VIEW_NORMAL) {
 		vma->ggtt_view = *view;
 		if (view->type == I915_GGTT_VIEW_PARTIAL) {
 			GEM_BUG_ON(range_overflows_t(u64,
