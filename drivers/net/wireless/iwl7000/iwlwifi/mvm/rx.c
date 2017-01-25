@@ -767,8 +767,11 @@ void iwl_mvm_handle_rx_statistics(struct iwl_mvm *mvm,
 	u32 temperature;
 	int i;
 
-	if (iwl_rx_packet_payload_len(pkt) != expected_size)
-		goto invalid;
+	if (iwl_rx_packet_payload_len(pkt) != expected_size) {
+		IWL_ERR(mvm, "received invalid statistics size (%d)!\n",
+			iwl_rx_packet_payload_len(pkt));
+		return;
+	}
 
 	temperature = le32_to_cpu(stats->general.radio_temperature);
 	data.mac_id = stats->rx.general.mac_id;
@@ -836,11 +839,6 @@ void iwl_mvm_handle_rx_statistics(struct iwl_mvm *mvm,
 	}
 	spin_unlock(&mvm->tcm.lock);
 #endif
-	return;
-
- invalid:
-	IWL_ERR(mvm, "received invalid statistics size (%d)!\n",
-		iwl_rx_packet_payload_len(pkt));
 }
 
 void iwl_mvm_rx_statistics(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
