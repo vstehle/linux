@@ -554,7 +554,7 @@
 };
 
 &dmc_opp_table {
-	opp04 {
+	opp03 {
 		opp-suspend;
 	};
 };
