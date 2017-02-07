@@ -891,8 +891,7 @@ static void gen9_dc_off_power_well_enable(struct drm_i915_private *dev_priv,
 {
 	gen9_set_dc_state(dev_priv, DC_STATE_DISABLE);
 
-	WARN_ON(dev_priv->cdclk_freq !=
-		dev_priv->display.get_display_clock_speed(dev_priv));
+	WARN_ON(dev_priv->cdclk_freq != dev_priv->display.get_cdclk(dev_priv));
 
 	if (IS_BROXTON(dev_priv))
 		bxt_verify_ddi_phy_power_wells(dev_priv);
