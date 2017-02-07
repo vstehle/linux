@@ -889,9 +889,12 @@ static bool gen9_dc_off_power_well_enabled(struct drm_i915_private *dev_priv,
 static void gen9_dc_off_power_well_enable(struct drm_i915_private *dev_priv,
 					  struct i915_power_well *power_well)
 {
+	struct intel_cdclk_state cdclk_state = {};
+
 	gen9_set_dc_state(dev_priv, DC_STATE_DISABLE);
 
-	WARN_ON(dev_priv->cdclk_freq != dev_priv->display.get_cdclk(dev_priv));
+	dev_priv->display.get_cdclk(dev_priv, &cdclk_state);
+	WARN_ON(!intel_cdclk_state_compare(&dev_priv->cdclk.hw, &cdclk_state));
 
 	if (IS_BROXTON(dev_priv))
 		bxt_verify_ddi_phy_power_wells(dev_priv);
