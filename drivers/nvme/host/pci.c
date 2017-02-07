@@ -38,6 +38,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/t10-pi.h>
+#include <linux/pm_qos.h>
 #include <linux/types.h>
 #include <linux/pr.h>
 #include <scsi/sg.h>
@@ -72,6 +73,11 @@ module_param(nvme_major, int, 0);
 
 static int nvme_char_major;
 module_param(nvme_char_major, int, 0);
+
+static unsigned long default_ps_max_latency_us = 25000;
+module_param(default_ps_max_latency_us, ulong, 0644);
+MODULE_PARM_DESC(default_ps_max_latency_us,
+		 "max power saving latency for new devices; use PM QOS to change per device");
 
 static int use_threaded_interrupts;
 module_param(use_threaded_interrupts, int, 0);
@@ -1799,6 +1805,122 @@ static int nvme_shutdown_ctrl(struct nvme_dev *dev)
 	return 0;
 }
 
+static void nvme_configure_apst(struct nvme_dev *dev)
+{
+	/*
+	 * APST (Autonomous Power State Transition) lets us program a
+	 * table of power state transitions that the controller will
+	 * perform automatically.  We configure it with a simple
+	 * heuristic: we are willing to spend at most 2% of the time
+	 * transitioning between power states.  Therefore, when running
+	 * in any given state, we will enter the next lower-power
+	 * non-operational state after waiting 100 * (enlat + exlat)
+	 * microseconds, as long as that state's total latency is under
+	 * the requested maximum latency.
+	 *
+	 * We will not autonomously enter any non-operational state for
+	 * which the total latency exceeds ps_max_latency_us.  Users
+	 * can set ps_max_latency_us to zero to turn off APST.
+	 */
+
+	unsigned apste;
+	struct nvme_feat_auto_pst *table;
+	int ret;
+
+	/*
+	 * If APST isn't supported or if we haven't been initialized yet,
+	 * then don't do anything.
+	 */
+	if (!dev->apsta)
+		return;
+
+	if (dev->npss > 31) {
+		dev_warn(dev->device, "NPSS is invalid; not using APST\n");
+		return;
+	}
+
+	table = kzalloc(sizeof(*table), GFP_KERNEL);
+	if (!table)
+		return;
+
+	if (dev->ps_max_latency_us == 0) {
+		/* Turn off APST. */
+		apste = 0;
+	} else {
+		__le64 target = cpu_to_le64(0);
+		int state;
+
+		/*
+		 * Walk through all states from lowest- to highest-power.
+		 * According to the spec, lower-numbered states use more
+		 * power.  NPSS, despite the name, is the index of the
+		 * lowest-power state, not the number of states.
+		 */
+		for (state = (int)dev->npss; state >= 0; state--) {
+			u64 total_latency_us, transition_ms;
+
+			if (target)
+				table->entries[state] = target;
+
+			/*
+			 * Is this state a useful non-operational state for
+			 * higher-power states to autonomously transition to?
+			 */
+			if (!(dev->psd[state].flags &
+			      NVME_PS_FLAGS_NON_OP_STATE))
+				continue;
+
+			total_latency_us =
+				(u64)le32_to_cpu(dev->psd[state].entry_lat) +
+				+ le32_to_cpu(dev->psd[state].exit_lat);
+			if (total_latency_us > dev->ps_max_latency_us)
+				continue;
+
+			/*
+			 * This state is good.  Use it as the APST idle
+			 * target for higher power states.
+			 */
+			transition_ms = total_latency_us + 19;
+			do_div(transition_ms, 20);
+			if (transition_ms > (1 << 24) - 1)
+				transition_ms = (1 << 24) - 1;
+
+			target = cpu_to_le64((state << 3) |
+					     (transition_ms << 8));
+		}
+
+		apste = 1;
+	}
+
+	ret = nvme_set_features(dev, NVME_FEAT_AUTO_PST, apste,
+				table, sizeof(*table), NULL);
+	if (ret)
+		dev_err(dev->device, "failed to set APST feature (%d)\n", ret);
+
+	kfree(table);
+}
+
+static void nvme_set_latency_tolerance(struct device *dev, s32 val)
+{
+	struct nvme_dev *ndev = dev_get_drvdata(dev);
+	u64 latency;
+
+	switch (val) {
+	case PM_QOS_LATENCY_TOLERANCE_NO_CONSTRAINT:
+	case PM_QOS_LATENCY_ANY:
+		latency = U64_MAX;
+		break;
+
+	default:
+		latency = val;
+	}
+
+	if (ndev->ps_max_latency_us != latency) {
+		ndev->ps_max_latency_us = latency;
+		nvme_configure_apst(ndev);
+	}
+}
+
 static struct blk_mq_ops nvme_mq_admin_ops = {
 	.queue_rq	= nvme_queue_rq,
 	.map_queue	= blk_mq_map_queue,
@@ -2748,6 +2870,7 @@ static int nvme_dev_add(struct nvme_dev *dev)
 	int res;
 	struct nvme_id_ctrl *ctrl;
 	int shift = NVME_CAP_MPSMIN(lo_hi_readq(&dev->bar->cap)) + 12;
+	u8 prev_apsta;
 
 	res = nvme_identify_ctrl(dev, &ctrl);
 	if (res) {
@@ -2777,7 +2900,20 @@ static int nvme_dev_add(struct nvme_dev *dev)
 		} else
 			dev->max_hw_sectors = max_hw_sectors;
 	}
+
+	dev->npss = ctrl->npss;
+	prev_apsta = dev->apsta;
+	dev->apsta = ctrl->apsta;
+	memcpy(dev->psd, ctrl->psd, sizeof(ctrl->psd));
+
 	kfree(ctrl);
+
+	if (dev->apsta && !prev_apsta)
+		dev_pm_qos_expose_latency_tolerance(dev->device);
+	else if (!dev->apsta && prev_apsta)
+		dev_pm_qos_hide_latency_tolerance(dev->device);
+
+	nvme_configure_apst(dev);
 
 	if (!dev->tagset.tags) {
 		dev->tagset.ops = &nvme_mq_ops;
@@ -3500,6 +3636,14 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 	get_device(dev->device);
 	dev_set_drvdata(dev->device, dev);
+
+	/*
+	 * Initialize latency tolerance controls.  The sysfs files won't
+	 * be visible to userspace unless the device actually supports APST.
+	 */
+	dev->device->power.set_latency_tolerance = nvme_set_latency_tolerance;
+	dev_pm_qos_update_user_latency_tolerance(dev->device,
+		min(default_ps_max_latency_us, (unsigned long)S32_MAX));
 
 	result = device_create_file(dev->device, &dev_attr_reset_controller);
 	if (result)

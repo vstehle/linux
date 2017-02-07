@@ -78,10 +78,17 @@ struct nvme_dev {
 	u16 abort_limit;
 	u8 event_limit;
 	u8 vwc;
+	u8 npss;
+	u8 apsta;
 	u32 *dbbuf_dbs;
 	dma_addr_t dbbuf_dbs_dma_addr;
 	u32 *dbbuf_eis;
 	dma_addr_t dbbuf_eis_dma_addr;
+
+	struct nvme_id_power_state psd[32];
+
+	/* Power saving configuration */
+	u64 ps_max_latency_us;
 };
 
 /*
