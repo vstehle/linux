@@ -4421,11 +4421,15 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		      yesno(intel_dp_source_supports_hbr2(intel_dp)),
 		      yesno(drm_dp_tps3_supported(intel_dp->dpcd)));
 
-	/* Set the max lane count for sink */
-	intel_dp->max_sink_lane_count = drm_dp_max_lane_count(intel_dp->dpcd);
+	if (intel_dp->reset_link_params) {
+		/* Set the max lane count for sink */
+		intel_dp->max_sink_lane_count = drm_dp_max_lane_count(intel_dp->dpcd);
 
-	/* Set the max link BW for sink */
-	intel_dp->max_sink_link_bw = intel_dp_max_link_bw(intel_dp);
+		/* Set the max link BW for sink */
+		intel_dp->max_sink_link_bw = intel_dp_max_link_bw(intel_dp);
+
+		intel_dp->reset_link_params = false;
+	}
 
 	intel_dp_print_rates(intel_dp);
 
@@ -4793,6 +4797,8 @@ void intel_dp_encoder_reset(struct drm_encoder *encoder)
 	if (to_intel_encoder(encoder)->type != INTEL_OUTPUT_EDP)
 		return;
 
+	intel_dp->reset_link_params = true;
+
 	pps_lock(intel_dp);
 
 	/* Reinit the power sequencer, in case BIOS did something with it. */
@@ -4857,6 +4863,7 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 		      long_hpd ? "long" : "short");
 
 	if (long_hpd) {
+		intel_dp->reset_link_params = true;
 		intel_dp->detect_done = false;
 		return IRQ_NONE;
 	}
@@ -5656,6 +5663,7 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 		 intel_dig_port->max_lanes, port_name(port)))
 		return false;
 
+	intel_dp->reset_link_params = true;
 	intel_dp->pps_pipe = INVALID_PIPE;
 
 	/* intel_dp vfuncs */
