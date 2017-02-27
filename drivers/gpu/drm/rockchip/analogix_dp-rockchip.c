@@ -87,20 +87,6 @@ static int analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
 			dev_err(dp->dev, "line flag interrupt did not arrive\n");
 			return -ETIMEDOUT;
 		}
-
-		ret = analogix_dp_enable_psr(dp->adp);
-		if (ret) {
-			dev_err(dp->dev, "failed to enable psr %d\n", ret);
-			return ret;
-		}
-		rockchip_drm_set_win_enabled(crtc, false);
-	} else {
-		rockchip_drm_set_win_enabled(crtc, true);
-		ret = analogix_dp_disable_psr(dp->adp);
-		if (ret) {
-			dev_err(dp->dev, "failed to disable psr %d\n", ret);
-			return ret;
-		}
 	}
 	return 0;
 }
