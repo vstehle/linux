@@ -234,6 +234,7 @@ enum mtk_svs_state {
 
 struct mtk_svs_bank {
 	int bank_id;
+	int cpu_dev_id;
 
 	u32 flags;
 
@@ -264,7 +265,6 @@ struct mtk_svs_bank {
 };
 
 struct mtk_svs_bank_cfg {
-	int dev_id;
 	int ts;
 	int vmin_uV;
 	int vmax_uV;
@@ -362,7 +362,6 @@ static const struct mtk_thermal_sense_point
 
 static const struct mtk_svs_bank_cfg svs_bank_cfgs[MT8173_NUM_SVS_BANKS] = {
 	[MT8173_SVS_BANK_CA53] = {
-		.dev_id = 0,
 		.vmax_uV = 1125000,
 		.vmin_uV = 800000,
 		.vboot_uV = 1000000,
@@ -370,7 +369,6 @@ static const struct mtk_svs_bank_cfg svs_bank_cfgs[MT8173_NUM_SVS_BANKS] = {
 		.ts = MT8173_TS3
 	},
 	[MT8173_SVS_BANK_CA72] = {
-		.dev_id = 2,
 		.vmax_uV = 1125000,
 		.vmin_uV = 800000,
 		.vboot_uV = 1000000,
@@ -1038,10 +1036,9 @@ static int mtk_svs_bank_init(struct mtk_svs_bank *svs)
 
 	INIT_WORK(&svs->work, adjust_voltage_work);
 
-	svs->dev = get_cpu_device(svs_bank_cfgs[svs->bank_id].dev_id);
+	svs->dev = get_cpu_device(svs->cpu_dev_id);
 	if (!svs->dev) {
-		pr_err("failed to get cpu%d device\n",
-		       svs_bank_cfgs[svs->bank_id].dev_id);
+		pr_err("failed to get cpu%d device\n", svs->cpu_dev_id);
 		return -ENODEV;
 	}
 
@@ -1101,7 +1098,7 @@ static int mtk_svs_hw_init(struct mtk_thermal *mt)
 		svs = &svs_banks[i];
 
 		/* Backup current cpufreq policy */
-		ret = cpufreq_get_policy(&policy, svs_bank_cfgs[i].dev_id);
+		ret = cpufreq_get_policy(&policy, svs->cpu_dev_id);
 		if (ret) {
 			dev_err(svs->dev, "cpufreq is not ready.\n");
 			pm_qos_remove_request(&qos_request);
@@ -1131,7 +1128,7 @@ static int mtk_svs_hw_init(struct mtk_thermal *mt)
 
 		reinit_completion(&svs->init_done);
 
-		cpufreq_update_policy(svs_bank_cfgs[i].dev_id);
+		cpufreq_update_policy(svs->cpu_dev_id);
 
 		/* Check if the voltage is successfully set as 1.0 volt */
 		vboot_uV = regulator_get_voltage(svs->reg);
@@ -1167,7 +1164,7 @@ static int mtk_svs_hw_init(struct mtk_thermal *mt)
 		/* Unlimit CPUFreq OPP range */
 		svs->max_freq_khz = policy.max;
 		svs->min_freq_khz = policy.min;
-		cpufreq_update_policy(svs_bank_cfgs[i].dev_id);
+		cpufreq_update_policy(svs->cpu_dev_id);
 
 		/* Configure regulator to normal mode */
 		ret = regulator_set_mode(svs->reg, REGULATOR_MODE_NORMAL);
@@ -1211,7 +1208,7 @@ static int cpufreq_svs_notifier(struct notifier_block *nb, unsigned long event,
 	int i;
 
 	for (i = 0; i < MT8173_NUM_SVS_BANKS; i++) {
-		if (cpumask_test_cpu(svs_bank_cfgs[i].dev_id, policy->cpus))
+		if (cpumask_test_cpu(svs_banks[i].cpu_dev_id, policy->cpus))
 			break;
 	}
 
@@ -1278,11 +1275,39 @@ out:
 }
 late_initcall(mtk_svs_late_init);
 
+static int mtk_svs_get_cpu_id(struct platform_device *pdev)
+{
+	int ret;
+	struct device_node *np = pdev->dev.of_node;
+
+	ret = of_property_read_u32(np, "mediatek,svs-little-core-id",
+				  &svs_banks[MT8173_SVS_BANK_CA53].cpu_dev_id);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"Cannot find property mediatek,svs-little-core-id\n");
+		return ret;
+	}
+
+	ret = of_property_read_u32(np, "mediatek,svs-big-core-id",
+				  &svs_banks[MT8173_SVS_BANK_CA72].cpu_dev_id);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"Cannot find property mediatek,svs-big-core-id\n");
+		return ret;
+	}
+
+	return ret;
+}
+
 static int mtk_svs_probe(struct platform_device *pdev)
 {
 	struct mtk_thermal *mt = platform_get_drvdata(pdev);
 	char supply[8];
 	int i, ret;
+
+	ret = mtk_svs_get_cpu_id(pdev);
+	if (ret)
+		return ret;
 
 	mt->svs_pll = devm_clk_get(&pdev->dev, "svs_pll");
 	if (IS_ERR(mt->svs_pll)) {
