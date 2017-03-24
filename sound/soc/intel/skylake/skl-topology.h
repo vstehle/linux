@@ -321,6 +321,12 @@ struct skl_pipeline {
 	struct list_head node;
 };
 
+struct skl_module_deferred_bind {
+	struct skl_module_cfg *src;
+	struct skl_module_cfg *dst;
+	struct list_head node;
+};
+
 #define SKL_LIB_NAME_LENGTH 128
 #define SKL_MAX_LIB 16
 
