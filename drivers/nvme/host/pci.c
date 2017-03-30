@@ -127,6 +127,10 @@ struct nvme_queue {
 	u8 cq_phase;
 	u8 cqe_seen;
 	struct async_cmd_info cmdinfo;
+	u32 *dbbuf_sq_db;
+	u32 *dbbuf_cq_db;
+	u32 *dbbuf_sq_ei;
+	u32 *dbbuf_cq_ei;
 };
 
 /*
@@ -146,6 +150,121 @@ static inline void _nvme_check_size(void)
 	BUILD_BUG_ON(sizeof(struct nvme_id_ns) != 4096);
 	BUILD_BUG_ON(sizeof(struct nvme_lba_range_type) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_smart_log) != 512);
+	BUILD_BUG_ON(sizeof(struct nvme_dbbuf) != 64);
+}
+
+static inline unsigned int sq_idx(unsigned int qid, u32 stride)
+{
+	return qid * 2 * stride;
+}
+
+static inline unsigned int cq_idx(unsigned int qid, u32 stride)
+{
+	return (qid * 2 + 1) * stride;
+}
+
+static inline unsigned int nvme_dbbuf_size(u32 stride)
+{
+	return ((num_possible_cpus() + 1) * 8 * stride);
+}
+
+static int nvme_dbbuf_dma_alloc(struct nvme_dev *dev)
+{
+	unsigned int mem_size = nvme_dbbuf_size(dev->db_stride);
+
+	if (dev->dbbuf_dbs)
+		return 0;
+
+	dev->dbbuf_dbs = dma_alloc_coherent(dev->dev, mem_size,
+					    &dev->dbbuf_dbs_dma_addr,
+					    GFP_KERNEL);
+	if (!dev->dbbuf_dbs)
+		return -ENOMEM;
+	dev->dbbuf_eis = dma_alloc_coherent(dev->dev, mem_size,
+					    &dev->dbbuf_eis_dma_addr,
+					    GFP_KERNEL);
+	if (!dev->dbbuf_eis) {
+		dma_free_coherent(dev->dev, mem_size,
+				  dev->dbbuf_dbs, dev->dbbuf_dbs_dma_addr);
+		dev->dbbuf_dbs = NULL;
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static void nvme_dbbuf_dma_free(struct nvme_dev *dev)
+
+{
+	unsigned int mem_size = nvme_dbbuf_size(dev->db_stride);
+
+	if (dev->dbbuf_dbs) {
+		dma_free_coherent(dev->dev, mem_size,
+				  dev->dbbuf_dbs, dev->dbbuf_dbs_dma_addr);
+		dev->dbbuf_dbs = NULL;
+	}
+	if (dev->dbbuf_eis) {
+		dma_free_coherent(dev->dev, mem_size,
+				  dev->dbbuf_eis, dev->dbbuf_eis_dma_addr);
+		dev->dbbuf_eis = NULL;
+	}
+}
+
+static void nvme_dbbuf_init(struct nvme_dev *dev,
+			    struct nvme_queue *nvmeq, int qid)
+{
+	if (!dev->dbbuf_dbs || !qid)
+		return;
+
+	nvmeq->dbbuf_sq_db = &dev->dbbuf_dbs[sq_idx(qid, dev->db_stride)];
+	nvmeq->dbbuf_cq_db = &dev->dbbuf_dbs[cq_idx(qid, dev->db_stride)];
+	nvmeq->dbbuf_sq_ei = &dev->dbbuf_eis[sq_idx(qid, dev->db_stride)];
+	nvmeq->dbbuf_cq_ei = &dev->dbbuf_eis[cq_idx(qid, dev->db_stride)];
+}
+
+static void nvme_dbbuf_set(struct nvme_dev *dev)
+{
+	struct nvme_command c;
+
+	if (!dev->dbbuf_dbs)
+		return;
+
+	memset(&c, 0, sizeof(c));
+	c.dbbuf.opcode = nvme_admin_dbbuf;
+	c.dbbuf.prp1 = cpu_to_le64(dev->dbbuf_dbs_dma_addr);
+	c.dbbuf.prp2 = cpu_to_le64(dev->dbbuf_eis_dma_addr);
+
+	if (nvme_submit_sync_cmd(dev->admin_q, &c, NULL, 0)) {
+		dev_warn(dev->dev, "unable to set dbbuf\n");
+		/* Free memory and continue on */
+		nvme_dbbuf_dma_free(dev);
+	}
+}
+
+static inline int nvme_dbbuf_need_event(u16 event_idx, u16 new_idx, u16 old)
+{
+	return (u16)(new_idx - event_idx - 1) < (u16)(new_idx - old);
+}
+
+static void nvme_write_doorbell(u16 value, u32 __iomem *db, u32 *dbbuf_db,
+				volatile u32 *dbbuf_ei)
+{
+	if (dbbuf_db) {
+		u16 old_value;
+
+		/*
+		 * Ensure that the queue is written before updating
+		 * the doorbell in memory
+		 */
+		wmb();
+
+		old_value = *dbbuf_db;
+		*dbbuf_db = value;
+		if (!nvme_dbbuf_need_event(*dbbuf_ei, value, old_value))
+			return;
+	}
+
+	writel(value, db);
 }
 
 typedef void (*nvme_completion_fn)(struct nvme_queue *, void *,
@@ -401,7 +520,8 @@ static void __nvme_submit_cmd(struct nvme_queue *nvmeq,
 
 	if (++tail == nvmeq->q_depth)
 		tail = 0;
-	writel(tail, nvmeq->q_db);
+	nvme_write_doorbell(tail, nvmeq->q_db, nvmeq->dbbuf_sq_db,
+			    nvmeq->dbbuf_sq_ei);
 	nvmeq->sq_tail = tail;
 }
 
@@ -978,7 +1098,8 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 		return;
 
 	if (likely(nvmeq->cq_vector >= 0))
-		writel(head, nvmeq->q_db + nvmeq->dev->db_stride);
+		nvme_write_doorbell(head, nvmeq->q_db + nvmeq->dev->db_stride,
+				    nvmeq->dbbuf_cq_db, nvmeq->dbbuf_cq_ei);
 	nvmeq->cq_head = head;
 	nvmeq->cq_phase = phase;
 
@@ -1571,6 +1692,7 @@ static void nvme_init_queue(struct nvme_queue *nvmeq, u16 qid)
 	nvmeq->cq_phase = 1;
 	nvmeq->q_db = &dev->dbs[qid * 2 * dev->db_stride];
 	memset((void *)nvmeq->cqes, 0, CQ_SIZE(nvmeq->q_depth));
+	nvme_dbbuf_init(dev, nvmeq, qid);
 	dev->online_queues++;
 	spin_unlock_irq(&nvmeq->q_lock);
 }
@@ -2667,6 +2789,8 @@ static int nvme_dev_add(struct nvme_dev *dev)
 
 		if (blk_mq_alloc_tag_set(&dev->tagset))
 			return 0;
+
+		nvme_dbbuf_set(dev);
 	}
 	schedule_work(&dev->scan_work);
 	return 0;
@@ -3042,6 +3166,7 @@ static void nvme_free_dev(struct kref *kref)
 {
 	struct nvme_dev *dev = container_of(kref, struct nvme_dev, kref);
 
+	nvme_dbbuf_dma_free(dev);
 	put_device(dev->dev);
 	put_device(dev->device);
 	nvme_release_instance(dev);
@@ -3117,6 +3242,26 @@ static const struct file_operations nvme_dev_fops = {
 	.compat_ioctl	= nvme_dev_ioctl,
 };
 
+static int nvme_setup_dbbuf(struct nvme_dev *dev)
+{
+	struct nvme_id_ctrl *ctrl;
+	int res;
+
+	res = nvme_identify_ctrl(dev, &ctrl);
+	if (res) {
+		dev_err(dev->dev, "Identify Controller failed (%d)\n", res);
+		return res;
+	}
+	if (le16_to_cpu(ctrl->oacs) & NVME_CTRL_OACS_DBBUF_SUPP) {
+		if (nvme_dbbuf_dma_alloc(dev))
+			dev_warn(dev->dev,
+				 "unable to allocate dma for dbbuf\n");
+	}
+	kfree(ctrl);
+
+	return 0;
+}
+
 static void nvme_probe_work(struct work_struct *work)
 {
 	struct nvme_dev *dev = container_of(work, struct nvme_dev, probe_work);
@@ -3154,6 +3299,10 @@ static void nvme_probe_work(struct work_struct *work)
 	result = nvme_alloc_admin_tags(dev);
 	if (result)
 		goto disable;
+
+	result = nvme_setup_dbbuf(dev);
+	if (result)
+		goto free_tags;
 
 	result = nvme_setup_io_queues(dev);
 	if (result)

@@ -146,6 +146,7 @@ enum {
 	NVME_CTRL_ONCS_WRITE_UNCORRECTABLE	= 1 << 1,
 	NVME_CTRL_ONCS_DSM			= 1 << 2,
 	NVME_CTRL_VWC_PRESENT			= 1 << 0,
+	NVME_CTRL_OACS_DBBUF_SUPP               = 1 << 7,
 };
 
 struct nvme_lbaf {
@@ -385,6 +386,7 @@ enum nvme_admin_opcode {
 	nvme_admin_async_event		= 0x0c,
 	nvme_admin_activate_fw		= 0x10,
 	nvme_admin_download_fw		= 0x11,
+	nvme_admin_dbbuf                = 0x7C,
 	nvme_admin_format_nvm		= 0x80,
 	nvme_admin_security_send	= 0x81,
 	nvme_admin_security_recv	= 0x82,
@@ -517,6 +519,16 @@ struct nvme_format_cmd {
 	__u32			rsvd11[5];
 };
 
+struct nvme_dbbuf {
+	__u8                    opcode;
+	__u8                    flags;
+	__u16                   command_id;
+	__u32                   rsvd1[5];
+	__le64                  prp1;
+	__le64                  prp2;
+	__u32                   rsvd12[6];
+};
+
 struct nvme_command {
 	union {
 		struct nvme_common_command common;
@@ -530,6 +542,7 @@ struct nvme_command {
 		struct nvme_format_cmd format;
 		struct nvme_dsm_cmd dsm;
 		struct nvme_abort_cmd abort;
+		struct nvme_dbbuf dbbuf;
 	};
 };
 
