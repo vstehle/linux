@@ -230,4 +230,7 @@ int snd_skl_parse_uuids(struct sst_dsp *ctx, const struct firmware *fw,
 void skl_freeup_uuid_list(struct skl_sst *ctx);
 
 int skl_dsp_strip_extended_manifest(struct firmware *fw);
+int skl_sst_ctx_init(struct device *dev, int irq, const char *fw_name,
+		struct skl_dsp_loader_ops dsp_ops, struct skl_sst **dsp,
+		struct sst_dsp_device *skl_dev);
 #endif /*__SKL_SST_DSP_H__*/
