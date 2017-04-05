@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012 Red Hat
- * Copyright (c) 2015 - 2016 DisplayLink (UK) Ltd.
+ * Copyright (c) 2015 - 2017 DisplayLink (UK) Ltd.
  *
  * Based on parts on udlfb.c:
  * Copyright (C) 2009 its respective authors
@@ -17,17 +17,17 @@
 #include <drm/drmP.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
-#include <drm/drm_gem.h>
 #include <drm/drm_rect.h>
+# include <drm/drm_gem.h>
 #include "evdi_debug.h"
 
 #define DRIVER_NAME   "evdi"
 #define DRIVER_DESC   "Extensible Virtual Display Interface"
-#define DRIVER_DATE   "20161003"
+#define DRIVER_DATE   "20170417"
 
 #define DRIVER_MAJOR      1
 #define DRIVER_MINOR      4
-#define DRIVER_PATCHLEVEL 0
+#define DRIVER_PATCHLEVEL 1
 
 struct evdi_fbdev;
 struct evdi_painter;
@@ -84,10 +84,10 @@ long evdi_compat_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 int evdi_fbdev_init(struct drm_device *dev);
 void evdi_fbdev_cleanup(struct drm_device *dev);
 void evdi_fbdev_unplug(struct drm_device *dev);
-struct drm_framebuffer *evdi_fb_user_fb_create(struct drm_device *dev,
-					       struct drm_file *file,
-					       const struct drm_mode_fb_cmd2
-					       *mode_cmd);
+struct drm_framebuffer *evdi_fb_user_fb_create(
+				struct drm_device *dev,
+				struct drm_file *file,
+				const struct drm_mode_fb_cmd2 *mode_cmd);
 
 int evdi_dumb_create(struct drm_file *file_priv,
 		     struct drm_device *dev, struct drm_mode_create_dumb *args);
@@ -105,6 +105,7 @@ struct dma_buf *evdi_gem_prime_export(struct drm_device *dev,
 int evdi_gem_vmap(struct evdi_gem_object *obj);
 void evdi_gem_vunmap(struct evdi_gem_object *obj);
 int evdi_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma);
+
 int evdi_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
 
 void evdi_stats_init(struct evdi_device *evdi);
@@ -120,7 +121,6 @@ void evdi_painter_mode_changed_notify(struct evdi_device *evdi,
 				      struct drm_framebuffer *fb,
 				      struct drm_display_mode *mode);
 void evdi_painter_crtc_state_notify(struct evdi_device *evdi, int state);
-
 unsigned int evdi_painter_poll(struct file *filp,
 			       struct poll_table_struct *wait);
 

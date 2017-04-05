@@ -2,6 +2,7 @@
  * evdi_ioc32.c
  *
  * Copyright (c) 2016 The Chromium OS Authors
+ * Copyright (c) 2017 DisplayLink (UK) Ltd.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -43,7 +44,8 @@ struct drm_evdi_grabpix32 {
 	uint32_t rects_ptr32;
 };
 
-static int compat_evdi_connect(struct file *file, unsigned int cmd,
+static int compat_evdi_connect(struct file *file,
+				unsigned int __always_unused cmd,
 				unsigned long arg)
 {
 	struct drm_evdi_connect32 req32;
@@ -66,7 +68,8 @@ static int compat_evdi_connect(struct file *file, unsigned int cmd,
 			 (unsigned long)request);
 }
 
-static int compat_evdi_grabpix(struct file *file, unsigned int cmd,
+static int compat_evdi_grabpix(struct file *file,
+				unsigned int __always_unused cmd,
 				unsigned long arg)
 {
 	struct drm_evdi_grabpix32 req32;
