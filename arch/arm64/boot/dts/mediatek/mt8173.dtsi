@@ -132,3 +132,8 @@
 		};
 	};
 };
+
+&thermal {
+	mediatek,svs-little-core-id = <0>;
+	mediatek,svs-big-core-id = <2>;
+};
