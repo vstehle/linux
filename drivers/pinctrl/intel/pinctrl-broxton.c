@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/pinctrl/pinctrl.h>
+#include <linux/interrupt.h>
 
 #include "pinctrl-intel.h"
 
@@ -1009,7 +1010,7 @@ static int bxt_pinctrl_probe(struct platform_device *pdev)
 	const struct intel_pinctrl_soc_data **soc_table;
 	const struct acpi_device_id *id;
 	struct acpi_device *adev;
-	int i;
+	int i, irq;
 
 	adev = ACPI_COMPANION(&pdev->dev);
 	if (!adev)
@@ -1030,6 +1031,17 @@ static int bxt_pinctrl_probe(struct platform_device *pdev)
 
 	if (!soc_data)
 		return -ENODEV;
+
+	/* Configure parent IRQ of sdcard cd as a wake source. This is a hack and
+	 * needs to be reverted once we have actual fix in mainline kernel. This
+	 * change impacts Apollolake and Geminilake platforms.
+	 */
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0) {
+		dev_err(&pdev->dev, "failed to get interrupt number\n");
+		return irq;
+	}
+	enable_irq_wake(irq);
 
 	return intel_pinctrl_probe(pdev, soc_data);
 }
