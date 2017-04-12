@@ -68,6 +68,21 @@
 		};
 	};
 
+	front_camera_reg: fixedregulator@3 {
+		compatible = "regulator-fixed";
+		regulator-name = "fcam_ctrl";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		enable-active-high;
+		gpio = <&pio 84 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&front_camera_pins>;
+		regulator-always-on;
+		regulator-state-mem {
+			regulator-off-in-suspend;
+		};
+	};
+
 	gpio_keys: gpio-keys {
 		compatible = "gpio-keys";
 		pinctrl-names = "default";
@@ -497,6 +512,17 @@
 	disp_pwm0_pins: disp_pwm0_pins {
 		pins1 {
 			pinmux = <MT8173_PIN_87_DISP_PWM0__FUNC_DISP_PWM0>;
+			output-low;
+		};
+	};
+
+	front_camera_pins: front_camera_pins {
+		en_fcam_pwr {
+			pinmux = <MT8173_PIN_84_AUD_DAT_MISO__FUNC_GPIO84>;
+		};
+
+		cam_select_mipih_usbl {
+			pinmux = <MT8173_PIN_92_PCM_CLK__FUNC_GPIO92>;
 			output-low;
 		};
 	};
@@ -947,9 +973,13 @@
 			mt6397_vgp4_reg: ldo_vgp4 {
 				regulator-compatible = "ldo_vgp4";
 				regulator-name = "vgp4";
-				regulator-min-microvolt = <1200000>;
-				regulator-max-microvolt = <3300000>;
+				regulator-min-microvolt = <2800000>;
+				regulator-max-microvolt = <2800000>;
 				regulator-enable-ramp-delay = <218>;
+				regulator-always-on;
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
 			};
 
 			mt6397_vgp5_reg: ldo_vgp5 {
