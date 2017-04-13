@@ -141,7 +141,7 @@
 		gpio = <&pio 30 GPIO_ACTIVE_HIGH>;
 	};
 
-	panel_fixed_avee: regulator@1 {
+	panel_fixed_avee: regulator@2 {
 		compatible = "regulator-fixed";
 		regulator-name = "PANEL_AVEE";
 		regulator-min-microvolt = <5600000>;
@@ -150,7 +150,7 @@
 		gpio = <&pio 115 GPIO_ACTIVE_HIGH>;
 	};
 
-	panel_fixed_1v8: regulator@1 {
+	panel_fixed_1v8: regulator@3 {
 		compatible = "regulator-fixed";
 		regulator-name = "PANEL_1V8";
 		regulator-min-microvolt = <1800000>;
