@@ -1046,7 +1046,7 @@ mwifiex_create_custom_regdomain(struct mwifiex_private *priv,
 
 	for (idx = 0; idx < num_chan; idx++) {
 		u8 chan;
-		enum nl80211_band band;
+		enum ieee80211_band band;
 
 		chan = *buf++;
 		if (!chan) {
@@ -1054,14 +1054,14 @@ mwifiex_create_custom_regdomain(struct mwifiex_private *priv,
 			return NULL;
 		}
 		chflags = *buf++;
-		band = (chan <= 14) ? NL80211_BAND_2GHZ : NL80211_BAND_5GHZ;
+		band = (chan <= 14) ? IEEE80211_BAND_2GHZ : IEEE80211_BAND_5GHZ;
 		freq = ieee80211_channel_to_frequency(chan, band);
 		new_rule = false;
 
 		if (chflags & MWIFIEX_CHANNEL_DISABLED)
 			continue;
 
-		if (band == NL80211_BAND_5GHZ) {
+		if (band == IEEE80211_BAND_5GHZ) {
 			if (!(chflags & MWIFIEX_CHANNEL_NOHT80))
 				bw = MHZ_TO_KHZ(80);
 			else if (!(chflags & MWIFIEX_CHANNEL_NOHT40))
