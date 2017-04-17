@@ -51,9 +51,9 @@ CFLAGS_traps.o  += -mfixed-range=f2-f5,f16-f31
 include $(src)/Makefile.gate
 
 # We use internal kbuild rules to avoid the "is up to date" message from make
-arch/$(SRCARCH)/kernel/nr-irqs.s: arch/$(SRCARCH)/kernel/nr-irqs.c FORCE
-	$(call filechk,offsets,__ASM_NR_IRQS_H__)
-
-include/generated/nr-irqs.h: arch/$(SRCARCH)/kernel/nr-irqs.s
+arch/$(SRCARCH)/kernel/nr-irqs.s: arch/$(SRCARCH)/kernel/nr-irqs.c
 	$(Q)mkdir -p $(dir $@)
-	$(call cmd,nr_irqs)
+	$(call if_changed_dep,cc_s_c)
+
+include/generated/nr-irqs.h: arch/$(SRCARCH)/kernel/nr-irqs.s FORCE
+	$(call filechk,offsets,__ASM_NR_IRQS_H__)
