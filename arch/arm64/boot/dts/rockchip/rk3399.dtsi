@@ -411,6 +411,7 @@
 			snps,dis_u2_freeclk_exists_quirk;
 			snps,dis_u2_susphy_quirk;
 			snps,dis_del_phy_power_chg_quirk;
+			snps,dis-tx-ipgap-linecheck-quirk;
 			snps,usb3-slow-suspend-quirk;
 			snps,usb3-warm-reset-on-resume-quirk;
 			power-domains = <&power RK3399_PD_USB3>;
@@ -447,6 +448,7 @@
 			snps,dis_u2_freeclk_exists_quirk;
 			snps,dis_u2_susphy_quirk;
 			snps,dis_del_phy_power_chg_quirk;
+			snps,dis-tx-ipgap-linecheck-quirk;
 			snps,usb3-slow-suspend-quirk;
 			snps,usb3-warm-reset-on-resume-quirk;
 			power-domains = <&power RK3399_PD_USB3>;
