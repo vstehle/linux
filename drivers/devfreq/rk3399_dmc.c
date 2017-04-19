@@ -344,6 +344,7 @@ static int rk3399_dfi_event_handler(struct devfreq *devfreq, unsigned int event,
 			return ret;
 		}
 
+		devfreq_monitor_start(devfreq);
 		return sysfs_create_group(&devfreq->dev.kobj, &dev_attr_group);
 	case DEVFREQ_GOV_STOP:
 		ret = devfreq_event_disable_edev(edev);
@@ -352,6 +353,7 @@ static int rk3399_dfi_event_handler(struct devfreq *devfreq, unsigned int event,
 			return ret;
 		}
 
+		devfreq_monitor_stop(devfreq);
 		devfreq->data = NULL;
 		sysfs_remove_group(&devfreq->dev.kobj, &dev_attr_group);
 		break;
