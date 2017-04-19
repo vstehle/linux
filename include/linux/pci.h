@@ -1176,6 +1176,11 @@ int __must_check pci_bus_alloc_resource(struct pci_bus *bus,
 
 int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
 void pci_unmap_iospace(struct resource *res);
+void __iomem *devm_pci_remap_cfgspace(struct device *dev,
+				      resource_size_t offset,
+				      resource_size_t size);
+void __iomem *devm_pci_remap_cfg_resource(struct device *dev,
+					  struct resource *res);
 
 static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
 {
