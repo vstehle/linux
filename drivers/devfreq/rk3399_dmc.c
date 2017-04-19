@@ -601,29 +601,15 @@ static struct devfreq_dev_profile rk3399_devfreq_dmc_profile = {
 static __maybe_unused int rk3399_dmcfreq_suspend(struct device *dev)
 {
 	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-	int ret;
 
-	ret = devfreq_suspend_device(dmcfreq->devfreq);
-	if (ret < 0) {
-		dev_err(dev, "failed to suspend the devfreq devices\n");
-		return ret;
-	}
-
-	return 0;
+	return rockchip_dmcfreq_block(dmcfreq->devfreq);
 }
 
 static __maybe_unused int rk3399_dmcfreq_resume(struct device *dev)
 {
 	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-	int ret;
 
-	ret = devfreq_resume_device(dmcfreq->devfreq);
-	if (ret < 0) {
-		dev_err(dev, "failed to resume the devfreq devices\n");
-		return ret;
-	}
-
-	return ret;
+	return rockchip_dmcfreq_unblock(dmcfreq->devfreq);
 }
 
 static SIMPLE_DEV_PM_OPS(rk3399_dmcfreq_pm, rk3399_dmcfreq_suspend,
@@ -685,35 +671,39 @@ EXPORT_SYMBOL_GPL(rockchip_dmcfreq_unregister_clk_sync_nb);
 int rockchip_dmcfreq_block(struct devfreq *devfreq)
 {
 	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(devfreq->dev.parent);
+	int ret = 0;
 
 	mutex_lock(&dmcfreq->en_lock);
 	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count <= 0) {
 		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, false);
-		devfreq_suspend_device(devfreq);
+		ret = devfreq_suspend_device(devfreq);
 	}
 
-	dmcfreq->disable_count++;
+	if (!ret)
+		dmcfreq->disable_count++;
 	mutex_unlock(&dmcfreq->en_lock);
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(rockchip_dmcfreq_block);
 
 int rockchip_dmcfreq_unblock(struct devfreq *devfreq)
 {
 	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(devfreq->dev.parent);
+	int ret = 0;
 
 	mutex_lock(&dmcfreq->en_lock);
-	dmcfreq->disable_count--;
-	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count <= 0) {
+	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count > 0) {
 		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, true);
-		devfreq_resume_device(devfreq);
+		ret = devfreq_resume_device(devfreq);
 	}
 
+	if (!ret)
+		dmcfreq->disable_count--;
 	WARN_ON(dmcfreq->disable_count < 0);
 	mutex_unlock(&dmcfreq->en_lock);
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(rockchip_dmcfreq_unblock);
 
