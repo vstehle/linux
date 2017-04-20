@@ -1,4 +1,4 @@
-img_basedir := drivers/gpu/drm/img-rogue/
+img_basedir := drivers/gpu/drm/img-rogue/1.7/
 include $(img_basedir)/config_kernel.mk
 
 obj-$(CONFIG_DRM_POWERVR_ROGUE) += pvrsrvkm.o
