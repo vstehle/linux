@@ -140,6 +140,13 @@ ap_i2c_cam: &i2c2 {
 	phys = <&tcphy0_dp>;
 };
 
+// TODO: remove for new revisions, where centerlogic should be more stable.
+&dmc {
+	rockchip,pd_idle_dis_freq = <800000000>;
+	rockchip,sr_idle_dis_freq = <800000000>;
+	rockchip,sr_mc_gate_idle_dis_freq = <800000000>;
+};
+
 &mipi_dsi {
 	status = "okay";
 	panel {
