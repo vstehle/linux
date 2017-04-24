@@ -113,7 +113,7 @@
 
 		tablet_mode {
 			label = "Tablet_mode";
-			gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
+			gpios = <&pio 116 GPIO_ACTIVE_LOW>;
 			linux,code = <1>; /* SW_TABLET_MODE */
 			linux,input-type = <5>; /* EV_SW */
 			gpio-key,wakeup;
