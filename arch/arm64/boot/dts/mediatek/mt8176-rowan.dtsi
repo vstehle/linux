@@ -1010,10 +1010,6 @@
 	};
 };
 
-&scpsys {
-	mfg_async-supply = <&da9211_vgpu_reg>;
-};
-
 &spi {
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi_pins_a>;
