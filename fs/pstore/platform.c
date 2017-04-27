@@ -788,17 +788,17 @@ static void decompress_record(struct pstore_record *record)
 }
 
 /*
- * Read all the records from the persistent store. Create
+ * Read all the records from one persistent store backend. Create
  * files in our filesystem.  Don't warn about -EEXIST errors
  * when we are re-scanning the backing store looking to add new
  * error records.
  */
-void pstore_get_records(int quiet)
+void pstore_get_backend_records(struct pstore_info *psi,
+				struct dentry *root, int quiet)
 {
-	struct pstore_info *psi = psinfo;
 	int failed = 0;
 
-	if (!psi)
+	if (!psi || !root)
 		return;
 
 	mutex_lock(&psi->read_mutex);
@@ -828,7 +828,7 @@ void pstore_get_records(int quiet)
 			break;
 
 		decompress_record(record);
-		rc = pstore_mkfile(record);
+		rc = pstore_mkfile(root, record);
 		if (rc) {
 			/* pstore_mkfile() did not take buf, so free it. */
 			kfree(record->buf);
