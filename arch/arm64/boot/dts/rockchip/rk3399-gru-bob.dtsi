@@ -153,6 +153,14 @@
 	};
 };
 
+&target {
+	temperature = <80000>;
+};
+
+&threshold {
+	temperature = <65000>;
+};
+
 &pinctrl {
 	wifi {
 		wlan_host_wake_l: wlan-host-wake-l {
