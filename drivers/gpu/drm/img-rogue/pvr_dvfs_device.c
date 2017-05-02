@@ -449,7 +449,6 @@ PVRSRV_ERROR InitDVFS(PVRSRV_DEVICE_NODE *psDeviceNode)
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,"PVRSRVInit: Failed to suspend DVFS"));
-		eError = eError;
 		goto err_exit;
 	}
 

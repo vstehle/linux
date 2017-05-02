@@ -1281,7 +1281,7 @@ void RGXHWPerfHostDeInit(void)
 	if (gpsRgxDevInfo && gpsRgxDevInfo->hLockHWPerfHostStream)
 	{
 		OSLockDestroy(gpsRgxDevInfo->hLockHWPerfHostStream);
-		gpsRgxDevInfo->hLockHWPerfHostStream = IMG_FALSE;
+		gpsRgxDevInfo->hLockHWPerfHostStream = NULL;
 	}
 
 	/* Clear global RGX device reference */
@@ -1791,8 +1791,8 @@ static PVRSRV_ERROR RGXHWPerfFTraceGPUEnable(void)
 		IMG_UINT64 ui64UFOFilter = RGX_HWPERF_EVENT_MASK_VALUE(RGX_HWPERF_UFO) &
 								   gpsRgxDevInfo->ui64HWPerfFilter;
 
-		eError = PVRSRVRGXCtrlHWPerfKM(NULL, gpsRgxDevNode, IMG_FALSE,
-		                               RGX_HWPERF_STREAM_ID0_FW,
+		eError = PVRSRVRGXCtrlHWPerfKM(NULL, gpsRgxDevNode, RGX_HWPERF_STREAM_ID0_FW,
+		                               IMG_FALSE,
 		                               RGX_HWPERF_EVENT_MASK_HW_KICKFINISH |
 		                               ui64UFOFilter);
 		PVR_LOGG_IF_ERROR(eError, "PVRSRVRGXCtrlHWPerfKM", err_out);
