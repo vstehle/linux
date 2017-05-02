@@ -15,10 +15,11 @@ config DRM_POWERVR_ROGUE
 	  information, see <http://www.imgtec.com/powervr/>.
 
 config DRM_POWERVR_ROGUE_1_7
-	tristate "PowerVR Rogue"
+	tristate "PowerVR Rogue v1.7"
 	depends on ARM64 || X86
 	depends on HAS_IOMEM
 	depends on DRM
+	depends on (DRM_POWERVR_ROGUE!=m && m) || (DRM_POWERVR_ROGUE!=y && y)
 	select DRM_KMS_HELPER
 	select PM_DEVFREQ
 	select DEVFREQ_GOV_SIMPLE_ONDEMAND
