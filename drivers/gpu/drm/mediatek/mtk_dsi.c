@@ -320,9 +320,6 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 
 	mipi_tx_rate = dsi->data_rate;
 
-	if (dsi->dual_dsi_mode)
-		mipi_tx_rate /= 2;
-
 	/* Store DSI data rate in MHz */
 	dsi->data_rate /= 1000000;
 
@@ -456,8 +453,6 @@ static void dsi_ps_control_vact(struct mtk_dsi *dsi)
 		dsi_buf_bpp = 3;
 
 	ps_wc = vm->hactive * dsi_buf_bpp;
-	if (dsi->dual_dsi_mode)
-		ps_wc /= 2;
 
 	ps_bpp_mode = ps_wc;
 
@@ -539,8 +534,6 @@ static void dsi_ps_control(struct mtk_dsi *dsi)
 	}
 
 	hactive = dsi->vm.hactive;
-	if (dsi->dual_dsi_mode)
-		hactive /= 2;
 	tmp_reg += (hactive * dsi_tmp_buf_bpp) & DSI_PS_WC;
 	mtk_dsi_write(dsi, tmp_reg, DSI_PSCTRL);
 }
@@ -790,6 +783,13 @@ static void mtk_dsi_encoder_mode_set(struct drm_encoder *encoder,
 	dsi->vm.hfront_porch = adjusted->hsync_start - adjusted->hdisplay;
 	dsi->vm.hsync_len = adjusted->hsync_end - adjusted->hsync_start;
 
+	if (dsi->dual_dsi_mode) {
+		dsi->vm.pixelclock /= 2;
+		dsi->vm.hactive /= 2;
+		dsi->vm.hback_porch /= 2;
+		dsi->vm.hfront_porch /= 2;
+		dsi->vm.hsync_len /= 2;
+	}
 	dsi->vm.vactive = adjusted->vdisplay;
 	dsi->vm.vback_porch = adjusted->vtotal - adjusted->vsync_end;
 	dsi->vm.vfront_porch = adjusted->vsync_start - adjusted->vdisplay;
