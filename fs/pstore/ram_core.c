@@ -478,9 +478,6 @@ static int persistent_ram_post_init(struct persistent_ram_zone *prz, u32 sig,
 
 	sig ^= PERSISTENT_RAM_SIG;
 
-	prz->buffer_lock = __RAW_SPIN_LOCK_UNLOCKED(buffer_lock);
-	prz->flags = flags;
-
 	if (prz->buffer->sig == sig) {
 		if (buffer_size(prz) > prz->buffer_size ||
 		    buffer_start(prz) > buffer_size(prz))
@@ -499,6 +496,8 @@ static int persistent_ram_post_init(struct persistent_ram_zone *prz, u32 sig,
 
 	prz->buffer->sig = sig;
 	persistent_ram_zap(prz);
+	prz->buffer_lock = __RAW_SPIN_LOCK_UNLOCKED(buffer_lock);
+	prz->flags = flags;
 
 	return 0;
 }
