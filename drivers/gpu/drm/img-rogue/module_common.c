@@ -124,9 +124,16 @@ EXPORT_SYMBOL(PhysHeapRegionGetCpuPAddr);
 EXPORT_SYMBOL(PhysHeapRegionGetSize);
 EXPORT_SYMBOL(PhysHeapCpuPAddrToDevPAddr);
 
+EXPORT_SYMBOL(PVRSRVGetDriverStatus);
 EXPORT_SYMBOL(PVRSRVSystemInstallDeviceLISR);
 EXPORT_SYMBOL(PVRSRVSystemUninstallDeviceLISR);
-#endif
+
+#include "pvr_notifier.h"
+EXPORT_SYMBOL(PVRSRVCheckStatus);
+
+#include "pvr_debug.h"
+EXPORT_SYMBOL(PVRSRVGetErrorStringKM);
+#endif /* defined(SUPPORT_DISPLAY_CLASS) */
 
 /* Host para-virtz call handlers  (required by guest drivers) */
 #if defined(PVRSRV_GPUVIRT_MULTIDRV_MODEL)
@@ -145,8 +152,6 @@ EXPORT_SYMBOL(PvzServerDestroyDevPhysHeaps2);
 #endif
 
 #if !(defined(PVRSRV_GPUVIRT_GUESTDRV) && defined(PVRSRV_GPUVIRT_MULTIDRV_MODEL))
-#include "pvr_notifier.h"
-
 /*
  * Export some symbols that may be needed by other drivers
  *
@@ -156,23 +161,12 @@ EXPORT_SYMBOL(PvzServerDestroyDevPhysHeaps2);
  * the kernel to manage the physical device), the other guest drivers
  * are all modules.
  */
-EXPORT_SYMBOL(PVRSRVCheckStatus);
-EXPORT_SYMBOL(PVRSRVGetDriverStatus);
-EXPORT_SYMBOL(PVRSRVGetErrorStringKM);
 
 #include "rgxapi_km.h"
 #if defined(SUPPORT_SHARED_SLC) && !defined(PVRSRV_GPUVIRT_GUESTDRV)
 /* Guest drivers do not perform device management so RGXInitSLC is absent */
 EXPORT_SYMBOL(RGXInitSLC);
 #endif
-
-EXPORT_SYMBOL(RGXHWPerfConnect);
-EXPORT_SYMBOL(RGXHWPerfDisconnect);
-EXPORT_SYMBOL(RGXHWPerfControl);
-EXPORT_SYMBOL(RGXHWPerfConfigureAndEnableCounters);
-EXPORT_SYMBOL(RGXHWPerfDisableCounters);
-EXPORT_SYMBOL(RGXHWPerfAcquireEvents);
-EXPORT_SYMBOL(RGXHWPerfReleaseEvents);
 #endif
 
 CONNECTION_DATA *LinuxConnectionFromFile(struct file *pFile)

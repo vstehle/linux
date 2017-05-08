@@ -247,7 +247,3 @@ int dbgdrv_ioctl_compat(struct file *file, unsigned int ioctlCmd, unsigned long 
 {
 	return dbgdrv_ioctl_work((void *) arg, IMG_TRUE);
 }
-
-
-
-EXPORT_SYMBOL(DBGDrvGetServiceTable);
