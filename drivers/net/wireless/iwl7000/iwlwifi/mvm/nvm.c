@@ -608,6 +608,8 @@ int iwl_mvm_nvm_get_from_fw(struct iwl_mvm *mvm)
 		return -EINVAL;
 	}
 
+	IWL_INFO(trans, "base HW address: %pM\n", mvm->nvm_data->hw_addr);
+
 	/* Initialize general data */
 	mvm->nvm_data->nvm_version = le16_to_cpu(rsp->general.nvm_version);
 
