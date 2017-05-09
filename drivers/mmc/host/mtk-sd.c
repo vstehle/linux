@@ -1675,7 +1675,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 			host->hs400_ds_delay);
 
 	if (!of_property_read_u32(pdev->dev.of_node, "sdr104-clk-delay",
-				&host->sdr104_clk_delay));
+				&host->sdr104_clk_delay))
 		dev_dbg(&pdev->dev, "sdr104-clk-delay: %x\n",
 			host->sdr104_clk_delay);
 
