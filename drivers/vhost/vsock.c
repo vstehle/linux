@@ -661,7 +661,7 @@ static const struct file_operations vhost_vsock_fops = {
 };
 
 static struct miscdevice vhost_vsock_misc = {
-	.minor = MISC_DYNAMIC_MINOR,
+	.minor = VHOST_VSOCK_MINOR,
 	.name = "vhost-vsock",
 	.fops = &vhost_vsock_fops,
 };
@@ -732,3 +732,5 @@ module_exit(vhost_vsock_exit);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Asias He");
 MODULE_DESCRIPTION("vhost transport for vsock ");
+MODULE_ALIAS_MISCDEV(VHOST_VSOCK_MINOR);
+MODULE_ALIAS("devname:vhost-vsock");
