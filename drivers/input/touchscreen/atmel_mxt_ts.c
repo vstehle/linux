@@ -506,6 +506,7 @@ static void mxt_save_aux_regs(struct mxt_data *data);
 static void mxt_start(struct mxt_data *data);
 static void mxt_stop(struct mxt_data *data);
 static int mxt_initialize(struct mxt_data *data);
+static int mxt_get_config_from_chip(struct mxt_data *data);
 static int mxt_input_dev_create(struct mxt_data *data);
 static int get_touch_major_pixels(struct mxt_data *data, int touch_channels);
 
@@ -1639,6 +1640,9 @@ static int mxt_handle_pdata(struct mxt_data *data)
 		return 0;
 	}
 
+	if (pdata->is_tp)
+		data->is_tp = true;
+
 	ret = mxt_apply_pdata_config(data);
 	if (ret)
 		return ret;
@@ -1942,6 +1946,13 @@ static int mxt_initialize(struct mxt_data *data)
 	mxt_save_power_config(data);
 	mxt_save_aux_regs(data);
 	mxt_stop(data);
+
+	error = mxt_get_config_from_chip(data);
+	if (error) {
+		dev_err(&client->dev,
+			"Failed to fetch config from chip: %d\n", error);
+		return error;
+	}
 
 	return 0;
 }
@@ -2400,6 +2411,12 @@ static int mxt_load_config(struct mxt_data *data, const struct firmware *fw)
 	mxt_stop(data);
 
 register_input_dev:
+	ret2 = mxt_get_config_from_chip(data);
+	if (ret2) {
+		dev_err(dev, "Failed to fetch config from chip (%d)\n", ret2);
+		ret = ret2;
+	}
+
 	ret2 = mxt_input_dev_create(data);
 	if (ret2) {
 		dev_err(dev, "Error creating input_dev (%d)\n", ret2);
@@ -3553,17 +3570,9 @@ static int mxt_input_uninhibit(struct input_dev *input)
 	return 0;
 }
 
-static int mxt_input_dev_create(struct mxt_data *data)
+static int mxt_get_config_from_chip(struct mxt_data *data)
 {
-	const struct mxt_platform_data *pdata = data->pdata;
-	struct input_dev *input_dev;
 	int error;
-	int max_area_channels;
-	int max_touch_major;
-
-	/* Don't need to register input_dev in bl mode */
-	if (mxt_in_bootloader(data))
-		return 0;
 
 	error = data->has_T9 ? mxt_calc_resolution_T9(data) :
 			       mxt_calc_resolution_T100(data);
@@ -3577,6 +3586,21 @@ static int mxt_input_dev_create(struct mxt_data *data)
 			return error;
 	}
 
+	return 0;
+}
+
+static int mxt_input_dev_create(struct mxt_data *data)
+{
+	const struct mxt_platform_data *pdata = data->pdata;
+	struct input_dev *input_dev;
+	int error;
+	int max_area_channels;
+	int max_touch_major;
+
+	/* Don't need to register input_dev in bl mode */
+	if (mxt_in_bootloader(data))
+		return 0;
+
 	/* Clear the existing one if it exists */
 	if (data->input_dev) {
 		input_unregister_device(data->input_dev);
@@ -3586,9 +3610,6 @@ static int mxt_input_dev_create(struct mxt_data *data)
 	input_dev = devm_input_allocate_device(&data->client->dev);
 	if (!input_dev)
 		return -ENOMEM;
-
-	if (pdata && pdata->is_tp)
-		data->is_tp = true;
 
 	input_dev->name = (data->is_tp) ? "Atmel maXTouch Touchpad" :
 					  "Atmel maXTouch Touchscreen";
@@ -3922,19 +3943,7 @@ static int mxt_probe(struct i2c_client *client,
 		if (error)
 			return error;
 
-		error = mxt_input_dev_create(data);
-		if (error)
-			return error;
 	}
-
-	/*
-	 * Force the device to report back status so we can cache the device
-	 * config checksum.
-	 */
-	error = mxt_write_object(data, MXT_GEN_COMMAND_T6,
-				 MXT_COMMAND_REPORTALL, 1);
-	if (error)
-		dev_warn(&client->dev, "error making device report status.\n");
 
 	/* Default to falling edge if no platform data provided */
 	irqflags = data->pdata ? data->pdata->irqflags : IRQF_TRIGGER_FALLING;
@@ -3948,7 +3957,20 @@ static int mxt_probe(struct i2c_client *client,
 		return error;
 	}
 
+	/*
+	 * Force the device to report back status so we can cache the device
+	 * config checksum.
+	 */
+	error = mxt_write_object(data, MXT_GEN_COMMAND_T6,
+				 MXT_COMMAND_REPORTALL, 1);
+	if (error)
+		dev_warn(&client->dev, "error making device report status.\n");
+
 	if (!mxt_in_bootloader(data)) {
+		error = mxt_input_dev_create(data);
+		if (error)
+			return error;
+
 		error = mxt_handle_messages(data, true);
 		if (error)
 			return error;
