@@ -20,6 +20,7 @@
 #include <drm/drm_flip_work.h>
 #include <drm/drm_plane_helper.h>
 
+#include <linux/atomic.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -29,6 +30,7 @@
 #include <linux/of_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/component.h>
+#include <linux/wait.h>
 
 #include <linux/reset.h>
 #include <linux/delay.h>
@@ -141,7 +143,8 @@ struct vop {
 	unsigned long pending;
 
 	ktime_t line_flag_timestamp;
-	struct completion line_flag_completion;
+	atomic_t line_flag_wait_count;
+	wait_queue_head_t line_flag_wq;
 	struct notifier_block dmc_nb;
 
 	const struct vop_data *data;
@@ -156,7 +159,6 @@ struct vop {
 	spinlock_t reg_lock;
 	/* lock vop irq reg */
 	spinlock_t irq_lock;
-	struct mutex vop_lock;
 
 	unsigned int irq;
 
@@ -511,23 +513,12 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
  * dsp_vact_end ----------------------------+     |   VOP_DSP_VACT_ST_END
  * dsp_total -------------------------------------+   VOP_DSP_VTOTAL_VS_END
  */
-static bool vop_line_flag_irq_is_enabled(struct vop *vop)
-{
-	uint32_t line_flag_irq;
-	unsigned long flags;
-
-	spin_lock_irqsave(&vop->irq_lock, flags);
-
-	line_flag_irq = VOP_INTR_GET_TYPE(vop, enable, LINE_FLAG_INTR);
-
-	spin_unlock_irqrestore(&vop->irq_lock, flags);
-
-	return !!line_flag_irq;
-}
-
-static void vop_line_flag_irq_enable(struct vop *vop)
+static void vop_line_flag_irq_get(struct vop *vop)
 {
 	unsigned long flags;
+
+	if (atomic_inc_return(&vop->line_flag_wait_count) != 1)
+		return;
 
 	if (WARN_ON(!vop->is_enabled))
 		return;
@@ -540,9 +531,12 @@ static void vop_line_flag_irq_enable(struct vop *vop)
 	spin_unlock_irqrestore(&vop->irq_lock, flags);
 }
 
-static void vop_line_flag_irq_disable(struct vop *vop)
+static void vop_line_flag_irq_put(struct vop *vop)
 {
 	unsigned long flags;
+
+	if (!atomic_dec_and_test(&vop->line_flag_wait_count))
+		return;
 
 	if (WARN_ON(!vop->is_enabled))
 		return;
@@ -656,7 +650,6 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
 		return;
 
 	rockchip_dmcfreq_unregister_clk_sync_nb(priv->devfreq, &vop->dmc_nb);
-	mutex_lock(&vop->vop_lock);
 	/*
 	 * We need to make sure that all windows are disabled before we
 	 * disable that crtc. Otherwise we might try to scan from a destroyed
@@ -712,7 +705,6 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
 	clk_disable(vop->aclk);
 	clk_disable(vop->hclk);
 	pm_runtime_put(vop->dev);
-	mutex_unlock(&vop->vop_lock);
 }
 
 static void vop_plane_destroy(struct drm_plane *plane)
@@ -1224,10 +1216,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
 	uint32_t pin_pol, val;
 	int ret;
 
-	mutex_lock(&vop->vop_lock);
 	ret = vop_enable(crtc);
 	if (ret) {
-		mutex_unlock(&vop->vop_lock);
 		DRM_DEV_ERROR(vop->dev, "Failed to enable vop (%d)\n", ret);
 		return;
 	}
@@ -1324,7 +1314,6 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
 
 	VOP_CTRL_SET(vop, standby, 0);
-	mutex_unlock(&vop->vop_lock);
 	rockchip_dmcfreq_register_clk_sync_nb(priv->devfreq, &vop->dmc_nb);
 }
 
@@ -1529,7 +1518,7 @@ static irqreturn_t vop_isr(int irq, void *data)
 
 	if (active_irqs & LINE_FLAG_INTR) {
 		vop->line_flag_timestamp = ktime_get();
-		complete(&vop->line_flag_completion);
+		wake_up_all(&vop->line_flag_wq);
 		active_irqs &= ~LINE_FLAG_INTR;
 		ret = IRQ_HANDLED;
 	}
@@ -1651,7 +1640,8 @@ static int vop_create_crtc(struct vop *vop)
 			   vop_fb_unref_worker);
 
 	init_completion(&vop->dsp_hold_completion);
-	init_completion(&vop->line_flag_completion);
+	init_waitqueue_head(&vop->line_flag_wq);
+	atomic_set(&vop->line_flag_wait_count, 0);
 	crtc->port = port;
 	rockchip_register_crtc_funcs(crtc, &private_crtc_funcs);
 
@@ -1829,6 +1819,8 @@ static void vop_win_init(struct vop *vop)
  * @mstimeout: millisecond for timeout
  *
  * Wait for vact_end line flag irq or timeout.
+ * Must be called from a context that is mutually exclusive with VOP
+ * enable/disable.
  *
  * Returns:
  * Zero on success, negative errno on failure.
@@ -1837,39 +1829,28 @@ int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout)
 {
 	struct vop *vop = to_vop(crtc);
 	unsigned long jiffies_left;
-	int ret = 0;
+	DEFINE_WAIT(wait);
 
 	if (!crtc || !vop->is_enabled)
 		return -ENODEV;
 
-	mutex_lock(&vop->vop_lock);
+	if (mstimeout <= 0)
+		return -EINVAL;
 
-	if (mstimeout <= 0) {
-		ret = -EINVAL;
-		goto out;
-	}
+	vop_line_flag_irq_get(vop);
 
-	if (vop_line_flag_irq_is_enabled(vop)) {
-		ret = -EBUSY;
-		goto out;
-	}
+	prepare_to_wait(&vop->line_flag_wq, &wait, TASK_UNINTERRUPTIBLE);
+	jiffies_left = schedule_timeout(msecs_to_jiffies(mstimeout));
+	finish_wait(&vop->line_flag_wq, &wait);
 
-	reinit_completion(&vop->line_flag_completion);
-	vop_line_flag_irq_enable(vop);
-
-	jiffies_left = wait_for_completion_timeout(&vop->line_flag_completion,
-						   msecs_to_jiffies(mstimeout));
-	vop_line_flag_irq_disable(vop);
+	vop_line_flag_irq_put(vop);
 
 	if (jiffies_left == 0) {
 		dev_err(vop->dev, "Timeout waiting for IRQ\n");
-		ret = -ETIMEDOUT;
-		goto out;
+		return -ETIMEDOUT;
 	}
 
-out:
-	mutex_unlock(&vop->vop_lock);
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(rockchip_drm_wait_vact_end);
 
@@ -1925,7 +1906,6 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
 
 	spin_lock_init(&vop->reg_lock);
 	spin_lock_init(&vop->irq_lock);
-	mutex_init(&vop->vop_lock);
 	vop->dmc_nb.notifier_call = dmc_notify;
 
 	ret = devm_request_irq(dev, vop->irq, vop_isr,
