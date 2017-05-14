@@ -472,10 +472,21 @@ struct drm_framebuffer *evdi_fb_user_fb_create(
 	int ret;
 	uint32_t size;
 
-	unsigned int depth;
 	int bpp;
+	const struct drm_format_info *info;
 
-	drm_fb_get_bpp_depth(mode_cmd->pixel_format, &depth, &bpp);
+	info = drm_format_info(mode_cmd->pixel_format);
+	if (!info || !info->depth) {
+		char *format_name = drm_get_format_name(mode_cmd->pixel_format);
+
+		DRM_DEBUG_KMS("unsupported pixel format %s\n", format_name);
+		kfree(format_name);
+
+		bpp = 0;
+	}
+	else
+		bpp = info->cpp[0] * 8;
+
 	if (bpp != 32) {
 		EVDI_ERROR("Unsupported bpp (%d)\n", bpp);
 		return ERR_PTR(-EINVAL);
