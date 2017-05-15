@@ -5,6 +5,8 @@
  *	Alex Chiang <achiang@hp.com>
  */
 
+#define DEBUG
+
 #include <linux/kobject.h>
 #include <linux/slab.h>
 #include <linux/module.h>

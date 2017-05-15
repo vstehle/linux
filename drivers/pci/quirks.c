@@ -11,6 +11,8 @@
  *  USB quirks file, where their drivers can access reuse it.
  */
 
+#define DEBUG
+
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/export.h>

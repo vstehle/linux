@@ -8,6 +8,8 @@
  *
  */
 
+#define DEBUG
+
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/init.h>

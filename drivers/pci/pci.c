@@ -7,6 +7,8 @@
  *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
  */
 
+#define DEBUG
+
 #include <linux/acpi.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>

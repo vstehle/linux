@@ -2,6 +2,8 @@
  * probe.c - PCI detection and setup code
  */
 
+#define DEBUG
+
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/init.h>

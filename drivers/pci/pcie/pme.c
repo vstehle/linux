@@ -10,6 +10,8 @@
  * for more details.
  */
 
+#define DEBUG
+
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>

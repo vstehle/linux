@@ -72,6 +72,8 @@ int pci_generic_config_read(struct pci_bus *bus, unsigned int devfn,
 {
 	void __iomem *addr;
 
+	printk("%s: %u:%u %#x(%d)\n", __func__, bus->number, devfn, where, size);
+
 	addr = bus->ops->map_bus(bus, devfn, where);
 	if (!addr) {
 		*val = ~0;
@@ -85,6 +87,8 @@ int pci_generic_config_read(struct pci_bus *bus, unsigned int devfn,
 	else
 		*val = readl(addr);
 
+	printk(" -> %#x\n", *val);
+
 	return PCIBIOS_SUCCESSFUL;
 }
 EXPORT_SYMBOL_GPL(pci_generic_config_read);
@@ -93,6 +97,8 @@ int pci_generic_config_write(struct pci_bus *bus, unsigned int devfn,
 			     int where, int size, u32 val)
 {
 	void __iomem *addr;
+
+	printk("%s: %u:%u %#x(%d) <- %#x\n", __func__, bus->number, devfn, where, size, val);
 
 	addr = bus->ops->map_bus(bus, devfn, where);
 	if (!addr)

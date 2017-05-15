@@ -31,6 +31,8 @@
  *   Dely Sy <dely.l.sy@intel.com>"
  */
 
+#define DEBUG
+
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>

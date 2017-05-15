@@ -28,6 +28,8 @@
  *   Scott Murray <scottm@somanetworks.com>
  */
 
+#define DEBUG
+
 #include <linux/module.h>	/* try_module_get & module_put */
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>

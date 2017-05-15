@@ -9,6 +9,7 @@
  * Support routines for initializing a PCI subsystem.
  */
 
+#define DEBUG
 
 #include <linux/kernel.h>
 #include <linux/pci.h>
