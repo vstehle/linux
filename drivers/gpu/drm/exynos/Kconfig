@@ -1,6 +1,7 @@
 config DRM_EXYNOS
 	tristate "DRM Support for Samsung SoC EXYNOS Series"
 	depends on OF && DRM && (PLAT_SAMSUNG || ARCH_MULTIPLATFORM)
+	depends on BROKEN
 	select DRM_KMS_HELPER
 	select DRM_KMS_FB_HELPER
 	select FB_CFB_FILLRECT
