@@ -96,7 +96,7 @@ static uint32_t mtk_atomic_crtc_mask(struct drm_device *drm,
 	int i;
 
 	for (i = 0, crtc_mask = 0; i < drm->mode_config.num_crtc; i++) {
-		struct drm_crtc *crtc = state->crtcs[i];
+		struct drm_crtc *crtc = state->crtcs[i].ptr;
 
 		if (!crtc)
 			continue;
