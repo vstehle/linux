@@ -318,7 +318,7 @@ static inline s64 timekeeping_get_ns(struct tk_read_base *tkr)
 	return timekeeping_delta_to_ns(tkr, delta);
 }
 
-static inline s64 timekeeping_cycles_to_ns(struct tk_read_base *tkr,
+static inline s64 __maybe_unused timekeeping_cycles_to_ns(struct tk_read_base *tkr,
 					    cycle_t cycles)
 {
 	cycle_t delta;
