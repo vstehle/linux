@@ -665,8 +665,10 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
 		spin_unlock(&vop->reg_lock);
 	}
 
-	if (vop->data->afbdc)
+	if (vop->data->afbdc) {
 		VOP_AFBDC_SET(vop, enable, 0);
+		vop->afbdc_win = NULL;
+	}
 
 	vop_cfg_done(vop);
 
