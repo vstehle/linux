@@ -342,6 +342,11 @@ rockchip_gem_create_object(struct drm_device *drm, unsigned int size,
 	struct rockchip_gem_object *rk_obj;
 	int ret;
 
+	if (!size) {
+		DRM_ERROR("gem buffer size is zero\n");
+		return ERR_PTR(-EINVAL);
+	}
+
 	rk_obj = rockchip_gem_alloc_object(drm, size);
 	if (IS_ERR(rk_obj))
 		return rk_obj;
