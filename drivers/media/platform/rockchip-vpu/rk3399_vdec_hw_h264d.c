@@ -302,8 +302,15 @@ static void rk3399_vdec_h264d_assemble_hw_rps(struct rockchip_vpu_ctx *ctx)
 
 	memset(hw_rps, 0, RKV_RPS_SIZE);
 
+	/*
+	 * Assign an invalid pic_num if DPB entry at that position is inactive.
+	 * If we assign 0 in that position hardware will treat that as a real
+	 * reference picture with pic_num 0, triggering output picture
+	 * corruption.
+	 */
 	for (i = 0; i < 16; i++)
-		p[i] = dpb[i].pic_num;
+		p[i] = (dpb[i].flags & V4L2_H264_DPB_ENTRY_FLAG_ACTIVE) ?
+			dpb[i].pic_num : 0xff;
 
 	for (j = 0; j < 3; j++) {
 		for (i = 0; i < 32; i++) {
