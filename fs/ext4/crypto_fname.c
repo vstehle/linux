@@ -314,7 +314,7 @@ int _ext4_fname_disk_to_usr(struct inode *inode,
 			    const struct ext4_str *iname,
 			    struct ext4_str *oname)
 {
-	char buf[EXT4_FNAME_CRYPTO_DIGEST_SIZE + sizeof(u64)];
+	char buf[24];
 	int ret;
 
 	if (iname->len < 3) {
@@ -339,16 +339,13 @@ int _ext4_fname_disk_to_usr(struct inode *inode,
 		return ret;
 	}
 	if (hinfo) {
-		memcpy(buf, &hinfo->hash, sizeof(u32));
-		memcpy(buf + sizeof(u32), &hinfo->minor_hash, sizeof(u32));
+		memcpy(buf, &hinfo->hash, 4);
+		memcpy(buf+4, &hinfo->minor_hash, 4);
 	} else
-		memset(buf, 0, sizeof(u64));
-	memcpy(buf + sizeof(u64),
-	       iname->name + iname->len - EXT4_FNAME_CRYPTO_DIGEST_SIZE,
-	       EXT4_FNAME_CRYPTO_DIGEST_SIZE);
+		memset(buf, 0, 8);
+	memcpy(buf + 8, iname->name + iname->len - 16, 16);
 	oname->name[0] = '_';
-	ret = digest_encode(buf, EXT4_FNAME_CRYPTO_DIGEST_SIZE + sizeof(u64),
-			    oname->name+1);
+	ret = digest_encode(buf, 24, oname->name+1);
 	oname->len = ret + 1;
 	return ret + 1;
 }
@@ -436,13 +433,11 @@ int ext4_fname_setup_filename(struct inode *dir, const struct qstr *iname,
 	 */
 	if (iname->name[0] == '_')
 		bigname = 1;
-	if ((bigname && (iname->len != 55)) ||
+	if ((bigname && (iname->len != 33)) ||
 	    (!bigname && (iname->len > 43)))
 		return -ENOENT;
 
-	fname->crypto_buf.name = kmalloc(
-			EXT4_FNAME_CRYPTO_DIGEST_SIZE + sizeof(u64),
-			GFP_KERNEL);
+	fname->crypto_buf.name = kmalloc(32, GFP_KERNEL);
 	if (fname->crypto_buf.name == NULL)
 		return -ENOMEM;
 	ret = digest_decode(iname->name + bigname, iname->len - bigname,

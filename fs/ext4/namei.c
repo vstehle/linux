@@ -1243,12 +1243,10 @@ static inline int ext4_match(struct ext4_filename *fname,
 	if (unlikely(!name)) {
 		if (fname->usr_fname->name[0] == '_') {
 			int ret;
-			if (de->name_len < EXT4_FNAME_CRYPTO_DIGEST_SIZE)
+			if (de->name_len < 16)
 				return 0;
-			ret = memcmp(de->name + de->name_len -
-					EXT4_FNAME_CRYPTO_DIGEST_SIZE,
-				     fname->crypto_buf.name + sizeof(u64),
-				     EXT4_FNAME_CRYPTO_DIGEST_SIZE);
+			ret = memcmp(de->name + de->name_len - 16,
+				     fname->crypto_buf.name + 8, 16);
 			return (ret == 0) ? 1 : 0;
 		}
 		name = fname->crypto_buf.name;
