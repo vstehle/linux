@@ -726,11 +726,6 @@ static bool gen8_ppgtt_clear_pt(struct i915_address_space *vm,
 
 	bitmap_clear(pt->used_ptes, pte, num_entries);
 
-	if (bitmap_empty(pt->used_ptes, GEN8_PTES)) {
-		free_pt(vm->i915, pt);
-		return true;
-	}
-
 	pt_vaddr = kmap_px(pt);
 
 	while (pte < pte_end)
@@ -768,11 +763,6 @@ static bool gen8_ppgtt_clear_pd(struct i915_address_space *vm,
 		}
 	}
 
-	if (bitmap_empty(pd->used_pdes, I915_PDES)) {
-		free_pd(vm->i915, pd);
-		return true;
-	}
-
 	return false;
 }
 
@@ -785,7 +775,6 @@ static bool gen8_ppgtt_clear_pdp(struct i915_address_space *vm,
 				 uint64_t length)
 {
 	struct i915_hw_ppgtt *ppgtt = i915_vm_to_ppgtt(vm);
-	struct drm_i915_private *dev_priv = vm->i915;
 	struct i915_page_directory *pd;
 	uint64_t pdpe;
 	gen8_ppgtt_pdpe_t *pdpe_vaddr;
@@ -798,7 +787,7 @@ static bool gen8_ppgtt_clear_pdp(struct i915_address_space *vm,
 
 		if (gen8_ppgtt_clear_pd(vm, pd, start, length)) {
 			__clear_bit(pdpe, pdp->used_pdpes);
-			if (USES_FULL_48BIT_PPGTT(dev_priv)) {
+			if (i915.enable_ppgtt == 3) {
 				pdpe_vaddr = kmap_px(pdp);
 				pdpe_vaddr[pdpe] = scratch_pdpe;
 				kunmap_px(ppgtt, pdpe_vaddr);
@@ -807,12 +796,6 @@ static bool gen8_ppgtt_clear_pdp(struct i915_address_space *vm,
 	}
 
 	mark_tlbs_dirty(ppgtt);
-
-	if (USES_FULL_48BIT_PPGTT(dev_priv) &&
-	    bitmap_empty(pdp->used_pdpes, I915_PDPES_PER_PDP(dev_priv))) {
-		free_pdp(dev_priv, pdp);
-		return true;
-	}
 
 	return false;
 }
