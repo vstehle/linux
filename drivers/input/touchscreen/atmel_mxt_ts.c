@@ -1421,7 +1421,7 @@ static int mxt_proc_messages(struct mxt_data *data, u8 count, bool report)
 	 * it is a sanity check.
 	 */
 	if (!data->input_dev)
-		return 0;
+		goto out;
 
 	for (i = 0; i < count; i++) {
 		u8 *msg = &message_buffer[i * data->message_length];
