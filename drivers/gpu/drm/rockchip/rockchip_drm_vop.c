@@ -790,7 +790,7 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 			return -EINVAL;
 		}
 
-		if (state->rotation) {
+		if (state->rotation && state->rotation != DRM_ROTATE_0) {
 			DRM_ERROR("afbdc does not support rotation\n");
 			DRM_ERROR("rotation=%d\n", state->rotation);
 			return -EINVAL;
