@@ -1172,7 +1172,7 @@ int kbase_process_soft_job(struct kbase_jd_atom *katom)
 #if defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)
 		katom->kctx->jctx.implicit_sync = false;
 #endif				/* CONFIG_KDS or CONFIG_DRM_DMA_SYNC */
-		KBASE_DEBUG_ASSERT(katom->fence != NULL);
+		KBASE_DEBUG_ASSERT(katom->sfile != NULL);
 		katom->event_code = kbase_fence_trigger(katom, katom->event_code == BASE_JD_EVENT_DONE ? 0 : -EFAULT);
 		/* Release the reference as we don't need it any more */
 		sync_file_put(katom->sfile);
