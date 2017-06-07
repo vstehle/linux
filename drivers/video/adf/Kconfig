@@ -1,6 +1,7 @@
 menuconfig ADF
 	depends on SYNC
 	depends on DMA_SHARED_BUFFER
+	depends on BROKEN
 	tristate "Atomic Display Framework"
 
 menuconfig ADF_FBDEV
