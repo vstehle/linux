@@ -323,7 +323,7 @@ struct binder_proc {
 	int max_threads;
 	int requested_threads;
 	int requested_threads_started;
-	atomic_t ready_threads;
+	int ready_threads;
 	long default_priority;
 	struct dentry *debugfs_entry;
 };
@@ -2241,8 +2241,7 @@ static int binder_has_thread_work(struct binder_thread *thread)
 static int binder_thread_read(struct binder_proc *proc,
 			      struct binder_thread *thread,
 			      binder_uintptr_t binder_buffer, size_t size,
-			      binder_size_t *consumed, int non_block,
-			      bool *binder_unlocked)
+			      binder_size_t *consumed, int non_block)
 {
 	void __user *buffer = (void __user *)(uintptr_t)binder_buffer;
 	void __user *ptr = buffer + *consumed;
@@ -2283,7 +2282,7 @@ retry:
 
 
 	if (wait_for_proc_work)
-		atomic_inc(&proc->ready_threads);
+		proc->ready_threads++;
 
 	binder_unlock(__func__);
 
@@ -2312,15 +2311,13 @@ retry:
 			ret = wait_event_freezable(thread->wait, binder_has_thread_work(thread));
 	}
 
-	if (wait_for_proc_work)
-		atomic_dec(&proc->ready_threads);
-
-	if (ret) {
-		*binder_unlocked = true;
-		return ret;
-	}
-
 	binder_lock(__func__);
+
+	if (wait_for_proc_work)
+		proc->ready_threads--;
+
+	if (ret)
+		return ret;
 
 	while (1) {
 		uint32_t cmd;
@@ -2551,7 +2548,7 @@ retry:
 done:
 
 	*consumed = ptr - buffer;
-	if (proc->requested_threads + atomic_read(&proc->ready_threads) == 0 &&
+	if (proc->requested_threads + proc->ready_threads == 0 &&
 	    proc->requested_threads_started < proc->max_threads &&
 	    (thread->looper & (BINDER_LOOPER_STATE_REGISTERED |
 	     BINDER_LOOPER_STATE_ENTERED)) /* the user-space code fails to */
@@ -2754,8 +2751,7 @@ static int binder_ioctl_write_read(struct binder_proc *proc,
 {
 	struct binder_thread *thread;
 	struct binder_write_read bwr;
-	int rd_ret = 0, wr_ret = 0, ret = 0;
-	bool binder_unlocked = false;
+	int ret = 0;
 
 	if (size != sizeof(struct binder_write_read))
 		return -EINVAL;
@@ -2783,42 +2779,39 @@ static int binder_ioctl_write_read(struct binder_proc *proc,
 					  bwr.write_size,
 					  &bwr.write_consumed);
 		trace_binder_write_done(ret);
-		wr_ret = ret;
-		if (ret < 0)
+		if (ret < 0) {
 			bwr.read_consumed = 0;
+			if (copy_to_user_preempt_disabled(ubuf, &bwr, sizeof(bwr)))
+				ret = -EFAULT;
+			goto out;
+		}
 	}
-
-	if (!ret && bwr.read_size > 0) {
+	if (bwr.read_size > 0) {
 		ret = binder_thread_read(proc, thread, bwr.read_buffer,
 					 bwr.read_size,
 					 &bwr.read_consumed,
-					 non_block,
-					 &binder_unlocked);
+					 non_block);
 		trace_binder_read_done(ret);
-		rd_ret = ret;
-
-		/*
-		 * If binder is unlocked it might not be safe to access
-		 * the proc->todo list, so let's wake up waiter and
-		 * let it sort it all out.
-		 */
-		if (binder_unlocked || !list_empty(&proc->todo))
+		if (!list_empty(&proc->todo))
 			wake_up_interruptible(&proc->wait);
+		if (ret < 0) {
+			if (copy_to_user_preempt_disabled(ubuf, &bwr, sizeof(bwr)))
+				ret = -EFAULT;
+			goto out;
+		}
+	}
+	binder_debug(BINDER_DEBUG_READ_WRITE,
+		     "%d:%d wrote %lld of %lld, read return %lld of %lld\n",
+		     proc->pid, thread->pid,
+		     (u64)bwr.write_consumed, (u64)bwr.write_size,
+		     (u64)bwr.read_consumed, (u64)bwr.read_size);
+	if (copy_to_user_preempt_disabled(ubuf, &bwr, sizeof(bwr))) {
+		ret = -EFAULT;
+		goto out;
 	}
 
-	binder_debug(BINDER_DEBUG_READ_WRITE,
-		     "%d:%d wrote %lld of %lld (%d), read return %lld of %lld (%d)\n",
-		     proc->pid, thread->pid,
-		     (u64)bwr.write_consumed, (u64)bwr.write_size, wr_ret,
-		     (u64)bwr.read_consumed, (u64)bwr.read_size, rd_ret);
-
 out:
-	if (!binder_unlocked)
-		binder_unlock(__func__);
-
-	if (copy_to_user(ubuf, &bwr, sizeof(bwr)))
-		ret = -EFAULT;
-
+	binder_unlock(__func__);
 	return ret;
 }
 
@@ -3626,8 +3619,7 @@ static void print_binder_proc_stats(struct seq_file *m,
 			"  ready threads %d\n"
 			"  free async space %zd\n", proc->requested_threads,
 			proc->requested_threads_started, proc->max_threads,
-			atomic_read(&proc->ready_threads),
-			proc->free_async_space);
+			proc->ready_threads, proc->free_async_space);
 	count = 0;
 	for (n = rb_first(&proc->nodes); n != NULL; n = rb_next(n))
 		count++;
