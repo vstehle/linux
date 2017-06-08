@@ -26,16 +26,19 @@
 /* Size with u32 units. */
 #define RKV_CABAC_INIT_BUFFER_SIZE	(3680 + 128)
 #define RKV_RPS_SIZE			(128 + 128)
-#define RKV_SPSPPS_SIZE			(256 * 32 + 128)
 #define RKV_SCALING_LIST_SIZE		(6 * 16 + 6 * 64 + 128)
 #define RKV_ERROR_INFO_SIZE		(256 * 144 * 4)
+
+struct hw_sps_pps_packet {
+	u8 info[32];
+};
 
 /* Data structure describing auxiliary buffer format. */
 struct rk3399_vdec_h264d_priv_tbl {
 	u8 cabac_table[RKV_CABAC_INIT_BUFFER_SIZE];
 	u8 scaling_list[RKV_SCALING_LIST_SIZE];
 	u8 rps[RKV_RPS_SIZE];
-	u8 pps[RKV_SPSPPS_SIZE];
+	struct hw_sps_pps_packet param_set[256];
 	u8 err_info[RKV_ERROR_INFO_SIZE];
 };
 
@@ -208,16 +211,20 @@ static void rk3399_vdec_h264d_assemble_hw_pps(struct rockchip_vpu_ctx *ctx)
 		ctx->hw.h264d.priv_tbl.cpu;
 	u32 scaling_distance;
 	dma_addr_t scaling_list_address;
-	u8 *hw_pps = priv_tbl->pps;
+	struct hw_sps_pps_packet *hw_ps;
 	u32 i;
 
-	memset(hw_pps, 0, RKV_SPSPPS_SIZE);
+	/*
+	 * HW read the SPS/PPS informantion from PPS packet index by PPS id.
+	 * offset from the base can be calculated by PPS_id * 32 (size per PPS
+	 * packet unit). so the driver copy SPS/PPS information to the exact PPS
+	 * packet unit for HW accessing.
+	 */
+	hw_ps = &priv_tbl->param_set[pps->pic_parameter_set_id];
+	memset(hw_ps, 0, sizeof(*hw_ps));
 
-#define WRITE_PPS(value, field)	WRITE_HEADER(value, (u32 *)hw_pps, field)
+#define WRITE_PPS(value, field)	WRITE_HEADER(value, (u32 *)hw_ps, field)
 	/* write sps */
-	WRITE_PPS(-1, SEQ_PARAMETER_SET_ID);
-	WRITE_PPS(-1, PROFILE_IDC);
-	WRITE_PPS(-1, CONSTRAINT_SET3_FLAG);
 	WRITE_PPS(sps->chroma_format_idc, CHROMA_FORMAT_IDC);
 	WRITE_PPS(sps->bit_depth_luma_minus8 + 8, BIT_DEPTH_LUMA);
 	WRITE_PPS(sps->bit_depth_chroma_minus8 + 8, BIT_DEPTH_CHROMA);
@@ -241,8 +248,6 @@ static void rk3399_vdec_h264d_assemble_hw_pps(struct rockchip_vpu_ctx *ctx)
 		  DIRECT_8X8_INFERENCE_FLAG);
 
 	/* write pps */
-	WRITE_PPS(-1, PIC_PARAMETER_SET_ID);
-	WRITE_PPS(-1, PPS_SEQ_PARAMETER_SET_ID);
 	WRITE_PPS(pps->flags & V4L2_H264_PPS_FLAG_ENTROPY_CODING_MODE,
 		  ENTROPY_CODING_MODE_FLAG);
 	WRITE_PPS((pps->flags &
@@ -284,7 +289,7 @@ static void rk3399_vdec_h264d_assemble_hw_pps(struct rockchip_vpu_ctx *ctx)
 	for (i = 0; i < 16; i++)
 		write_header((dpb[i].flags &
 			      V4L2_H264_DPB_ENTRY_FLAG_LONG_TERM) ?
-			     1 : 0, (u32 *)hw_pps, IS_LONG_TERM_OFF(i),
+			     1 : 0, (u32 *)hw_ps, IS_LONG_TERM_OFF(i),
 			     IS_LONG_TERM_LEN);
 }
 
@@ -579,7 +584,7 @@ static void rk3399_vdec_h264d_config_registers(struct rockchip_vpu_ctx *ctx)
 	vdpu_write_relaxed(vpu, reg, RKVDEC_REG_CUR_POC1);
 
 	/* config hw pps address */
-	offset = offsetof(struct rk3399_vdec_h264d_priv_tbl, pps);
+	offset = offsetof(struct rk3399_vdec_h264d_priv_tbl, param_set);
 	vdpu_write_relaxed(vpu, priv_start_addr + offset, RKVDEC_REG_PPS_BASE);
 
 	/* config hw rps address */
