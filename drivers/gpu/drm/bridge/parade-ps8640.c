@@ -967,11 +967,6 @@ static int ps8640_probe(struct i2c_client *client,
 	if (IS_ERR(ps_bridge->v33))
 		return PTR_ERR(ps_bridge->v33);
 
-	if (ret) {
-		dev_info(dev, "failed to get regulators: %d\n", ret);
-		return ret;
-	}
-
 	ps_bridge->gpio_mode_sel_n = devm_gpiod_get_optional(&client->dev,
 							     "mode-sel",
 							     GPIOD_OUT_HIGH);
