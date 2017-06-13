@@ -179,7 +179,7 @@ static IMG_BOOL _IsSystemStatePowered(PVRSRV_SYS_POWER_STATE eSystemPowerState)
 
 ******************************************************************************/
 IMG_EXPORT
-PVRSRV_ERROR PVRSRVPowerLock(PVRSRV_DEVICE_NODE *psDeviceNode)
+PVRSRV_ERROR PVRSRVPowerLock(const PVRSRV_DEVICE_NODE *psDeviceNode)
 {
 	OSLockAcquire(psDeviceNode->hPowerLock);
 
@@ -223,7 +223,7 @@ void PVRSRVForcedPowerLock(PVRSRV_DEVICE_NODE *psDeviceNode)
 
 ******************************************************************************/
 IMG_EXPORT
-void PVRSRVPowerUnlock(PVRSRV_DEVICE_NODE *psDeviceNode)
+void PVRSRVPowerUnlock(const PVRSRV_DEVICE_NODE *psDeviceNode)
 {
 	OSLockRelease(psDeviceNode->hPowerLock);
 }
@@ -740,7 +740,7 @@ PVRSRV_ERROR PVRSRVRemovePowerDevice(PVRSRV_DEVICE_NODE *psDeviceNode)
 
 ******************************************************************************/
 IMG_EXPORT
-PVRSRV_ERROR PVRSRVGetDevicePowerState(PVRSRV_DEVICE_NODE *psDeviceNode,
+PVRSRV_ERROR PVRSRVGetDevicePowerState(const PVRSRV_DEVICE_NODE *psDeviceNode,
 									   PPVRSRV_DEV_POWER_STATE pePowerState)
 {
 	PVRSRV_POWER_DEV *psPowerDevice;

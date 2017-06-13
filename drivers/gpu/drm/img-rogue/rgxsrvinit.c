@@ -458,41 +458,35 @@ static INLINE void GetApphints(RGX_SRVINIT_APPHINTS *psHints, IMG_UINT64 ui64Ern
 	 */
 	{
 		IMG_UINT32 ui32LogType;
-		IMG_BOOL bFirmwareLogTypeConfigured, bAnyLogGroupConfigured;
+		IMG_BOOL bAnyLogGroupConfigured;
 
 		SrvInitParamGetUINT32BitField(pvParamState, EnableLogGroup, ui32LogType);
 		bAnyLogGroupConfigured = ui32LogType ? IMG_TRUE : IMG_FALSE;
-		bFirmwareLogTypeConfigured = SrvInitParamGetUINT32List(pvParamState, FirmwareLogType, ui32ParamTemp);
+		SrvInitParamGetUINT32List(pvParamState, FirmwareLogType, ui32ParamTemp);
 
-		if (bFirmwareLogTypeConfigured)
+		/* Defaulting to TRACE */
+		ui32LogType |= RGXFWIF_LOG_TYPE_TRACE;
+
+		if (ui32ParamTemp == 2 /* TRACE */)
 		{
-			if (ui32ParamTemp == 2 /* TRACE */)
+			if (!bAnyLogGroupConfigured)
 			{
-				if (!bAnyLogGroupConfigured)
-				{
-					/* No groups configured - defaulting to MAIN group */
-					ui32LogType |= RGXFWIF_LOG_TYPE_GROUP_MAIN;
-				}
-				ui32LogType |= RGXFWIF_LOG_TYPE_TRACE;
-			}
-			else if (ui32ParamTemp == 1 /* TBI */)
-			{
-				if (!bAnyLogGroupConfigured)
-				{
-					/* No groups configured - defaulting to MAIN group */
-					ui32LogType |= RGXFWIF_LOG_TYPE_GROUP_MAIN;
-				}
-				ui32LogType &= ~RGXFWIF_LOG_TYPE_TRACE;
-			}
-			else if (ui32ParamTemp == 0 /* NONE */)
-			{
-				ui32LogType = RGXFWIF_LOG_TYPE_NONE;
+				/* No groups configured - defaulting to MAIN group */
+				ui32LogType |= RGXFWIF_LOG_TYPE_GROUP_MAIN;
 			}
 		}
-		else
+		else if (ui32ParamTemp == 1 /* TBI */)
 		{
-			/* No log type configured - defaulting to TRACE */
-			ui32LogType |= RGXFWIF_LOG_TYPE_TRACE;
+			if (!bAnyLogGroupConfigured)
+			{
+				/* No groups configured - defaulting to MAIN group */
+				ui32LogType |= RGXFWIF_LOG_TYPE_GROUP_MAIN;
+			}
+			ui32LogType &= ~RGXFWIF_LOG_TYPE_TRACE;
+		}
+		else if (ui32ParamTemp == 0 /* NONE */)
+		{
+			ui32LogType = RGXFWIF_LOG_TYPE_NONE;
 		}
 
 		psHints->ui32LogType = ui32LogType;
@@ -1002,7 +996,7 @@ static IMG_BOOL PrepareDebugScript(RGX_SCRIPT_BUILD* psDbgInitScript,
 		DBG_MCR_READ(META_CR_THR1_SP,						"T1 SP                           ");
 	}
 
-	if (bFirmwarePerf)
+	if (ui32Meta && bFirmwarePerf)
 	{
 		DBG_MSP_READ(META_CR_PERF_COUNT0,				"PERF_COUNT0                     ");
 		DBG_MSP_READ(META_CR_PERF_COUNT1,				"PERF_COUNT1                     ");

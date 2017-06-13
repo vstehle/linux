@@ -279,7 +279,7 @@ static IMG_UINT64 TimeStampUnpack(COMMAND_TIMESTAMP *psTimeStamp)
 	for(i = IMG_ARR_NUM_ELEMS(psTimeStamp->aui8TimeNs); i > 0; i--)
 	{
 		ui64TimeNs <<= 8;
-		ui64TimeNs |= psTimeStamp->aui8TimeNs[i - 1];
+		ui64TimeNs |= (IMG_UINT64) psTimeStamp->aui8TimeNs[i - 1];
 	}
 
 	return ui64TimeNs;
@@ -451,7 +451,7 @@ static void MapRangeUnpack(COMMAND_MAP_RANGE *psMapRange,
 	for(i = IMG_ARR_NUM_ELEMS(psMapRange->aui8Data); i > 0; i--)
 	{
 		ui64Data <<= 8;
-		ui64Data |= psMapRange->aui8Data[i - 1];
+		ui64Data |= (IMG_UINT64) psMapRange->aui8Data[i - 1];
 	}
 
 	*pui32StartPage = (ui64Data >> 12);
@@ -637,52 +637,6 @@ static IMG_UINT32 GetFreeAllocation(void)
 	return ui32Alloc;
 }
 
-/* FindAllocation:
- * Searches the list of allocations and returns the index if an allocation
- * is found which matches the given properties
- */
-static IMG_UINT32 FindAllocation(const IMG_CHAR *pszName,
-							IMG_UINT64 ui64Serial,
-							IMG_PID uiPID,
-							IMG_DEV_VIRTADDR sDevVAddr,
-							IMG_DEVMEM_SIZE_T uiSize)
-{
-	IMG_UINT32 ui32Head, ui32Index;
-	RECORD_ALLOCATION *psAlloc;
-
-	ui32Head = ui32Index = gsDevicememHistoryData.sRecords.ui32AllocationsListHead;
-
-	if(IsAllocationListEmpty(ui32Index))
-	{
-		goto not_found;
-	}
-
-	do
-	{
-		psAlloc = &gsDevicememHistoryData.sRecords.pasAllocations[ui32Index];
-
-		if(	(psAlloc->ui64Serial == ui64Serial) &&
-			(psAlloc->sDevVAddr.uiAddr == sDevVAddr.uiAddr) &&
-			(psAlloc->uiSize == uiSize) &&
-			(strcmp(psAlloc->szName, pszName) == 0))
-		{
-			goto found;
-		}
-
-		ui32Index = psAlloc->ui32Next;
-	} while(ui32Index != ui32Head);
-
-not_found:
-	/* not found */
-	ui32Index = END_OF_LIST;
-
-found:
-	/* if the allocation was not found then we return END_OF_LIST.
-	 * otherwise, we return the index of the allocation
-	 */
-
-	return ui32Index;
-}
 
 /* InitialiseAllocation:
  * Initialise the given allocation structure with the given properties
@@ -765,7 +719,7 @@ static IMG_BOOL MatchAllocation(IMG_UINT32 ui32AllocationIndex,
 			(psAlloc->sDevVAddr.uiAddr == sDevVAddr.uiAddr) &&
 			(psAlloc->uiSize == uiSize) &&
 			(psAlloc->ui32Log2PageSize == ui32Log2PageSize) &&
-			(strcmp(psAlloc->szName, pszName) == 0);
+			(OSStringCompare(psAlloc->szName, pszName) == 0);
 }
 
 /* FindOrCreateAllocation:
@@ -786,12 +740,16 @@ static PVRSRV_ERROR FindOrCreateAllocation(IMG_UINT32 ui32AllocationIndexHint,
 							IMG_BOOL *pbCreated)
 {
 	IMG_UINT32 ui32AllocationIndex;
+	PVRSRV_ERROR eError;
 
 	if(ui32AllocationIndexHint != DEVICEMEM_HISTORY_ALLOC_INDEX_NONE)
 	{
 		IMG_BOOL bHaveAllocation;
 
-		/* first, try to match against the index given by the client */
+		/* first, try to match against the index given by the client.
+		 * if the caller provided a hint but the allocation record is no longer
+		 * there, it must have been purged, so go ahead and create a new allocation
+		 */
 		bHaveAllocation = MatchAllocation(ui32AllocationIndexHint,
 								ui64Serial,
 								sDevVAddr,
@@ -807,53 +765,32 @@ static PVRSRV_ERROR FindOrCreateAllocation(IMG_UINT32 ui32AllocationIndexHint,
 		}
 	}
 
-	/* if matching against the client-supplied index fails then check
-	 * if the allocation exists in the list
-	 */
-	ui32AllocationIndex = FindAllocation(pszName,
-						ui64Serial,
-						uiPID,
-						sDevVAddr,
-						uiSize);
-
 	/* if there is no record of the allocation then we
 	 * create it now
 	 */
-	if(ui32AllocationIndex == END_OF_LIST)
+	eError = CreateAllocation(pszName,
+					ui64Serial,
+					uiPID,
+					sDevVAddr,
+					uiSize,
+					ui32Log2PageSize,
+					IMG_TRUE,
+					&ui32AllocationIndex);
+
+	if(eError == PVRSRV_OK)
 	{
-		PVRSRV_ERROR eError;
-		eError = CreateAllocation(pszName,
-						ui64Serial,
-						uiPID,
-						sDevVAddr,
-						uiSize,
-						ui32Log2PageSize,
-						IMG_TRUE,
-						&ui32AllocationIndex);
-
-		if(eError == PVRSRV_OK)
-		{
-			*pui32AllocationIndexOut = ui32AllocationIndex;
-			*pbCreated = IMG_TRUE;
-		}
-		else
-		{
-			PVR_DPF((PVR_DBG_ERROR,
-				"%s: Failed to create record for allocation %s",
-									__func__,
-									pszName));
-		}
-
-		return eError;
+		*pui32AllocationIndexOut = ui32AllocationIndex;
+		*pbCreated = IMG_TRUE;
 	}
 	else
 	{
-		/* found existing record */
-		*pui32AllocationIndexOut = ui32AllocationIndex;
-		*pbCreated = IMG_FALSE;
-		return PVRSRV_OK;
+		PVR_DPF((PVR_DBG_ERROR,
+			"%s: Failed to create record for allocation %s",
+								__func__,
+								pszName));
 	}
 
+	return eError;
 }
 
 /* GenerateMapUnmapCommandsForSparsePMR:

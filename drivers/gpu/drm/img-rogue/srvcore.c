@@ -1132,6 +1132,7 @@ static PVR_POOL_BUFFER *_BridgePoolAcquireBuffer(void **ppvBridgeIn,
 				goto return_;
 			}
 
+			psBuffer->bTaken = IMG_TRUE;
 			*ppvBridgeIn = psBuffer->pvBuffer;
 			*ppvBridgeOut = ((IMG_BYTE *) psBuffer->pvBuffer) +
 			        PVRSRV_MAX_BRIDGE_IN_SIZE;

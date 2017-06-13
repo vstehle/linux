@@ -132,25 +132,32 @@ PVRSRVRGXDebugMiscSetFWLogKM(
 	IMG_UINT32  ui32RGXFWLogType)
 {
 	RGXFWIF_KCCB_CMD sLogTypeUpdateCmd;
+	PVRSRV_DEV_POWER_STATE ePowerState;
 	PVRSRV_ERROR eError = PVRSRV_OK;
 	PVRSRV_RGXDEV_INFO* psDevInfo = psDeviceNode->pvDevice;
 
 	PVR_UNREFERENCED_PARAMETER(psConnection);
-	
+
+#if defined(PVRSRV_GPUVIRT_GUESTDRV)
+	/* Guest drivers do not support tracebuf */
+	PVR_UNREFERENCED_PARAMETER(psDevInfo);
+	PVR_UNREFERENCED_PARAMETER(sLogTypeUpdateCmd);
+	PVR_UNREFERENCED_PARAMETER(ePowerState);
+	PVR_UNREFERENCED_PARAMETER(eError);
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+#else
+
 	/* check log type is valid */
 	if (ui32RGXFWLogType & ~RGXFWIF_LOG_TYPE_MASK)
 	{
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-#if defined(PVRSRV_GPUVIRT_GUESTDRV)
-	/* Guest drivers do not support tracebuf */
-	PVR_UNREFERENCED_PARAMETER(psDevInfo);
-	PVR_UNREFERENCED_PARAMETER(sLogTypeUpdateCmd);
-	eError = PVRSRV_ERROR_NOT_IMPLEMENTED;
-#else
-	/* set the new log type */
+	/* set the new log type and ensure the new log type is written to memory
+	 * before requesting the FW to read it
+	 */
 	psDevInfo->psRGXFWIfTraceBuf->ui32LogType = ui32RGXFWLogType;
+	OSMemoryBarrier();
 
 	/* Allocate firmware trace buffer resource(s) if not already done */
 	if (RGXTraceBufferIsInitRequired(psDevInfo))
@@ -158,30 +165,47 @@ PVRSRVRGXDebugMiscSetFWLogKM(
 		RGXTraceBufferInitOnDemandResources(psDevInfo);
 	}
 
-	/* Ask the FW to update its cached version of logType value */
-	sLogTypeUpdateCmd.eCmdType = RGXFWIF_KCCB_CMD_LOGTYPE_UPDATE;
-	eError = RGXScheduleCommand(psDevInfo,
-	                            RGXFWIF_DM_GP,
-	                            &sLogTypeUpdateCmd,
-	                            sizeof(sLogTypeUpdateCmd),
-	                            0,
-	                            PDUMP_FLAGS_CONTINUOUS);
-	if(eError != PVRSRV_OK)
+	eError = PVRSRVPowerLock(psDeviceNode);
+	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: RGXScheduleCommandfailed. Error:%u", __FUNCTION__, eError));
+		PVR_DPF((PVR_DBG_ERROR,"%s: Failed to acquire power lock (%u)", __func__, eError));
+		return eError;
 	}
-	else
+
+	eError = PVRSRVGetDevicePowerState(psDeviceNode, &ePowerState);
+
+	if ((eError == PVRSRV_OK) && (ePowerState != PVRSRV_DEV_POWER_STATE_OFF))
 	{
-		/* Wait for the LogType value to be updated */
-		eError = RGXWaitForFWOp(psDevInfo, RGXFWIF_DM_GP, psDeviceNode->psSyncPrim, PDUMP_FLAGS_CONTINUOUS);
+		/* Ask the FW to update its cached version of logType value */
+		sLogTypeUpdateCmd.eCmdType = RGXFWIF_KCCB_CMD_LOGTYPE_UPDATE;
+
+		eError = RGXSendCommand(psDevInfo,
+		                        RGXFWIF_DM_GP,
+		                        &sLogTypeUpdateCmd,
+		                        sizeof(sLogTypeUpdateCmd),
+		                        PDUMP_FLAGS_CONTINUOUS);
 		if (eError != PVRSRV_OK)
 		{
-			PVR_DPF((PVR_DBG_ERROR,"%s: Waiting for value aborted with error (%u)", __FUNCTION__, eError));
+			PVR_DPF((PVR_DBG_ERROR, "%s: RGXSendCommand failed. Error:%u", __func__, eError));
+		}
+		else
+		{
+			/* Give up the power lock as its acquired in RGXWaitForFWOp */
+			PVRSRVPowerUnlock(psDeviceNode);
+
+			/* Wait for the LogType value to be updated */
+			eError = RGXWaitForFWOp(psDevInfo, RGXFWIF_DM_GP, psDeviceNode->psSyncPrim, PDUMP_FLAGS_CONTINUOUS);
+			if (eError != PVRSRV_OK)
+			{
+				PVR_DPF((PVR_DBG_ERROR,"%s: Waiting for value aborted with error (%u)", __func__, eError));
+			}
+			return eError;
 		}
 	}
-#endif
 
+	PVRSRVPowerUnlock(psDeviceNode);
 	return eError;
+#endif
 }
 
 IMG_EXPORT PVRSRV_ERROR

@@ -178,6 +178,21 @@ void RGXErrorLogInit(const void *hPrivate,
 ******************************************************************************/
 IMG_INTERNAL
 IMG_BOOL RGXDeviceHasFeatureInit(const void *hPrivate, IMG_UINT64 ui64Feature);
+
+/*!
+*******************************************************************************
+
+ @Function       RGXDeviceHasErnBrnInit
+
+ @Description    Checks if a device has a particular errata
+
+ @Input          hPrivate     : Implementation specific data
+ @Input          ui64ErnsBrns : Flags to check
+
+ @Return         IMG_TRUE if the given errata is available, IMG_FALSE otherwise
+
+******************************************************************************/
+IMG_BOOL RGXDeviceHasErnBrnInit(const void *hPrivate, IMG_UINT64 ui64ErnsBrns);
 #endif
 
 /*!

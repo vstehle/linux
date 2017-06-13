@@ -91,7 +91,7 @@ IMG_UINT64 OSClockns64(void);
 /*************************************************************************/ /*!
 @Function       OSClockus64
 @Description    This function returns the number of ticks since system boot
-                expressed in microseconds. Unlike   OSClockus, OSClockus64 has
+                expressed in microseconds. Unlike OSClockus, OSClockus64 has
                 a near 64-bit range.
 @Return         The 64-bit clock value, in microseconds.
 */ /**************************************************************************/
@@ -272,7 +272,7 @@ PVRSRV_ERROR OSScheduleMISR(IMG_HANDLE hMISRData);
 @Description    Creates a kernel thread and starts it running. The caller
                 is responsible for informing the thread that it must finish
                 and return from the pfnThread function. It is not possible
-                to kill or terminate it.The new thread runs with the default
+                to kill or terminate it. The new thread runs with the default
                 priority provided by the Operating System.
 @Output         phThread       Returned handle to the thread.
 @Input          pszThreadName  Name to assign to the thread.
@@ -294,7 +294,7 @@ typedef enum priority_levels
 	OS_THREAD_NORMAL_PRIORITY,
 	OS_THREAD_LOW_PRIORITY,
 	OS_THREAD_LOWEST_PRIORITY,
-	OS_THREAD_NOSET_PRIORITY,   /* With this option the priority level is is the default for the given OS */
+	OS_THREAD_NOSET_PRIORITY,   /* With this option the priority level is the default for the given OS */
 	OS_THREAD_LAST_PRIORITY     /* This must be always the last entry */
 } OS_THREAD_LEVEL;
 
@@ -538,7 +538,7 @@ void OSInvalidateCPUCacheRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 
 /**************************************************************************/ /*!
 @Function       OSCPUCacheOpAddressType
-@Description    Returns the address type (i.e. virtual/physical/both) that is 
+@Description    Returns the address type (i.e. virtual/physical/both) that is
                 used to perform cache maintenance on the CPU. This is used
 				to infer whether the virtual or physical address supplied to
 				the OSxxxCPUCacheRangeKM functions can be omitted when called.
@@ -706,7 +706,7 @@ void OSPhyContigPagesUnmap(PVRSRV_DEVICE_NODE *psDevNode, PG_HANDLE *psMemHandle
                 uncached this can be implemented as nop.
 @Input          psDevNode     device on which the allocation was made
 @Input          psMemHandle   the handle of the allocation to be flushed
-@Input          uiOffset      the offset in bytes from the start of the 
+@Input          uiOffset      the offset in bytes from the start of the
                               allocation from where to start flushing
 @Input          uiLength      the amount to flush from the offset in bytes
 @Return         PVRSRV_OK on success, a failure code otherwise.
@@ -1561,7 +1561,7 @@ void OSReleaseBridgeLock(void);
  *  Functions for providing support for PID statistics.
  */
 typedef void (OS_STATS_PRINTF_FUNC)(void *pvFilePtr, const IMG_CHAR *pszFormat, ...);
- 
+
 typedef void (OS_STATS_PRINT_FUNC)(void *pvFilePtr,
 								   void *pvStatPtr,
 								   OS_STATS_PRINTF_FUNC* pfnOSGetStatsPrintf);
@@ -1687,6 +1687,12 @@ void OSUserModeAccessToPerfCountersEn(void);
 @Return         PVRSRV_OK on success, a failure code otherwise.
 */ /**************************************************************************/
 PVRSRV_ERROR OSDebugSignalPID(IMG_UINT32 ui32PID);
+
+#if defined(LINUX) && defined(__KERNEL__)
+#define OSWarnOn(a) WARN_ON(a)
+#else
+#define OSWarnOn(a) do { if (!!(a)) { OSDumpStack(); } } while(0)
+#endif
 
 #if defined(CONFIG_L4)
 #include <asm/api-l4env/api.h>

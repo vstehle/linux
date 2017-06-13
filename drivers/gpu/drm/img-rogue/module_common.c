@@ -124,16 +124,27 @@ EXPORT_SYMBOL(PhysHeapRegionGetCpuPAddr);
 EXPORT_SYMBOL(PhysHeapRegionGetSize);
 EXPORT_SYMBOL(PhysHeapCpuPAddrToDevPAddr);
 
-EXPORT_SYMBOL(PVRSRVGetDriverStatus);
 EXPORT_SYMBOL(PVRSRVSystemInstallDeviceLISR);
 EXPORT_SYMBOL(PVRSRVSystemUninstallDeviceLISR);
 
+#if !(defined(PVRSRV_GPUVIRT_GUESTDRV) && defined(PVRSRV_GPUVIRT_MULTIDRV_MODEL))
 #include "pvr_notifier.h"
-EXPORT_SYMBOL(PVRSRVCheckStatus);
-
 #include "pvr_debug.h"
+
+/*
+ * Export some symbols that may be needed by other drivers
+ *
+ * When support for GPU virtualization is present and the multi-driver
+ * model (multiple drivers in same OS kernel) is being used, then only
+ * the host driver is a true device drivers (i.e. is registered with
+ * the kernel to manage the physical device), the other guest drivers
+ * are all modules.
+ */
+EXPORT_SYMBOL(PVRSRVCheckStatus);
+EXPORT_SYMBOL(PVRSRVGetDriverStatus);
 EXPORT_SYMBOL(PVRSRVGetErrorStringKM);
-#endif /* defined(SUPPORT_DISPLAY_CLASS) */
+#endif
+#endif
 
 /* Host para-virtz call handlers  (required by guest drivers) */
 #if defined(PVRSRV_GPUVIRT_MULTIDRV_MODEL)
@@ -166,6 +177,13 @@ EXPORT_SYMBOL(PvzServerDestroyDevPhysHeaps2);
 #if defined(SUPPORT_SHARED_SLC) && !defined(PVRSRV_GPUVIRT_GUESTDRV)
 /* Guest drivers do not perform device management so RGXInitSLC is absent */
 EXPORT_SYMBOL(RGXInitSLC);
+#endif
+
+#if defined(SUPPORT_KERNEL_HWPERF_TEST)
+EXPORT_SYMBOL(OSAddTimer);
+EXPORT_SYMBOL(OSEnableTimer);
+EXPORT_SYMBOL(OSDisableTimer);
+EXPORT_SYMBOL(OSRemoveTimer);
 #endif
 #endif
 

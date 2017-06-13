@@ -650,9 +650,13 @@ PVRSRV_ERROR RGXAPMLatencyChange(IMG_HANDLE				hDevHandle,
 		return eError;
 	}
 
-	/* Update runtime configuration with the new values */
+	/* Update runtime configuration with the new values and ensure the
+	 * new APM latency is written to memory before requesting the FW to
+	 * read it
+	 */
 	psRuntimeCfg->ui32ActivePMLatencyms = ui32ActivePMLatencyms;
 	psRuntimeCfg->bActivePMLatencyPersistant = bActivePMLatencyPersistant;
+	OSMemoryBarrier();
 
 	eError = PVRSRVGetDevicePowerState(psDeviceNode, &ePowerState);
 
@@ -663,9 +667,6 @@ PVRSRV_ERROR RGXAPMLatencyChange(IMG_HANDLE				hDevHandle,
 		sActivePMLatencyChange.uCmdData.sPowData.bNotifyTimeout = IMG_FALSE;
 		sActivePMLatencyChange.uCmdData.sPowData.ePowType = RGXFWIF_POW_APM_LATENCY_CHANGE;
 		sActivePMLatencyChange.uCmdData.sPowData.uPoweReqData.ui32ActivePMLatencyms = ui32ActivePMLatencyms;
-
-		/* Ensure the new APM latency is written to memory before requesting the FW to read it */
-		OSMemoryBarrier();
 
 		PDUMPCOMMENT("Scheduling command to change APM latency to %u", ui32ActivePMLatencyms);
 		eError = RGXSendCommand(psDeviceNode->pvDevice,
@@ -678,13 +679,14 @@ PVRSRV_ERROR RGXAPMLatencyChange(IMG_HANDLE				hDevHandle,
 		{
 			PDUMPCOMMENT("Scheduling command to change APM latency failed. Error:%u", eError);
 			PVR_DPF((PVR_DBG_ERROR, "RGXAPMLatencyChange: Scheduling KCCB to change APM latency failed. Error:%u", eError));
-			return eError;
+			goto ErrorExit;
 		}
 	}
 
+ErrorExit:
 	PVRSRVPowerUnlock(psDeviceNode);
 
-	return PVRSRV_OK;
+	return eError;
 }
 
 /*

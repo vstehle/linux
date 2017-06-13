@@ -70,8 +70,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvr_gputrace.h"
 #endif
 
-/* Defined to ensure HWPerf packets are not delayed */
-#define SUPPORT_TL_PROODUCER_CALLBACK 1
+/* This is defined by default to enable producer callbacks.
+ * Clients of the TL interface can disable the use of the callback
+ * with PVRSRV_STREAM_FLAG_DISABLE_PRODUCER_CALLBACK. */
+#define SUPPORT_TL_PRODUCER_CALLBACK 1
 
 /* Defines size of buffers returned from acquire/release calls */
 #define FW_STREAM_BUFFER_SIZE (0x80000)
@@ -398,8 +400,8 @@ PVRSRV_ERROR RGXHWPerfDataStoreCB(PVRSRV_DEVICE_NODE *psDevInfo)
 }
 
 
-/* Not currently supported by default */
-#if defined(SUPPORT_TL_PROODUCER_CALLBACK)
+/* Currently supported by default */
+#if defined(SUPPORT_TL_PRODUCER_CALLBACK)
 static PVRSRV_ERROR RGXHWPerfTLCB(IMG_HANDLE hStream,
 		IMG_UINT32 ui32ReqOp, IMG_UINT32* ui32Resp, void* pvUser)
 {
@@ -618,7 +620,7 @@ PVRSRV_ERROR RGXHWPerfInitOnDemandResources(void)
 					ui32L2BufferSize, 
 					TL_FLAG_RESERVE_DROP_NEWER | TL_FLAG_NO_SIGNAL_ON_COMMIT, 
 					NULL, NULL,
-#if !defined(SUPPORT_TL_PROODUCER_CALLBACK)
+#if !defined(SUPPORT_TL_PRODUCER_CALLBACK)
 					NULL, NULL
 #else
 					/* Not enabled  by default */
@@ -1581,21 +1583,33 @@ cleanup:
 	_PostFunctionEpilogue();
 }
 
-static inline IMG_UINT32 _FixNameSizeAndCalculateHostAllocPacketSize(
+#define UNKNOWN_SYNC_NAME "UnknownSync"
+
+static inline IMG_UINT32 _FixNameAndCalculateHostAllocPacketSize(
                                        RGX_HWPERF_HOST_RESOURCE_TYPE eAllocType,
-                                       const IMG_CHAR *psName,
+                                       const IMG_CHAR **ppsName,
                                        IMG_UINT32 *ui32NameSize)
 {
 	RGX_HWPERF_HOST_ALLOC_DATA *psData;
 	RGX_HWPERF_HOST_ALLOC_DETAIL *puData;
 	IMG_UINT32 ui32Size = sizeof(psData->ui32AllocType);
 
-	/* first strip the terminator */
-	if (psName[*ui32NameSize - 1] == '\0')
-		*ui32NameSize -= 1;
-	/* if string longer than maximum cut it (leave space for '\0') */
-	if (*ui32NameSize >= SYNC_MAX_CLASS_NAME_LEN)
-		*ui32NameSize = SYNC_MAX_CLASS_NAME_LEN - 1;
+	if (*ppsName != NULL && *ui32NameSize > 0)
+	{
+		/* first strip the terminator */
+		if ((*ppsName)[*ui32NameSize - 1] == '\0')
+			*ui32NameSize -= 1;
+		/* if string longer than maximum cut it (leave space for '\0') */
+		if (*ui32NameSize >= SYNC_MAX_CLASS_NAME_LEN)
+			*ui32NameSize = SYNC_MAX_CLASS_NAME_LEN - 1;
+	}
+	else
+	{
+		PVR_DPF((PVR_DBG_WARNING, "RGXHWPerfHostPostAllocEvent: Invalid"
+		        " resource name given."));
+		*ppsName = UNKNOWN_SYNC_NAME;
+		*ui32NameSize = sizeof(UNKNOWN_SYNC_NAME) - 1;
+	}
 
 	switch (eAllocType)
 	{
@@ -1623,12 +1637,20 @@ static inline void _SetupHostAllocPacketData(IMG_UINT8 *pui8Dest,
 	RGX_HWPERF_HOST_ALLOC_DATA *psData = (RGX_HWPERF_HOST_ALLOC_DATA *)
 	        (pui8Dest + sizeof(RGX_HWPERF_V2_PACKET_HDR));
 	psData->ui32AllocType = eAllocType;
-	psData->uAllocDetail.sSyncAlloc.ui32FWAddr = ui32FWAddr;
-	OSStringNCopy(psData->uAllocDetail.sSyncAlloc.acName, psName,
-	              ui32NameSize);
-	/* we know here that string is not null terminated and that we have enough
-	 * space for the terminator */
-	psData->uAllocDetail.sSyncAlloc.acName[ui32NameSize] = '\0';
+
+	if (ui32NameSize)
+	{
+		OSStringNCopy(psData->uAllocDetail.sSyncAlloc.acName, psName,
+		              ui32NameSize);
+		/* we know here that string is not null terminated and that we have
+		 *enough space for the terminator */
+		psData->uAllocDetail.sSyncAlloc.acName[ui32NameSize] = '\0';
+	}
+	else
+	{
+		/* In case no name was given make sure we don't access random memory */
+		psData->uAllocDetail.sSyncAlloc.acName[0] = '\0';
+	}
 }
 
 void RGXHWPerfHostPostAllocEvent(RGX_HWPERF_HOST_RESOURCE_TYPE eAllocType,
@@ -1637,9 +1659,9 @@ void RGXHWPerfHostPostAllocEvent(RGX_HWPERF_HOST_RESOURCE_TYPE eAllocType,
                                  IMG_UINT32 ui32NameSize)
 {
 	IMG_UINT8 *pui8Dest;
-	IMG_UINT32 ui32Size =
-	        _FixNameSizeAndCalculateHostAllocPacketSize(eAllocType, psName,
-	                                                    &ui32NameSize);
+	IMG_UINT32 ui32Size = _FixNameAndCalculateHostAllocPacketSize(eAllocType,
+	                                                             &psName,
+	                                                             &ui32NameSize);
 
 	_PostFunctionPrologue();
 
@@ -1791,8 +1813,8 @@ static PVRSRV_ERROR RGXHWPerfFTraceGPUEnable(void)
 		IMG_UINT64 ui64UFOFilter = RGX_HWPERF_EVENT_MASK_VALUE(RGX_HWPERF_UFO) &
 								   gpsRgxDevInfo->ui64HWPerfFilter;
 
-		eError = PVRSRVRGXCtrlHWPerfKM(NULL, gpsRgxDevNode, RGX_HWPERF_STREAM_ID0_FW,
-		                               IMG_FALSE,
+		eError = PVRSRVRGXCtrlHWPerfKM(NULL, gpsRgxDevNode,
+		                               RGX_HWPERF_STREAM_ID0_FW, IMG_FALSE,
 		                               RGX_HWPERF_EVENT_MASK_HW_KICKFINISH |
 		                               ui64UFOFilter);
 		PVR_LOGG_IF_ERROR(eError, "PVRSRVRGXCtrlHWPerfKM", err_out);
@@ -2603,6 +2625,10 @@ PVRSRV_ERROR RGXHWPerfOpen(
 	RGX_KM_HWPERF_DEVDATA* psDevData = (RGX_KM_HWPERF_DEVDATA*) hDevData;
 	IMG_UINT32 ui32BufSize;
 
+	/* Disable producer callback by default for the Kernel API. */
+	IMG_UINT32 ui32StreamFlags = PVRSRV_STREAM_FLAG_ACQUIRE_NONBLOCKING |
+			                     PVRSRV_STREAM_FLAG_DISABLE_PRODUCER_CALLBACK;
+
 	/* Valid input argument values supplied by the caller */
 	if (!psDevData)
 	{
@@ -2650,7 +2676,7 @@ PVRSRV_ERROR RGXHWPerfOpen(
 	/* Open the RGX TL stream for reading in this session */
 	eError = TLClientOpenStream(DIRECT_BRIDGE_HANDLE,
 								PVRSRV_TL_HWPERF_RGX_FW_STREAM,
-								PVRSRV_STREAM_FLAG_ACQUIRE_NONBLOCKING,
+								ui32StreamFlags,
 								&psDevData->hSD[RGX_HWPERF_STREAM_ID0_FW]);
 	if (eError != PVRSRV_OK)
 	{
@@ -3083,6 +3109,35 @@ const IMG_CHAR *RGXHWPerfKickTypeToStr(RGX_HWPERF_KICK_TYPE eKickType)
 	}
 
 	return aszKickType[eKickType];
+}
+
+
+IMG_UINT64 RGXHWPerfConvertCRTimeStamp(
+		IMG_UINT32 ui32ClkSpeed,
+		IMG_UINT64 ui64CorrCRTimeStamp,
+		IMG_UINT64 ui64CorrOSTimeStamp,
+		IMG_UINT64 ui64CRTimeStamp)
+{
+	IMG_UINT32 ui32Remainder;
+	IMG_UINT64 ui64CRDeltaToOSDeltaKNs;
+	IMG_UINT64 ui64EventOSTimestamp, deltaRgxTimer, delta_ns;
+
+	if (!(ui64CRTimeStamp) || !(ui32ClkSpeed) || !(ui64CorrCRTimeStamp) || !(ui64CorrOSTimeStamp))
+	{
+		return 0;
+	}
+
+	ui64CRDeltaToOSDeltaKNs = RGXFWIF_GET_CRDELTA_TO_OSDELTA_K_NS(ui32ClkSpeed,
+																  ui32Remainder);
+
+	/* RGX CR timer ticks delta */
+	deltaRgxTimer = ui64CRTimeStamp - ui64CorrCRTimeStamp;
+	/* RGX time delta in nanoseconds */
+	delta_ns = RGXFWIF_GET_DELTA_OSTIME_NS(deltaRgxTimer, ui64CRDeltaToOSDeltaKNs);
+	/* Calculate OS time of HWPerf event */
+	ui64EventOSTimestamp = ui64CorrOSTimeStamp + delta_ns;
+
+	return ui64EventOSTimestamp;
 }
 
 /******************************************************************************

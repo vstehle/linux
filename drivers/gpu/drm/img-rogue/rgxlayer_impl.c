@@ -136,6 +136,19 @@ IMG_BOOL RGXDeviceHasFeatureInit(const void *hPrivate, IMG_UINT64 ui64Feature)
 
 	return (psDevInfo->sDevFeatureCfg.ui64Features & ui64Feature) != 0;
 }
+
+IMG_BOOL RGXDeviceHasErnBrnInit(const void *hPrivate, IMG_UINT64 ui64ErnsBrns)
+{
+	PVRSRV_DEVICE_NODE *psDeviceNode;
+	PVRSRV_RGXDEV_INFO *psDevInfo;
+
+	PVR_ASSERT(hPrivate != NULL);
+
+	psDeviceNode = (PVRSRV_DEVICE_NODE *)(((RGX_INIT_LAYER_PARAMS *)hPrivate)->hServices);
+	psDevInfo = (PVRSRV_RGXDEV_INFO *)psDeviceNode->pvDevice;
+
+	return (psDevInfo->sDevFeatureCfg.ui64ErnsBrns & ui64ErnsBrns) != 0;
+}
 #endif
 
 IMG_UINT32 RGXGetFWCorememSize(const void *hPrivate)

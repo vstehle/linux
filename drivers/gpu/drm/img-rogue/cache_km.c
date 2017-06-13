@@ -40,7 +40,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
-#if defined(CONFIG_SW_SYNC)
+#if defined(SUPPORT_NATIVE_FENCE_SYNC) && defined(CONFIG_SW_SYNC)
 #include <linux/version.h>
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
 #include <linux/sw_sync.h>
@@ -691,13 +691,36 @@ static PVRSRV_ERROR CacheOpRangeBased (PMR *psPMR,
 
 	if (uiCacheOp == PVRSRV_CACHE_OP_NONE)
 	{
-		PVR_ASSERT(0);
 		return PVRSRV_OK;
 	}
 	else
 	{
+		IMG_DEVMEM_SIZE_T uiLogicalSize;
+
+		/* Also validate request parameters in KM */
+		eError = PMR_LogicalSize(psPMR, &uiLogicalSize);
+		if (eError != PVRSRV_OK)
+		{
+			PVR_DPF((CACHEOP_DPFL,
+					"%s: PMR_LogicalSize failed (%u)",
+					__FUNCTION__, eError));
+			return eError;
+		}
+		else if ((uiOffset + uiSize) > uiLogicalSize)
+		{
+			PVR_DPF((CACHEOP_DPFL,
+					"%s: request offset/size exceeds PMR logical size",
+					__FUNCTION__));
+			eError = PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE;
+			return eError;
+		}
+
+		if (! uiSize)
+		{
+			return PVRSRV_OK;
+		}
 		/* Carry out full dcache operation if size (in pages) qualifies */
-		if (uiSize >= PVR_DIRTY_BYTES_FLUSH_THRESHOLD)
+		else if (uiSize >= PVR_DIRTY_BYTES_FLUSH_THRESHOLD)
 		{
 			/* Flush, so we can skip subsequent invalidates */
 			eError = OSCPUOperation(PVRSRV_CACHE_OP_FLUSH);
@@ -1206,7 +1229,7 @@ static PVRSRV_ERROR CacheOpExecRangeBased(PVRSRV_DATA *psPVRSRVData,
 
 			OSAtomicWrite(&ghCompletedCacheOpSeqNum, psCacheOpWorkItem->ui32OpSeqNum);
 
-#if defined(CONFIG_SW_SYNC)
+#if defined(SUPPORT_NATIVE_FENCE_SYNC) && defined(CONFIG_SW_SYNC)
 			sync_timeline_signal(psCacheOpWorkItem->psTimeline->private_data, 1);
 			fput(psCacheOpWorkItem->psTimeline);
 #endif
@@ -1331,10 +1354,10 @@ static PVRSRV_ERROR CacheOpExecQueue (PMR **ppsPMR,
 
 		for (ui32Idx = 0; ui32Idx < ui32NumCacheOps; ui32Idx++)
 		{
-			eError = CacheOpExec(ppsPMR[ui32Idx],
-								 puiOffset[ui32Idx],
-								 puiSize[ui32Idx],
-								 puiCacheOp[ui32Idx]);
+			(void)CacheOpExec(ppsPMR[ui32Idx],
+							  puiOffset[ui32Idx],
+							  puiSize[ui32Idx],
+							  puiCacheOp[ui32Idx]);
 		}
 
 		/* No CacheOp fence dependencies */
@@ -1349,7 +1372,7 @@ static PVRSRV_ERROR CacheOpExecQueue (PMR **ppsPMR,
 			/* As PVRSRV_CACHE_OP_INVALIDATE is used to transfer
 			   device memory buffer ownership back to processor
 			   we cannot defer it so must action it immediately */
-			if (puiCacheOp[ui32Idx] == PVRSRV_CACHE_OP_INVALIDATE)
+			if (puiCacheOp[ui32Idx] & PVRSRV_CACHE_OP_INVALIDATE)
 			{
 				eError = CacheOpExec (ppsPMR[ui32Idx],
 									  puiOffset[ui32Idx],
@@ -1452,10 +1475,17 @@ static PVRSRV_ERROR CacheOpExecQueue(PMR **ppsPMR,
 
 	for (ui32Idx = 0; ui32Idx < ui32NumCacheOps; ui32Idx++)
 	{
-		eError = CacheOpExec(ppsPMR[ui32Idx],
-							 puiOffset[ui32Idx],
-							 puiSize[ui32Idx],
-							 puiCacheOp[ui32Idx]);
+		PVRSRV_ERROR eError2 = CacheOpExec(ppsPMR[ui32Idx],
+										   puiOffset[ui32Idx],
+										   puiSize[ui32Idx],
+										   puiCacheOp[ui32Idx]);
+		if (eError2 != PVRSRV_OK)
+		{
+			eError = eError2;
+			PVR_DPF((CACHEOP_DPFL,
+					"%s: CacheOpExec failed (%u)",
+					__FUNCTION__, eError));
+		}
 	}
 
 	/* For immediate RBF, common/completed are identical */
@@ -1633,7 +1663,7 @@ PVRSRV_ERROR CacheOpSetTimeline (IMG_INT32 i32Timeline)
 	psCacheOpWorkItem->pid = OSGetCurrentClientProcessIDKM();
 #endif
 
-#if defined(CONFIG_SW_SYNC)
+#if defined(SUPPORT_NATIVE_FENCE_SYNC) && defined(CONFIG_SW_SYNC)
 	psCacheOpWorkItem->psTimeline = fget(i32Timeline);
 	if (!psCacheOpWorkItem->psTimeline || 
 		!psCacheOpWorkItem->psTimeline->private_data)
@@ -1663,7 +1693,7 @@ PVRSRV_ERROR CacheOpSetTimeline (IMG_INT32 i32Timeline)
 		return PVRSRV_OK;
 	}
 
-#if defined(CONFIG_SW_SYNC)
+#if defined(SUPPORT_NATIVE_FENCE_SYNC) && defined(CONFIG_SW_SYNC)
 	psFile = fget(i32Timeline);
 	if (!psFile || !psFile->private_data)
 	{
@@ -1715,7 +1745,7 @@ PVRSRV_ERROR CacheOpQueue (IMG_UINT32 ui32NumCacheOps,
 	for (ui32Idx = 0; ui32Idx < ui32NumCacheOps; ui32Idx++)
 	{
 		uiCacheOp = SetCacheOp(uiCacheOp, puiCacheOp[ui32Idx]);
-		if (puiCacheOp[ui32Idx] == PVRSRV_CACHE_OP_INVALIDATE)
+		if (puiCacheOp[ui32Idx] & PVRSRV_CACHE_OP_INVALIDATE)
 		{
 			/* Cannot be deferred, action now */
 			bHasInvalidate = IMG_TRUE;
@@ -1861,7 +1891,7 @@ PVRSRV_ERROR CacheOpSetTimeline (IMG_INT32 i32Timeline)
 		return PVRSRV_OK;
 	}
 
-#if defined(CONFIG_SW_SYNC)
+#if defined(SUPPORT_NATIVE_FENCE_SYNC) && defined(CONFIG_SW_SYNC)
 	psFile = fget(i32Timeline);
 	if (!psFile || !psFile->private_data)
 	{

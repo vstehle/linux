@@ -270,6 +270,25 @@ PVRSRV_ERROR RGXHWPerfReleaseEvents(
 		RGX_HWPERF_STREAM_ID eStreamId);
 
 
+/**************************************************************************/ /*!
+@Function       RGXHWPerfConvertCRTimeStamp
+@Description    Converts the timestamp given by FW events to the common OS
+                timestamp. The first three inputs are obtained via
+                a CLK_SYNC event, ui64CRTimeStamp is the CR timestamp
+                from the FW event to be converted.
+@Input          ui32ClkSpeed            Clock speed given by sync event
+@Input          ui64CorrCRTimeStamp     CR Timestamp given by sync event
+@Input          ui64CorrOSTimeStamp     Correlating OS Timestamp given by sync
+                                        event
+@Input          ui64CRTimeStamp         CR Timestamp to convert
+@Return         IMG_UINT64:             Calculated OS Timestamp
+ */ /**************************************************************************/
+IMG_UINT64 RGXHWPerfConvertCRTimeStamp(
+		IMG_UINT32 ui32ClkSpeed,
+		IMG_UINT64 ui64CorrCRTimeStamp,
+		IMG_UINT64 ui64CorrOSTimeStamp,
+		IMG_UINT64 ui64CRTimeStamp);
+
 #endif /* __RGXAPI_KM_H__ */
 
 /******************************************************************************

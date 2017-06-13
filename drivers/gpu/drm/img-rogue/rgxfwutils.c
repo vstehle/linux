@@ -793,7 +793,7 @@ RGX_CLIENT_CCB *FWCommonContextGetClientCCB(RGX_SERVER_COMMON_CONTEXT *psServerC
 RGXFWIF_CONTEXT_RESET_REASON FWCommonContextGetLastResetReason(RGX_SERVER_COMMON_CONTEXT *psServerCommonContext,
                                                                IMG_UINT32 *pui32LastResetJobRef)
 {
-	RGXFWIF_CONTEXT_RESET_REASON  eLastResetReason;
+	RGXFWIF_CONTEXT_RESET_REASON eLastResetReason;
 
 	PVR_ASSERT(psServerCommonContext != NULL);
 	PVR_ASSERT(pui32LastResetJobRef != NULL);
@@ -1097,7 +1097,7 @@ static PVRSRV_ERROR RGXSetupFirmwareCCB(PVRSRV_RGXDEV_INFO		*psDevInfo,
 
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR,"RGXSetupFirmwareCCB: Failed to allocate %s (%u)", sCCBCtlName,  eError));
+		PVR_DPF((PVR_DBG_ERROR,"RGXSetupFirmwareCCB: Failed to allocate %s (%u)", sCCBCtlName, eError));
 		goto fail;
 	}
 
@@ -3594,6 +3594,7 @@ void RGXCheckFirmwareCCB(PVRSRV_RGXDEV_INFO *psDevInfo)
 			case RGXFWIF_FWCCB_CMD_DEBUG_DUMP:
 			{
 				RGXDumpDebugInfo(NULL,NULL,psDevInfo);
+				OSWarnOn(IMG_TRUE);
 				break;
 			}
 
@@ -3859,74 +3860,96 @@ PVRSRV_ERROR RGXStateFlagCtrl(PVRSRV_RGXDEV_INFO *psDevInfo,
 				IMG_BOOL bSetNotClear)
 {
 	PVRSRV_ERROR eError;
+	PVRSRV_DEV_POWER_STATE ePowerState;
 	RGXFWIF_KCCB_CMD sStateFlagCmd;
-	PVRSRV_CLIENT_SYNC_PRIM *psResponseSync;
+	PVRSRV_DEVICE_NODE *psDeviceNode;
+	RGXFWIF_INIT *psRGXFWInit;
 
 	if (!psDevInfo)
 	{
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-		goto return_;
+		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
+	psDeviceNode = psDevInfo->psDeviceNode;
 
-	if (psDevInfo->psDeviceNode->eDevState != PVRSRV_DEVICE_STATE_ACTIVE)
-	{
-		eError = PVRSRV_ERROR_NOT_INITIALISED;
-		goto return_;
-	}
-
-	sStateFlagCmd.eCmdType = RGXFWIF_KCCB_CMD_STATEFLAGS_CTRL;
-	sStateFlagCmd.eDM = RGXFWIF_DM_GP;
-	sStateFlagCmd.uCmdData.sStateFlagCtrl.ui32Config = ui32Config;
-	sStateFlagCmd.uCmdData.sStateFlagCtrl.bSetNotClear = bSetNotClear;
-
-	eError = SyncPrimAlloc(psDevInfo->hSyncPrimContext, &psResponseSync, "rgx config flags");
-	if (PVRSRV_OK != eError)
-	{
-		goto return_;
-	}
-	eError = SyncPrimSet(psResponseSync, 0);
+	eError = DevmemAcquireCpuVirtAddr(psDevInfo->psRGXFWIfInitMemDesc,
+	                                 (void **) &psRGXFWInit);
 	if (eError != PVRSRV_OK)
 	{
-		goto return_freesync_;
+		PVR_DPF((PVR_DBG_ERROR,"%s: Failed to acquire FWIF Ctrl (%u)", __func__, eError));
+		return eError;
 	}
 
-	eError = SyncPrimGetFirmwareAddr(psResponseSync, &sStateFlagCmd.uCmdData.sStateFlagCtrl.sSyncObjDevVAddr.ui32Addr);
-	if (PVRSRV_OK != eError)
+	/* apply change and ensure the new data is written to memory
+	 * before requesting the FW to read it
+	 */
+	ui32Config = ui32Config & RGXFWIF_INICFG_ALL;
+	if (bSetNotClear)
 	{
-		goto return_freesync_;
+		psRGXFWInit->ui32ConfigFlags |= ui32Config;
+	}
+	else
+	{
+		psRGXFWInit->ui32ConfigFlags &= ~ui32Config;
 	}
 
-	LOOP_UNTIL_TIMEOUT(MAX_HW_TIME_US)
-	{
-		eError = RGXScheduleCommand(psDevInfo,
-					RGXFWIF_DM_GP,
-					&sStateFlagCmd,
-					sizeof(sStateFlagCmd),
-					0,
-					PDUMP_FLAGS_CONTINUOUS);
-		if (eError != PVRSRV_ERROR_RETRY)
-		{
-			break;
-		}
-		OSWaitus(MAX_HW_TIME_US/WAIT_TRY_COUNT);
-	} END_LOOP_UNTIL_TIMEOUT();
-	PVR_LOGG_IF_ERROR(eError, "RGXScheduleCommand", return_);
-
-	/* Wait for FW to complete */
-	eError = RGXWaitForFWOp(psDevInfo,
-				RGXFWIF_DM_GP,
-	                        psDevInfo->psDeviceNode->psSyncPrim,
-				PDUMP_FLAGS_CONTINUOUS);
-	PVR_LOGG_IF_ERROR(eError, "RGXWaitForFWOp", return_);
-
+	/* return current/new value to caller */
 	if (pui32ConfigState)
 	{
-		*pui32ConfigState = *psResponseSync->pui32LinAddr;
+		*pui32ConfigState = psRGXFWInit->ui32ConfigFlags;
 	}
 
-return_freesync_:
-	SyncPrimFree(psResponseSync);
-return_:
+	OSMemoryBarrier();
+
+	eError = PVRSRVPowerLock(psDeviceNode);
+	if (eError != PVRSRV_OK)
+	{
+		PVR_DPF((PVR_DBG_ERROR,"%s: Failed to acquire power lock (%u)", __func__, eError));
+		goto error_lock;
+	}
+
+	/* notify FW to update setting */
+	eError = PVRSRVGetDevicePowerState(psDeviceNode, &ePowerState);
+
+	if ((eError == PVRSRV_OK) && (ePowerState != PVRSRV_DEV_POWER_STATE_OFF))
+	{
+		/* Ask the FW to update its cached version of the value */
+		sStateFlagCmd.eCmdType = RGXFWIF_KCCB_CMD_STATEFLAGS_CTRL;
+		sStateFlagCmd.uCmdData.sStateFlagCtrl.sSyncObjDevVAddr.ui32Addr = 0;
+
+		eError = RGXSendCommand(psDevInfo,
+		                        RGXFWIF_DM_GP,
+		                        &sStateFlagCmd,
+		                        sizeof(sStateFlagCmd),
+		                        PDUMP_FLAGS_CONTINUOUS);
+		if (eError != PVRSRV_OK)
+		{
+			PVR_DPF((PVR_DBG_ERROR, "%s: RGXSendCommand failed. Error:%u", __func__, eError));
+			goto error_cmd;
+		}
+		else
+		{
+			/* Give up the power lock as its acquired in RGXWaitForFWOp */
+			PVRSRVPowerUnlock(psDeviceNode);
+
+			/* Wait for the value to be updated as the FW validates
+			 * the parameters and modifies the ui32ConfigFlags
+			 * accordingly
+			 * (for completeness as registered callbacks should also
+			 *  not permit invalid transitions)
+			 */
+			eError = RGXWaitForFWOp(psDevInfo, RGXFWIF_DM_GP, psDeviceNode->psSyncPrim, PDUMP_FLAGS_CONTINUOUS);
+			if (eError != PVRSRV_OK)
+			{
+				PVR_DPF((PVR_DBG_ERROR,"%s: Waiting for value aborted with error (%u)", __func__, eError));
+			}
+			goto error_lock;
+		}
+	}
+
+error_cmd:
+	PVRSRVPowerUnlock(psDeviceNode);
+error_lock:
+	DevmemReleaseCpuVirtAddr(psDevInfo->psRGXFWIfInitMemDesc);
 	return eError;
 }
 
@@ -4599,7 +4622,6 @@ PVRSRV_ERROR RGXReadMETAAddr(PVRSRV_RGXDEV_INFO	*psDevInfo, IMG_UINT32 ui32METAA
 	return PVRSRV_OK;
 }
 
-
 /*
 	RGXUpdateHealthStatus
 */
@@ -4621,7 +4643,7 @@ PVRSRV_ERROR RGXUpdateHealthStatus(PVRSRV_DEVICE_NODE* psDevNode,
 	psRGXFWIfTraceBufCtl = psDevInfo->psRGXFWIfTraceBuf;
 
 	/* If the firmware is not initialised, there is not much point continuing! */
-	if (!psDevInfo->bFirmwareInitialised  ||  psDevInfo->pvRegsBaseKM == NULL  ||
+	if (!psDevInfo->bFirmwareInitialised || psDevInfo->pvRegsBaseKM == NULL ||
 	    psDevInfo->psDeviceNode == NULL)
 	{
 		return PVRSRV_OK;
@@ -4694,7 +4716,7 @@ PVRSRV_ERROR RGXUpdateHealthStatus(PVRSRV_DEVICE_NODE* psDevNode,
 	*/
 	if (!bCheckAfterTimePassed)
 	{
-		if (psDevInfo->ui32GEOTimeoutsLastTime > 1  &&  psPVRSRVData->ui32GEOConsecutiveTimeouts > psDevInfo->ui32GEOTimeoutsLastTime)
+		if (psDevInfo->ui32GEOTimeoutsLastTime > 1 && psPVRSRVData->ui32GEOConsecutiveTimeouts > psDevInfo->ui32GEOTimeoutsLastTime)
 		{
 			PVR_DPF((PVR_DBG_WARNING, "RGXGetDeviceHealthStatus: Global Event Object Timeouts have risen (from %d to %d)",
 					psDevInfo->ui32GEOTimeoutsLastTime, psPVRSRVData->ui32GEOConsecutiveTimeouts));

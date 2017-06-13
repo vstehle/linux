@@ -179,10 +179,11 @@ typedef enum _PVRSRVTL_PACKETTYPE_
  *        stream descriptor. Read from on the stream descriptor opened
  *        with this flag will fail.
  */
-#define PVRSRV_STREAM_FLAG_NONE                 (0U)
-#define PVRSRV_STREAM_FLAG_ACQUIRE_NONBLOCKING  (1U<<0)
-#define PVRSRV_STREAM_FLAG_OPEN_WAIT            (1U<<1)
-#define PVRSRV_STREAM_FLAG_OPEN_WO              (1U<<2)
+#define PVRSRV_STREAM_FLAG_NONE                        (0U)
+#define PVRSRV_STREAM_FLAG_ACQUIRE_NONBLOCKING         (1U<<0)
+#define PVRSRV_STREAM_FLAG_OPEN_WAIT                   (1U<<1)
+#define PVRSRV_STREAM_FLAG_OPEN_WO                     (1U<<2)
+#define PVRSRV_STREAM_FLAG_DISABLE_PRODUCER_CALLBACK   (1U<<3)
 
 #if defined (__cplusplus)
 }

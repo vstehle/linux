@@ -903,7 +903,9 @@ TLStreamSync(IMG_HANDLE psStream)
  * these functions are internal.
  */
 IMG_UINT32
-TLStreamAcquireReadPos(PTL_STREAM psStream, IMG_UINT32* puiReadOffset)
+TLStreamAcquireReadPos(PTL_STREAM psStream,
+                       IMG_BOOL bDisableCallback,
+                       IMG_UINT32* puiReadOffset)
 {
 	IMG_UINT32 uiReadLen = 0;
 	IMG_UINT32 ui32LRead, ui32LWrite;
@@ -918,7 +920,7 @@ TLStreamAcquireReadPos(PTL_STREAM psStream, IMG_UINT32* puiReadOffset)
 	ui32LWrite = psStream->ui32Write;
 
 	/* No data available and CB defined - try and get data */
-	if ((ui32LRead == ui32LWrite) && psStream->pfProducerCallback)
+	if ((ui32LRead == ui32LWrite) && psStream->pfProducerCallback && !bDisableCallback)
 	{
 		PVRSRV_ERROR eRc;
 		IMG_UINT32   ui32Resp = 0;

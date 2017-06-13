@@ -253,7 +253,9 @@ IMG_BOOL  TLUnrefDescAndTryFreeStreamNode(PTL_SNODE psRemove, PTL_STREAM_DESC ps
  * Transport Layer stream interface to server part declared here to avoid
  * circular dependency.
  */
-IMG_UINT32 TLStreamAcquireReadPos(PTL_STREAM psStream, IMG_UINT32* puiReadOffset);
+IMG_UINT32 TLStreamAcquireReadPos(PTL_STREAM psStream,
+                                  IMG_BOOL bDisableCallback,
+                                  IMG_UINT32* puiReadOffset);
 void TLStreamAdvanceReadPos(PTL_STREAM psStream, IMG_UINT32 uiReadLen);
 
 DEVMEM_MEMDESC* TLStreamGetBufferPointer(PTL_STREAM psStream);

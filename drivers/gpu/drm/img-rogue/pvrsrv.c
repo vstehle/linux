@@ -124,6 +124,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * a day to check for any missed clean-up. */
 #define CLEANUP_THREAD_WAIT_SLEEP_TIMEOUT 28800000000ULL
 
+/*! When unloading try a few times to free everything remaining on the list */
+#define CLEANUP_THREAD_UNLOAD_RETRY 4
 
 #define PVRSRV_PROC_HANDLE_BASE_INIT 10
 
@@ -304,6 +306,7 @@ static void CleanupThread(void *pvData)
 	IMG_HANDLE	 hOSEvent;
 	PVRSRV_ERROR eRc;
 	IMG_BOOL bUseGlobalEO = IMG_FALSE;
+	IMG_UINT32 uiUnloadRetry = 0;
 
 	/* Store the process id (pid) of the clean-up thread */
 	psPVRSRVData->cleanupThreadPid = OSGetCurrentProcessID();
@@ -322,10 +325,19 @@ static void CleanupThread(void *pvData)
 	/* While the driver is in a good state and is not being unloaded
 	 * try to free any deferred items when signalled
 	 */
-	while ((psPVRSRVData->eServicesState == PVRSRV_SERVICES_STATE_OK) && 
-			(!psPVRSRVData->bUnload))
+	while ((psPVRSRVData->eServicesState == PVRSRV_SERVICES_STATE_OK))
 	{
 		IMG_HANDLE hEvent;
+
+		if (psPVRSRVData->bUnload)
+		{
+			if (dllist_is_empty(&psPVRSRVData->sCleanupThreadWorkList) ||
+					uiUnloadRetry > CLEANUP_THREAD_UNLOAD_RETRY)
+			{
+				break;
+			}
+			uiUnloadRetry++;
+		}
 
 		/* Wait until signalled for deferred clean up OR wait for a
 		 * short period if the previous deferred clean up was not able
@@ -1452,6 +1464,7 @@ static PVRSRV_ERROR _ReadDeviceFlag(const PVRSRV_DEVICE_NODE *psDevice,
 
 	return eResult;
 }
+
 static PVRSRV_ERROR _SetStateFlag(const PVRSRV_DEVICE_NODE *psDevice,
                                   const void *psPrivate, IMG_BOOL bValue)
 {
@@ -1480,24 +1493,28 @@ static PVRSRV_ERROR _SetStateFlag(const PVRSRV_DEVICE_NODE *psDevice,
 static PVRSRV_ERROR _ReadStateFlag(const PVRSRV_DEVICE_NODE *psDevice,
                                    const void *psPrivate, IMG_BOOL *pbValue)
 {
-	PVRSRV_ERROR eResult = PVRSRV_OK;
+	PVRSRV_ERROR eError;
 	IMG_UINT32 ui32Flag = (IMG_UINT32)((uintptr_t)psPrivate);
-	IMG_UINT32 ui32State;
+	PVRSRV_RGXDEV_INFO *psDevInfo = psDevice->pvDevice;
+	RGXFWIF_INIT *psRGXFWInit;
 
-	if (!ui32Flag)
+	if (!ui32Flag || !pbValue)
 	{
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-	eResult = RGXStateFlagCtrl((PVRSRV_RGXDEV_INFO *)psDevice->pvDevice,
-	                           0, &ui32State, IMG_FALSE);
-
-	if (PVRSRV_OK == eResult)
+	eError = DevmemAcquireCpuVirtAddr(psDevInfo->psRGXFWIfInitMemDesc,
+	                                 (void **) &psRGXFWInit);
+	if (eError != PVRSRV_OK)
 	{
-		*pbValue = (ui32State & ui32Flag)? IMG_TRUE: IMG_FALSE;
+		PVR_DPF((PVR_DBG_ERROR,"%s: Failed to acquire FWIF Ctrl (%u)", __func__, eError));
+		return eError;
 	}
 
-	return eResult;
+	*pbValue = (psRGXFWInit->ui32ConfigFlags & ui32Flag)? IMG_TRUE: IMG_FALSE;
+
+	DevmemReleaseCpuVirtAddr(psDevInfo->psRGXFWIfInitMemDesc);
+	return PVRSRV_OK;
 }
 
 PVRSRV_ERROR PVRSRVDeviceInitialise(PVRSRV_DEVICE_NODE *psDeviceNode)

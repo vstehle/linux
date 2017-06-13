@@ -249,7 +249,7 @@ static void RGXFWConfigureSegMMU(const void       *hPrivate,
                                  IMG_DEV_VIRTADDR *psFWDataDevVAddrBase,
                                  IMG_UINT32       **ppui32BootConf)
 {
-	IMG_UINT64 ui64SegOutAddr;
+	IMG_UINT64 ui64SegOutAddrTop;
 	IMG_UINT32 i;
 
 	PVR_UNREFERENCED_PARAMETER(psFWCodeDevVAddrBase);
@@ -257,10 +257,28 @@ static void RGXFWConfigureSegMMU(const void       *hPrivate,
 	/* Configure Segment MMU */
 	RGXCommentLogInit(hPrivate, "********** FW configure Segment MMU **********");
 
+#if defined(SUPPORT_KERNEL_SRVINIT)
+	if (RGXDeviceHasErnBrnInit(hPrivate, HW_ERN_49144_BIT_MASK))
+	{
+		ui64SegOutAddrTop = RGXFW_SEGMMU_OUTADDR_TOP_ERN_49144(META_MMU_CONTEXT_MAPPING, RGXFW_SEGMMU_META_DM_ID);
+	}
+	else if (RGXDeviceHasErnBrnInit(hPrivate, HW_ERN_45914_BIT_MASK))
+	{
+		ui64SegOutAddrTop = RGXFW_SEGMMU_OUTADDR_TOP_ERN_45914(META_MMU_CONTEXT_MAPPING, RGXFW_SEGMMU_META_DM_ID);
+	}
+	else
+	{
+		ui64SegOutAddrTop = RGXFW_SEGMMU_OUTADDR_TOP_PRE_S7(META_MMU_CONTEXT_MAPPING, RGXFW_SEGMMU_META_DM_ID);
+	}
+#else
+	ui64SegOutAddrTop =  RGXFW_SEGMMU_OUTADDR_TOP(META_MMU_CONTEXT_MAPPING, RGXFW_SEGMMU_META_DM_ID);
+#endif
+
 	for (i = 0; i < RGXFW_META_NUM_DATA_SEGMENTS ; i++)
 	{
-		ui64SegOutAddr = (psFWDataDevVAddrBase->uiAddr |
-		                  RGXFW_SEGMMU_OUTADDR_TOP(META_MMU_CONTEXT_MAPPING, RGXFW_SEGMMU_META_DM_ID)) +
+		IMG_UINT64 ui64SegOutAddr;
+
+		ui64SegOutAddr = (psFWDataDevVAddrBase->uiAddr | ui64SegOutAddrTop) +
 		                  asRGXMetaFWDataSegments[i].ui32FWMemOffset;
 
 		RGXFWConfigureSegID(hPrivate,

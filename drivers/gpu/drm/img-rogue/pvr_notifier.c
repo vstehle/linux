@@ -416,15 +416,6 @@ PVRSRVDebugRequest(PVRSRV_DEVICE_NODE *psDevNode,
 
 	PVR_ASSERT(psDebugTable);
 
-	if (!pfnDumpDebugPrintf)
-	{
-		/*
-		 * Only dump the call stack to the kernel log if the debug text is going
-		 * there.
-		 */
-		OSDumpStack();
-	}
-
 	OSWRLockAcquireRead(psDebugTable->hLock);
 
 	if (ui32VerbLevel < IMG_ARR_NUM_ELEMS(apszVerbosityTable))
@@ -479,4 +470,12 @@ PVRSRVDebugRequest(PVRSRV_DEVICE_NODE *psDevNode,
 
 	PVR_DUMPDEBUG_LOG("------------[ PVR DBG: END ]------------");
 	OSWRLockReleaseRead(psDebugTable->hLock);
+
+	if (!pfnDumpDebugPrintf)
+	{
+		/* Only dump the call stack to the kernel log if the debug
+		 * dump has gone there
+		 */
+		OSWarnOn(IMG_TRUE);
+	}
 }

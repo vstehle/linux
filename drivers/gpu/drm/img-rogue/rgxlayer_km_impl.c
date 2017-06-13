@@ -521,6 +521,24 @@ IMG_BOOL RGXDoFWSlaveBoot(const void *hPrivate)
 	return PVRSRVSystemSnoopingOfCPUCache(psDevConfig);
 }
 
+static PVRSRV_ERROR RGXWriteMetaRegThroughSP(const void *hPrivate, IMG_UINT32 ui32RegAddr, IMG_UINT32 ui32RegValue)
+{
+	PVRSRV_ERROR eError = PVRSRV_OK;
+
+	/* Wait for Slave Port to be Ready */
+	eError = RGXPollReg32(hPrivate,
+	                      RGX_CR_META_SP_MSLVCTRL1,
+	                      RGX_CR_META_SP_MSLVCTRL1_READY_EN|RGX_CR_META_SP_MSLVCTRL1_GBLPORT_IDLE_EN,
+	                      RGX_CR_META_SP_MSLVCTRL1_READY_EN|RGX_CR_META_SP_MSLVCTRL1_GBLPORT_IDLE_EN);
+	if (eError != PVRSRV_OK) return eError;
+
+	/* Issue a Write */
+	RGXWriteReg32(hPrivate, RGX_CR_META_SP_MSLVCTRL0, ui32RegAddr);
+	RGXWriteReg32(hPrivate, RGX_CR_META_SP_MSLVDATAT, ui32RegValue);
+
+	return eError;
+}
+
 PVRSRV_ERROR RGXIOCoherencyTest(const void *hPrivate)
 {
 	PVRSRV_RGXDEV_INFO *psDevInfo;
@@ -529,8 +547,10 @@ PVRSRV_ERROR RGXIOCoherencyTest(const void *hPrivate)
 	RGXFWIF_DEV_VIRTADDR sCoherencyTestBuffer;
 	IMG_DEVMEM_SIZE_T uiCoherencyBlockSize = sizeof(IMG_UINT64);
 	IMG_DEVMEM_ALIGN_T uiCoherencyBlockAlign = sizeof(IMG_UINT64);
-	IMG_UINT32 ui32SLCCTRL;
+	IMG_UINT64 ui64SegOutAddrTopCached = 0, ui64SegOutAddrTopUncached = 0;
+	IMG_UINT32 ui32SLCCTRL = 0;
 	IMG_UINT32 ui32TestNum;
+	IMG_BOOL   bFeatureS7;
 	PVRSRV_ERROR eError = PVRSRV_OK;
 
 	PVR_ASSERT(hPrivate != NULL);
@@ -583,11 +603,33 @@ PVRSRV_ERROR RGXIOCoherencyTest(const void *hPrivate)
 		sCoherencyTestBuffer.ui32Addr |= RGXFW_SEGMMU_DATA_META_UNCACHED;
 	}
 
-	/* Bypass the SLC when IO coherency is enabled */
-	ui32SLCCTRL = RGXReadReg32(hPrivate, RGX_CR_SLC_CTRL_BYPASS);
-	RGXWriteReg32(hPrivate,
-	              RGX_CR_SLC_CTRL_BYPASS,
-	              ui32SLCCTRL | RGX_CR_SLC_CTRL_BYPASS_BYP_CC_EN);
+	bFeatureS7 = RGXDeviceHasFeaturePower(hPrivate, RGX_FEATURE_S7_TOP_INFRASTRUCTURE_BIT_MASK);
+
+	if (bFeatureS7)
+	{
+		if (RGXDeviceHasErnBrnPower(hPrivate, HW_ERN_49144_BIT_MASK))
+		{
+			ui64SegOutAddrTopCached   = RGXFW_SEGMMU_OUTADDR_TOP_S7_SLC_CACHED_ERN_49144(META_MMU_CONTEXT_MAPPING);
+			ui64SegOutAddrTopUncached = RGXFW_SEGMMU_OUTADDR_TOP_S7_SLC_UNCACHED_ERN_49144(META_MMU_CONTEXT_MAPPING);
+		}
+		else if (RGXDeviceHasErnBrnPower(hPrivate, HW_ERN_45914_BIT_MASK))
+		{
+			ui64SegOutAddrTopCached   = RGXFW_SEGMMU_OUTADDR_TOP_S7_SLC_CACHED_ERN_45914(META_MMU_CONTEXT_MAPPING);
+			ui64SegOutAddrTopUncached = RGXFW_SEGMMU_OUTADDR_TOP_S7_SLC_UNCACHED_ERN_45914(META_MMU_CONTEXT_MAPPING);
+		}
+
+		/* Configure META to use SLC force-linefill for the bootloader segment */
+		RGXWriteMetaRegThroughSP(hPrivate, META_CR_MMCU_SEGMENTn_OUTA1(6),
+		                         (ui64SegOutAddrTopUncached |  RGXFW_BOOTLDR_DEVV_ADDR) >> 32);
+	}
+	else
+	{
+		/* Bypass the SLC when IO coherency is enabled */
+		ui32SLCCTRL = RGXReadReg32(hPrivate, RGX_CR_SLC_CTRL_BYPASS);
+		RGXWriteReg32(hPrivate,
+		              RGX_CR_SLC_CTRL_BYPASS,
+		              ui32SLCCTRL | RGX_CR_SLC_CTRL_BYPASS_BYP_CC_EN);
+	}
 
 	for (ui32TestNum = 1; ui32TestNum < 3; ui32TestNum++)
 	{
@@ -636,8 +678,17 @@ PVRSRV_ERROR RGXIOCoherencyTest(const void *hPrivate)
 		         ui32TestNum, bPassed));
 	}
 
-	/* Restore SLC bypass settings */
-	RGXWriteReg32(hPrivate, RGX_CR_SLC_CTRL_BYPASS, ui32SLCCTRL);
+	if (bFeatureS7)
+	{
+		/* Restore bootloader segment settings */
+		RGXWriteMetaRegThroughSP(hPrivate, META_CR_MMCU_SEGMENTn_OUTA1(6),
+		                         (ui64SegOutAddrTopCached |  RGXFW_BOOTLDR_DEVV_ADDR) >> 32);
+	}
+	else
+	{
+		/* Restore SLC bypass settings */
+		RGXWriteReg32(hPrivate, RGX_CR_SLC_CTRL_BYPASS, ui32SLCCTRL);
+	}
 
 	RGXUnsetFirmwareAddress(psIOCoherencyTestMemDesc);
 	DevmemReleaseCpuVirtAddr(psIOCoherencyTestMemDesc);

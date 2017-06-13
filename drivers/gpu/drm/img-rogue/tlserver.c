@@ -527,7 +527,9 @@ TLServerAcquireDataKM(PTL_STREAM_DESC psSD,
 	//PVR_DPF((PVR_DBG_VERBOSE, "TLServerAcquireDataKM evList=%p, evObj=%p", psSD->psNode->hReadEventObj, psSD->hReadEvent));
 
 	/* Check for data in the associated stream buffer, sleep/wait if none */
-	while (((uiTmpLen = TLStreamAcquireReadPos(psNode->psStream, &uiTmpOffset)) == 0) &&
+	while (((uiTmpLen = TLStreamAcquireReadPos(psNode->psStream,
+			 psSD->ui32Flags & PVRSRV_STREAM_FLAG_DISABLE_PRODUCER_CALLBACK,
+			 &uiTmpOffset)) == 0) &&
 	       (!(psSD->ui32Flags&PVRSRV_STREAM_FLAG_ACQUIRE_NONBLOCKING)) )
 	{
 		PVR_DPF((PVR_DBG_VERBOSE, "TLAcquireDataKM sleeping..."));
