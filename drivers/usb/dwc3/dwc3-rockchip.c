@@ -296,6 +296,8 @@ static int dwc3_rockchip_probe(struct platform_device *pdev)
 			schedule_work(&rockchip->otg_work);
 	}
 
+	device_enable_async_suspend(dev);
+
 	mutex_unlock(&rockchip->lock);
 	return 0;
 
