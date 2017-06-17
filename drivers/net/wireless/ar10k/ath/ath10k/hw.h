@@ -123,6 +123,9 @@ enum qca9377_chip_id_rev {
 /* HTT id conflict fix for management frames over HTT */
 #define ATH10K_FW_API5_FILE		"firmware-5.bin"
 
+/* the firmware-6.bin blob */
+#define ATH10K_FW_API6_FILE		"firmware-6.bin"
+
 #define ATH10K_FW_UTF_FILE		"utf.bin"
 #define ATH10K_FW_UTF_API2_FILE		"utf-2.bin"
 
