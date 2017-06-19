@@ -35,6 +35,12 @@ int iommu_dma_init(void)
 }
 EXPORT_SYMBOL(iommu_dma_init);
 
+void iommu_dma_cleanup(void)
+{
+	iova_cache_put();
+}
+EXPORT_SYMBOL(iommu_dma_cleanup);
+
 /**
  * iommu_get_dma_cookie - Acquire DMA-API resources for a domain
  * @domain: IOMMU domain to prepare for DMA-API usage

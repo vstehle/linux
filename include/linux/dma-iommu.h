@@ -22,7 +22,9 @@
 #ifdef CONFIG_IOMMU_DMA
 #include <linux/iommu.h>
 
+/* Framework initialization - reference counted */
 int iommu_dma_init(void);
+void iommu_dma_cleanup(void);
 
 /* Domain management interface for IOMMU drivers */
 int iommu_get_dma_cookie(struct iommu_domain *domain);
@@ -69,6 +71,10 @@ struct iommu_domain;
 static inline int iommu_dma_init(void)
 {
 	return 0;
+}
+
+static inline void iommu_dma_cleanup(void)
+{
 }
 
 static inline int iommu_get_dma_cookie(struct iommu_domain *domain)
