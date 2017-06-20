@@ -265,7 +265,7 @@ i915_gem_shrinker_count(struct shrinker *shrinker, struct shrink_control *sc)
 			count += obj->base.size >> PAGE_SHIFT;
 
 	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_list) {
-		if (i915_gem_object_is_active(obj) && can_release_pages(obj))
+		if (!i915_gem_object_is_active(obj) && can_release_pages(obj))
 			count += obj->base.size >> PAGE_SHIFT;
 	}
 
