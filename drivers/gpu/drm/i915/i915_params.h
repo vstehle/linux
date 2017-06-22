@@ -52,6 +52,7 @@ struct i915_params {
 	int mmio_debug;
 	int edp_vswing;
 	unsigned int inject_load_failure;
+	int enable_dpcd_backlight;
 	/* leave bools at the end to not create holes */
 	bool enable_hangcheck;
 	bool fastboot;
@@ -62,7 +63,6 @@ struct i915_params {
 	bool verbose_state_checks;
 	bool nuclear_pageflip;
 	bool enable_dp_mst;
-	bool enable_dpcd_backlight;
 };
 
 extern struct i915_params i915 __read_mostly;
