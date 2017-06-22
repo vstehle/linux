@@ -60,6 +60,7 @@ struct i915_params i915 __read_mostly = {
 	.enable_dp_mst = false,
 	.inject_load_failure = 0,
 	.enable_dpcd_backlight = -1,
+	.enable_dbc = true,
 };
 
 module_param_named(modeset, i915.modeset, int, 0400);
@@ -223,3 +224,7 @@ module_param_named_unsafe(enable_dpcd_backlight, i915.enable_dpcd_backlight, int
 MODULE_PARM_DESC(enable_dpcd_backlight,
 	"Enable support for DPCD backlight control "
 	"(-1:auto (default), 0:force disable, 1:force enabled if supported");
+
+module_param_named_unsafe(enable_dbc, i915.enable_dbc, bool, 0600);
+MODULE_PARM_DESC(enable_dbc,
+	"Enable support for dynamic backlight control (default:true)");
