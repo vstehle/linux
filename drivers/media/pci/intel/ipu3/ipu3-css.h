@@ -16,6 +16,8 @@
 
 #include <linux/videodev2.h>
 #include <linux/types.h>
+#include <media/v4l2-ctrls.h>
+#include <media/videobuf2-core.h>
 #include "ipu3-abi.h"
 #include "ipu3-css-pool.h"
 
@@ -59,6 +61,33 @@ enum ipu3_css_pipe_id {
 	IPU3_CSS_PIPE_ID_YUVPP,
 	IPU3_CSS_PIPE_ID_ACC,
 	IPU3_CSS_PIPE_ID_NUM
+};
+
+struct ipu3_css_resolution {
+	u32 w;
+	u32 h;
+};
+
+enum ipu3_css_vf_status {
+	IPU3_NODE_VF_ENABLED,
+	IPU3_NODE_PV_ENABLED,
+	IPU3_NODE_VF_DISABLED
+};
+
+enum ipu3_css_buffer_state {
+	IPU3_CSS_BUFFER_NEW,	/* Not yet queued */
+	IPU3_CSS_BUFFER_QUEUED,	/* Queued, waiting to be filled */
+	IPU3_CSS_BUFFER_DONE,	/* Finished processing, removed from queue */
+	IPU3_CSS_BUFFER_FAILED,	/* Was not processed, removed from queue */
+};
+
+struct ipu3_css_buffer {
+	/* Private fields: user doesn't touch */
+	dma_addr_t daddr;
+	unsigned int queue;
+	enum ipu3_css_buffer_state state;
+	struct list_head list;
+	u8 queue_pos;
 };
 
 struct ipu3_css_format {
@@ -141,11 +170,66 @@ struct ipu3_css {
 
 	struct ipu3_css_queue queue[IPU3_CSS_QUEUES];
 	struct v4l2_rect rect[IPU3_CSS_RECTS];
+	struct ipu3_css_map abi_buffers[IPU3_CSS_QUEUES]
+				    [IMGU_ABI_HOST2SP_BUFQ_SIZE];
+
+	struct ipu3_css_ctrls {
+		struct v4l2_ctrl_handler handler;
+	} ctrls;
+
+	struct {
+		struct ipu3_css_pool parameter_set_info;
+		struct ipu3_css_pool acc;
+		struct ipu3_css_pool gdc;
+		struct ipu3_css_pool obgrid;
+		/* PARAM_CLASS_PARAM parameters for binding while streaming */
+		struct ipu3_css_pool binary_params_p[IMGU_ABI_NUM_MEMORIES];
+	} pool;
+
+	enum ipu3_css_vf_status vf_output_en;
 };
+
+/******************* css v4l *******************/
+int ipu3_css_init(struct device *dev, struct ipu3_css *css,
+		  void __iomem *base, int length, struct device *dma_dev);
+void ipu3_css_cleanup(struct ipu3_css *css);
+int ipu3_css_fmt_try(struct ipu3_css *css,
+		     struct v4l2_pix_format *fmts[IPU3_CSS_QUEUES],
+		     struct v4l2_rect *rects[IPU3_CSS_RECTS]);
+int ipu3_css_fmt_set(struct ipu3_css *css,
+		     struct v4l2_pix_format *fmts[IPU3_CSS_QUEUES],
+		     struct v4l2_rect *rects[IPU3_CSS_RECTS]);
+int ipu3_css_buf_queue(struct ipu3_css *css, struct ipu3_css_buffer *b);
+struct ipu3_css_buffer *ipu3_css_buf_dequeue(struct ipu3_css *css);
+int ipu3_css_start_streaming(struct ipu3_css *css);
+void ipu3_css_stop_streaming(struct ipu3_css *css);
 
 /******************* css hw *******************/
 int ipu3_css_set_powerup(struct device *dev, void __iomem *base);
 int ipu3_css_set_powerdown(struct device *dev, void __iomem *base);
 int ipu3_css_irq_ack(struct ipu3_css *css);
 
+/******************* set parameters ************/
+int ipu3_css_set_parameters(struct ipu3_css *css,
+		struct ipu3_uapi_params *set_params,
+		struct ipu3_uapi_gdc_warp_param *set_gdc,
+		unsigned int gdc_bytes,
+		struct ipu3_uapi_obgrid_param *set_obgrid,
+		unsigned int obgrid_bytes);
+
+/******************* css misc *******************/
+static inline enum ipu3_css_buffer_state
+ipu3_css_buf_state(struct ipu3_css_buffer *b)
+{
+	return b->state;
+}
+
+/* Initialize given buffer. May be called several times. */
+static inline void ipu3_css_buf_init(struct ipu3_css_buffer *b,
+				unsigned int queue, dma_addr_t daddr)
+{
+	b->state = IPU3_CSS_BUFFER_NEW;
+	b->queue = queue;
+	b->daddr = daddr;
+}
 #endif
