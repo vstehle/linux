@@ -13,3 +13,4 @@
 
 obj-$(CONFIG_VIDEO_IPU3_CIO2) += ipu3-cio2.o
 obj-$(CONFIG_INTEL_IPU3_MMU) += ipu3-mmu.o
+obj-$(CONFIG_INTEL_IPU3_DMAMAP) += ipu3-dmamap.o

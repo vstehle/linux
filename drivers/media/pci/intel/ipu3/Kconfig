@@ -24,3 +24,11 @@ config INTEL_IPU3_MMU
 
 	  Say Y here if you have Skylake/Kaby Lake SoC with IPU3.
 	  Say N if un-sure.
+
+config INTEL_IPU3_DMAMAP
+	tristate
+	default n
+	select IOMMU_DMA
+	select IOMMU_IOVA
+	---help---
+	This is IPU3 IOMMU domain specific DMA driver.
