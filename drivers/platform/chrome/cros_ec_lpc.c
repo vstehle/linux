@@ -317,7 +317,7 @@ static int cros_ec_lpc_remove(struct platform_device *pdev)
 	struct acpi_device *adev = ACPI_COMPANION(dev);
 
 	if (adev)
-		acpi_remove_notify_handler(adev->handle, ACPI_SYSTEM_NOTIFY,
+		acpi_remove_notify_handler(adev->handle, ACPI_ALL_NOTIFY,
 					   cros_ec_lpc_acpi_notify);
 	cros_ec_remove(ec_dev);
 
