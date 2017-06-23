@@ -62,8 +62,7 @@ struct i915_params {
 	bool verbose_state_checks;
 	bool nuclear_pageflip;
 	bool enable_dp_mst;
-	int enable_dpcd_backlight;
-	bool enable_dbc;
+	bool enable_dpcd_backlight;
 };
 
 extern struct i915_params i915 __read_mostly;
