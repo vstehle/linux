@@ -143,4 +143,9 @@ struct ipu3_css {
 	struct v4l2_rect rect[IPU3_CSS_RECTS];
 };
 
+/******************* css hw *******************/
+int ipu3_css_set_powerup(struct device *dev, void __iomem *base);
+int ipu3_css_set_powerdown(struct device *dev, void __iomem *base);
+int ipu3_css_irq_ack(struct ipu3_css *css);
+
 #endif
