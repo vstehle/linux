@@ -13,6 +13,21 @@ config VIDEO_IPU3_CIO2
 	Say Y or M here if you have a Skylake/Kaby Lake SoC with a camera.
 	The module will be called ipu3-cio2.
 
+config VIDEO_IPU3_IMGU
+	tristate "Intel ipu3-imgu driver"
+	depends on PCI && VIDEO_V4L2 && IOMMU_SUPPORT
+	depends on MEDIA_CONTROLLER && VIDEO_V4L2_SUBDEV_API
+	select INTEL_IPU3_MMU
+	select INTEL_IPU3_DMAMAP
+	select VIDEOBUF2_DMA_SG
+	---help---
+	This is the video4linux2 driver for Intel IPU3 image processing unit,
+	found in Intel Skylake and Kaby Lake SoCs and used for processing
+	images and video.
+
+	Say Y or M here if you have a Skylake/Kaby Lake SoC with a MIPI
+	camera.	The module will be called ipu3-imgu.
+
 config INTEL_IPU3_MMU
 	tristate
 	default n
