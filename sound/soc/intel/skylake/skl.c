@@ -882,7 +882,6 @@ static struct sst_codecs skl_codecs = { 1, {"NAU88L25"} };
 static struct sst_codecs kbl_codecs = { 1, {"NAU88L25"} };
 static struct sst_codecs bxt_codecs = { 1, {"MX98357A"} };
 static struct sst_codecs kbl_poppy_codecs = { 1, {"10EC5663"} };
-static struct sst_codecs kbl_5663_5514_codecs = { 2, {"10EC5663", "10EC5514"} };
 
 static struct sst_acpi_mach sst_skl_devdata[] = {
 	{
@@ -944,14 +943,6 @@ static struct sst_acpi_mach sst_kbl_devdata[] = {
 		.fw_filename = "intel/dsp_fw_kbl.bin",
 		.machine_quirk = sst_acpi_codec_list,
 		.quirk_data = &kbl_codecs,
-		.pdata = &skl_dmic_data
-	},
-	{
-		.id = "MX98927",
-		.drv_name = "kbl_r5514_5663_max",
-		.fw_filename = "intel/dsp_fw_kbl.bin",
-		.machine_quirk = sst_acpi_codec_list,
-		.quirk_data = &kbl_5663_5514_codecs,
 		.pdata = &skl_dmic_data
 	},
 	{
