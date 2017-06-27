@@ -851,7 +851,8 @@ static int check_slp_s0(u32 slp_s0_saved_count)
 	}
 
 	if (slp_s0_saved_count == slp_s0_new_count) {
-		pr_warn("CPU did not enter SLP S0 for suspend-to-idle.\n");
+		WARN(1, "CPU did not enter SLP S0 for suspend-to-idle.\n");
+		pmc_core_ppfear_display();
 		return -EIO;
 	}
 
