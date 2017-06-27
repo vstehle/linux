@@ -208,8 +208,14 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
 	if (!pages)
 		return NULL;
 
-	/* IOMMU can map any pages, so himem can also be used here */
-	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+	/*
+	 * Unless we have some addressing limitation implied by GFP_DMA flags,
+	 * assume the IOMMU can map all of RAM and we can allocate anywhere.
+	 */
+	if (!(gfp & (__GFP_DMA | __GFP_DMA32)))
+		gfp |= __GFP_HIGHMEM;
+
+	gfp |= __GFP_NOWARN;
 
 	while (count) {
 		struct page *page = NULL;
