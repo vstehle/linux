@@ -274,10 +274,38 @@ static void evdi_user_framebuffer_destroy(struct drm_framebuffer *fb)
 	kfree(ufb);
 }
 
+static int evdi_drm_get_reservations(struct drm_framebuffer *fb,
+				  struct reservation_object **resvs,
+				  unsigned int *num_resvs)
+{
+	int r;
+	struct evdi_framebuffer *efb = to_evdi_fb(fb);
+	struct evdi_gem_object *obj = NULL;
+
+	if (!efb) {
+		EVDI_ERROR("Failed to get framebuffer.\n");
+		return -EINVAL;
+	}
+	obj = efb->obj;
+	if (!obj) {
+		EVDI_ERROR("Failed to get gem object from framebuffer.\n");
+		return -EINVAL;
+	}
+
+	for (r = 0; r < *num_resvs; r++)
+		if (resvs[r] == obj->resv)
+			break;
+	if (r == *num_resvs)
+		resvs[(*num_resvs)++] = obj->resv;
+	return 0;
+}
+
+
 static const struct drm_framebuffer_funcs evdifb_funcs = {
 	.create_handle = evdi_user_framebuffer_create_handle,
 	.destroy = evdi_user_framebuffer_destroy,
 	.dirty = evdi_user_framebuffer_dirty,
+	.get_reservations = evdi_drm_get_reservations,
 };
 
 static int
@@ -421,9 +449,6 @@ int evdi_fbdev_init(struct drm_device *dev)
 	}
 
 	drm_fb_helper_single_add_all_connectors(&ufbdev->helper);
-
-	/* disable all the possible outputs/crtcs before entering KMS mode */
-	drm_helper_disable_unused_functions(dev);
 
 	ret = drm_fb_helper_initial_config(&ufbdev->helper, 32);
 	if (ret) {

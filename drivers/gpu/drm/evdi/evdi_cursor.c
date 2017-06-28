@@ -66,64 +66,41 @@ bool evdi_cursor_enabled(struct evdi_cursor *cursor)
 	return cursor->enabled;
 }
 
-static int evdi_cursor_download(struct evdi_cursor *cursor,
-		struct drm_gem_object *obj)
+void evdi_cursor_enable(struct evdi_cursor *cursor, bool enabled)
 {
-	struct evdi_gem_object *evdi_gem_obj = to_evdi_bo(obj);
+	cursor->enabled = enabled;
+}
+
+void evdi_cursor_download(struct evdi_cursor *cursor,
+			  struct evdi_gem_object *evdi_gem_obj)
+{
 	uint32_t *src_ptr, *dst_ptr;
 	size_t i;
-	int ret = evdi_gem_vmap(evdi_gem_obj);
+	int ret;
+
+	if (evdi_gem_obj == NULL) {
+		EVDI_ERROR("evdi gem object is NULL");
+		return;
+	}
+
+	ret = evdi_gem_vmap(evdi_gem_obj);
 
 	if (ret != 0) {
-		DRM_ERROR("failed to vmap cursor\n");
-		return ret;
+		EVDI_ERROR("failed to vmap cursor");
+		return;
 	}
 
 	src_ptr = evdi_gem_obj->vmapping;
 	dst_ptr = cursor->buffer;
 	for (i = 0; i < EVDI_CURSOR_BUF; ++i)
 		dst_ptr[i] = le32_to_cpu(src_ptr[i]);
-	return 0;
+
 }
 
-int evdi_cursor_set(__maybe_unused struct drm_crtc *crtc, struct drm_file *file,
-		uint32_t handle, uint32_t width, uint32_t height,
-		struct evdi_cursor *cursor)
-{
-	if (handle) {
-		struct drm_gem_object *obj;
-		int err;
-		/* Currently we only support 64x64 cursors */
-		if (width != EVDI_CURSOR_W || height != EVDI_CURSOR_H) {
-			DRM_ERROR("we currently only support %dx%d cursors\n",
-					EVDI_CURSOR_W, EVDI_CURSOR_H);
-			return -EINVAL;
-		}
-		obj = drm_gem_object_lookup(file, handle);
-		if (!obj) {
-			DRM_ERROR("failed to lookup gem object.\n");
-			return -EINVAL;
-		}
-		err = evdi_cursor_download(cursor, obj);
-		drm_gem_object_unreference(obj);
-		if (err != 0) {
-			DRM_ERROR("failed to copy cursor.\n");
-			return err;
-		}
-		cursor->enabled = true;
-	} else {
-		cursor->enabled = false;
-	}
-
-	return 0;
-}
-
-int evdi_cursor_move(__always_unused struct drm_crtc *crtc,
-		     int x, int y, struct evdi_cursor *cursor)
+void evdi_cursor_move(int x, int y, struct evdi_cursor *cursor)
 {
 	cursor->x = x;
 	cursor->y = y;
-	return 0;
 }
 
 static inline uint32_t blend_component(uint32_t pixel,

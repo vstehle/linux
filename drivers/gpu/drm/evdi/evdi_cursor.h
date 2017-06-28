@@ -27,30 +27,33 @@
 
 struct evdi_cursor;
 struct evdi_framebuffer;
+struct evdi_gem_object;
 struct evdi_cursor_hline {
 	uint32_t *buffer;
 	int width;
 	int offset;
 };
 
-extern int evdi_cursor_alloc(struct evdi_cursor **cursor);
-extern void evdi_cursor_free(struct evdi_cursor *cursor);
-extern void evdi_cursor_copy(struct evdi_cursor *dst, struct evdi_cursor *src);
-extern bool evdi_cursor_enabled(struct evdi_cursor *cursor);
-extern void evdi_cursor_get_hline(struct evdi_cursor *cursor, int x, int y,
-		struct evdi_cursor_hline *hline);
-extern int evdi_cursor_set(struct drm_crtc *crtc, struct drm_file *file,
-		uint32_t handle, uint32_t width, uint32_t height,
-		struct evdi_cursor *cursor);
-extern int evdi_cursor_move(struct drm_crtc *crtc, int x, int y,
-		struct evdi_cursor *cursor);
-extern void evdi_get_cursor_position(int *x, int *y,
-				     struct evdi_cursor *cursor);
-extern int evdi_cursor_composing_pixel(char *buffer,
-				       int const cursor_value,
-				       int const fb_value,
-				       int cmd_offset);
-extern int evdi_cursor_composing_and_copy(struct evdi_cursor *cursor,
+void evdi_cursor_enable(struct evdi_cursor *cursor, bool enabled);
+void evdi_cursor_download(struct evdi_cursor *cursor,
+			  struct evdi_gem_object *evdi_gem_obj);
+int evdi_cursor_alloc(struct evdi_cursor **cursor);
+void evdi_cursor_free(struct evdi_cursor *cursor);
+void evdi_cursor_copy(struct evdi_cursor *dst, struct evdi_cursor *src);
+bool evdi_cursor_enabled(struct evdi_cursor *cursor);
+void evdi_cursor_get_hline(struct evdi_cursor *cursor, int x, int y,
+			   struct evdi_cursor_hline *hline);
+int evdi_cursor_set(struct drm_crtc *crtc, struct drm_file *file,
+		    uint32_t handle, uint32_t width, uint32_t height,
+		    struct evdi_cursor *cursor);
+void evdi_cursor_move(int x, int y, struct evdi_cursor *cursor);
+void evdi_get_cursor_position(int *x, int *y,
+			      struct evdi_cursor *cursor);
+int evdi_cursor_composing_pixel(char *buffer,
+				int const cursor_value,
+				int const fb_value,
+				int cmd_offset);
+int evdi_cursor_composing_and_copy(struct evdi_cursor *cursor,
 				   struct evdi_framebuffer *ufb,
 				   char __user *buffer,
 				   int buf_byte_stride,

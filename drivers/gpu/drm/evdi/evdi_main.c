@@ -35,10 +35,7 @@ int evdi_driver_load(struct drm_device *dev,
 		goto err;
 
 	EVDI_CHECKPT();
-	ret = evdi_modeset_init(dev);
-
-	if (ret)
-		goto err;
+	evdi_modeset_init(dev);
 
 	ret = evdi_fbdev_init(dev);
 	if (ret)

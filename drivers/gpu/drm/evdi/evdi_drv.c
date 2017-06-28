@@ -60,8 +60,20 @@ static const struct file_operations evdi_driver_fops = {
 	.llseek = noop_llseek,
 };
 
+static int evdi_enable_vblank(__always_unused struct drm_device *dev,
+	__always_unused unsigned int pipe)
+{
+	return 1;
+}
+
+static void evdi_disable_vblank(__always_unused struct drm_device *dev,
+	__always_unused unsigned int pipe)
+{
+}
+
 static struct drm_driver driver = {
-	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME,
+	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME |
+	DRIVER_ATOMIC,
 	.load = evdi_driver_load,
 	.unload = evdi_driver_unload,
 	.preclose = evdi_driver_preclose,
@@ -83,6 +95,10 @@ static struct drm_driver driver = {
 	.gem_prime_import = evdi_gem_prime_import,
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
 	.gem_prime_export = evdi_gem_prime_export,
+
+	.get_vblank_counter = drm_vblank_no_hw_counter,
+	.enable_vblank = evdi_enable_vblank,
+	.disable_vblank = evdi_disable_vblank,
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,

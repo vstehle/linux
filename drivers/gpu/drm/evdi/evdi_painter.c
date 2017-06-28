@@ -53,6 +53,7 @@ struct evdi_painter {
 	struct drm_file *drm_filp;
 
 	bool was_update_requested;
+	bool needs_full_modeset;
 };
 
 static void expand_rect(struct drm_clip_rect *a, const struct drm_clip_rect *b)
@@ -292,7 +293,8 @@ void evdi_painter_mark_dirty(struct evdi_device *evdi,
 	painter_lock(evdi->painter);
 	efb = evdi->painter->scanout_fb;
 	if (!efb) {
-		EVDI_WARN("Skip clip rect. Scanout buffer not set.\n");
+		EVDI_WARN("(dev=%d) Skip clip rect. Scanout buffer not set.\n",
+			  evdi->dev_index);
 		goto unlock;
 	}
 
@@ -312,12 +314,19 @@ void evdi_painter_mark_dirty(struct evdi_device *evdi,
 	memcpy(&painter->dirty_rects[painter->num_dirts], &rect, sizeof(rect));
 	painter->num_dirts++;
 
+unlock:
+	painter_unlock(evdi->painter);
+}
+
+void evdi_painter_send_update_ready_if_needed(struct evdi_device *evdi)
+{
+	struct evdi_painter *painter = evdi->painter;
+
+	painter_lock(evdi->painter);
 	if (painter->was_update_requested) {
 		evdi_painter_send_update_ready(painter);
 		painter->was_update_requested = false;
 	}
-
-unlock:
 	painter_unlock(evdi->painter);
 }
 
@@ -348,24 +357,30 @@ void evdi_painter_crtc_state_notify(struct evdi_device *evdi, int state)
 }
 
 void evdi_painter_mode_changed_notify(struct evdi_device *evdi,
-				      struct drm_framebuffer *fb,
 				      struct drm_display_mode *new_mode)
 {
 	struct evdi_painter *painter = evdi->painter;
+	struct drm_framebuffer *fb = &painter->scanout_fb->base;
+	int bits_per_pixel;
+	uint32_t pixel_format;
 
-	int bits_per_pixel = fb->format->cpp[0];
-	uint32_t pixel_format = fb->format->format;
+	if (fb == NULL)
+		return;
 
-	EVDI_DEBUG(
-		"(dev=%d) Notifying mode changed: %dx%d@%d; bpp %d; ",
-		evdi->dev_index, new_mode->hdisplay, new_mode->vdisplay,
-		drm_mode_vrefresh(new_mode), bits_per_pixel);
+	bits_per_pixel = fb->format->cpp[0];
+	pixel_format = fb->format->format;
+
+	EVDI_DEBUG("(dev=%d) Notifying mode changed: %dx%d@%d; bpp %d; ",
+		   evdi->dev_index, new_mode->hdisplay, new_mode->vdisplay,
+		   drm_mode_vrefresh(new_mode), bits_per_pixel);
 	EVDI_DEBUG("pixel format %d\n", pixel_format);
 
 	evdi_painter_send_mode_changed(painter,
 				       new_mode,
 				       bits_per_pixel,
 				       pixel_format);
+	if (painter)
+		painter->needs_full_modeset = false;
 }
 
 static int
@@ -422,6 +437,7 @@ evdi_painter_connect(struct evdi_device *evdi,
 	painter->edid_length = edid_length;
 	painter->edid = new_edid;
 	painter->is_connected = true;
+	painter->needs_full_modeset = true;
 
 	painter_unlock(painter);
 
@@ -430,7 +446,6 @@ evdi_painter_connect(struct evdi_device *evdi,
 
 	drm_helper_hpd_irq_event(evdi->ddev);
 
-	drm_helper_resume_force_mode(evdi->ddev);
 
 	return 0;
 }
@@ -467,7 +482,6 @@ static void evdi_painter_disconnect(struct evdi_device *evdi,
 	EVDI_DEBUG("(dev=%d) Disconnected from %p\n", evdi->dev_index,
 		   painter->drm_filp);
 	painter->drm_filp = NULL;
-	evdi->dev_index = -1;
 
 	painter->was_update_requested = false;
 
@@ -650,6 +664,7 @@ int evdi_painter_init(struct evdi_device *dev)
 		mutex_init(&dev->painter->new_scanout_fb_lock);
 		dev->painter->edid = NULL;
 		dev->painter->edid_length = 0;
+		dev->painter->needs_full_modeset = true;
 		return 0;
 	}
 	return -ENOMEM;
@@ -719,4 +734,13 @@ void evdi_painter_commit_scanout_buffer(struct evdi_device *evdi)
 
 	if (oldfb)
 		drm_framebuffer_unreference(&oldfb->base);
+}
+
+bool evdi_painter_needs_full_modeset(struct evdi_device *evdi)
+{
+	struct evdi_painter *painter = evdi->painter;
+
+	if (painter)
+		return painter->needs_full_modeset;
+	return false;
 }
