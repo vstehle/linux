@@ -87,9 +87,10 @@ static bool fence_array_signaled(struct fence *fence)
 	return atomic_read(&array->num_pending) <= 0;
 }
 
-static void fence_array_release(struct fence *fence)
+static void fence_array_release_worker(struct work_struct *work)
 {
-	struct fence_array *array = to_fence_array(fence);
+	struct fence_array *array =
+		container_of(work, struct fence_array, release_work);
 	unsigned i;
 
 	flush_work(&array->signal_work);
@@ -98,7 +99,13 @@ static void fence_array_release(struct fence *fence)
 		fence_put(array->fences[i]);
 
 	kfree(array->fences);
-	fence_free(fence);
+	fence_free(&array->base);
+}
+
+static void fence_array_release(struct fence *fence)
+{
+	struct fence_array *array = to_fence_array(fence);
+	schedule_work(&array->release_work);
 }
 
 const struct fence_ops fence_array_ops = {
@@ -143,6 +150,7 @@ struct fence_array *fence_array_create(int num_fences, struct fence **fences,
 		return NULL;
 
 	INIT_WORK(&array->signal_work, fence_array_signal_worker);
+	INIT_WORK(&array->release_work, fence_array_release_worker);
 	spin_lock_init(&array->lock);
 	fence_init(&array->base, &fence_array_ops, &array->lock,
 		   context, seqno);
