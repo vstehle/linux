@@ -47,6 +47,7 @@ struct fence_array {
 
 	spinlock_t lock;
 	struct work_struct signal_work;
+	struct work_struct release_work;
 	unsigned num_fences;
 	atomic_t num_pending;
 	struct fence **fences;
