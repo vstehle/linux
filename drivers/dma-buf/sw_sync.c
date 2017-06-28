@@ -143,7 +143,24 @@ void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc)
 
 	spin_lock_irqsave(&obj->child_list_lock, flags);
 
-	obj->value += inc;
+	/*
+	 * Hwcomposer userspace does something crazy, increments the timeline value by
+	 * 0x7FFFFFFF, twice!!! when closing timeline.  This sort of worked, until
+	 * this change. Because now active list below is empty and no fences are ever
+	 * signaled. On 2nd call timeline value wraps around and afterwards last fence
+	 * (with seqno 2) is always going to fail timeline_fence_signaled() check.
+	 * So, we are going to detect this behavior and do what the userspace actually
+	 * intended, which is to make sure all fences on timeline are signaled.
+	 */
+	if (inc == 0x7FFFFFFF) {
+		list_for_each_entry_safe(pt, next, &obj->child_list_head,
+					child_list) {
+			if (pt->base.seqno > obj->value)
+				obj->value = pt->base.seqno;
+		}
+	} else {
+		obj->value += inc;
+	}
 
 	list_for_each_entry_safe(pt, next, &obj->active_list_head,
 				 active_list) {
