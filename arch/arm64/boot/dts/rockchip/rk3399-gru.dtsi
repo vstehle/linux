@@ -527,9 +527,8 @@
 
 	sound {
 		compatible = "rockchip,rk3399-gru-sound";
-		rockchip,cpu = <&i2s0 &i2s0 &i2s0 &i2s2 &hotword_codec>;
-		rockchip,codec = <&max98357a &dmic_codec &headset_codec>,
-				 <&cdn_dp &dmic_codec>;
+		rockchip,cpu = <&i2s0 &i2s2>;
+		rockchip,codec = <&max98357a &headsetcodec &codec &cdn_dp>;
 	};
 
 	gpio_keys: gpio-keys {
@@ -671,10 +670,17 @@ ap_i2c_mic: &i2c1 {
 	i2c-scl-falling-time-ns = <50>;
 	i2c-scl-rising-time-ns = <300>;
 
-	dmic_codec: rt5514@57 {
+	headsetcodec: rt5514@57 {
 		compatible = "realtek,rt5514";
 		reg = <0x57>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&mic_int>;
+
+		interrupt-parent = <&gpio1>;
+		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
+
 		realtek,dmic-init-delay = <20>;
+		wakeup-source;
 	};
 };
 
@@ -715,7 +721,7 @@ ap_i2c_audio: &i2c8 {
 	i2c-scl-falling-time-ns = <50>;
 	i2c-scl-rising-time-ns = <300>;
 
-	headset_codec: da7219@1a {
+	codec: da7219@1a {
 		compatible = "dlg,da7219";
 		reg = <0x1a>;
 
@@ -895,19 +901,12 @@ ap_i2c_audio: &i2c8 {
 &spi2 {
 	status = "okay";
 
-	hotword_codec: spi2@0 {
+	wacky_spi_audio: spi2@0 {
 		compatible = "realtek,rt5514";
 		reg = <0>;
 
 		/* May run faster once verified. */
 		spi-max-frequency = <10000000>;
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&mic_int>;
-
-		interrupt-parent = <&gpio1>;
-		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
-		wakeup-source;
 	};
 };
 
