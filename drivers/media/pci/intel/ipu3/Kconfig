@@ -1,8 +1,15 @@
+config VIDEO_IPU3_ACPI
+	tristate
+	depends on ACPI
+	---help---
+	   This helper library exports functions to be used by the IPU3
+	   drivers to enumerate the sensors and VCM through ACPI.
+
 config VIDEO_IPU3_CIO2
 	tristate "Intel ipu3-cio2 driver"
 	depends on VIDEO_DEV && PCI
 	depends on HAS_DMA
-	depends on ACPI
+	select VIDEO_IPU3_ACPI
 	select VIDEOBUF2_DMA_SG
 	select V4L2_FWNODE
 	---help---
