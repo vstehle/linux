@@ -340,4 +340,19 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
 	vunmap(cpu_addr);
 }
 EXPORT_SYMBOL(dma_common_free_remap);
+
+struct page **dma_common_get_mapped_pages(void *cpu_addr,
+					  unsigned long vm_flags)
+{
+	struct vm_struct *area = find_vm_area(cpu_addr);
+
+	if (!area || (area->flags & vm_flags) != vm_flags) {
+		WARN(1, "trying to get pages for invalid coherent area: %p\n",
+		     cpu_addr);
+		return NULL;
+	}
+
+	return area->pages;
+}
+EXPORT_SYMBOL(dma_common_get_mapped_pages);
 #endif

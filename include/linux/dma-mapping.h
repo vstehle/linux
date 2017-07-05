@@ -287,6 +287,8 @@ void *dma_common_pages_remap(struct page **pages, size_t size,
 			unsigned long vm_flags, pgprot_t prot,
 			const void *caller);
 void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags);
+struct page **dma_common_get_mapped_pages(void *cpu_addr,
+					  unsigned long vm_flags);
 
 /**
  * dma_mmap_attrs - map a coherent DMA allocation into user space
