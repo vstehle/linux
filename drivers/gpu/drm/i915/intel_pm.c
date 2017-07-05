@@ -6738,6 +6738,12 @@ void intel_init_gt_powersave(struct drm_i915_private *dev_priv)
 	/* Finally allow us to boost to max by default */
 	dev_priv->rps.boost_freq = dev_priv->rps.max_freq;
 
+	if (IS_VALLEYVIEW(dev_priv) && num_online_cpus() == 4) {
+		DRM_INFO("Use max GFX freq on quad-core Baytrail due to crbug.com/719040\n");
+		dev_priv->rps.idle_freq = dev_priv->rps.max_freq_softlimit;
+		dev_priv->rps.min_freq_softlimit = dev_priv->rps.idle_freq;
+	}
+
 	mutex_unlock(&dev_priv->rps.hw_lock);
 
 	intel_autoenable_gt_powersave(dev_priv);
