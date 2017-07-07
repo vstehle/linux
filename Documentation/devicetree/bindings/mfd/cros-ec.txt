@@ -71,3 +71,14 @@ spi@131b0000 {
 
 
 Example for LPC is not supplied as it is not yet implemented.
+
+The Chrome OS EC can be thought of as providing several distinct sub-devices.
+These sub-devices are separated into sub-nodes. See elsewhere for bindings
+for these sub-devices.  Namely, these devices might optionally be under
+cros-ec:
+
+- google,cros-ec-i2c-tunnel
+- google,cros-ec-keyb
+- google,cros-ec-pd-update
+- google,cros-ec-pwm
+- google,extcon-cros-ec
