@@ -340,8 +340,8 @@ int ipu3_css_set_powerdown(struct device *dev, void __iomem *base)
 		base + IMGU_REG_PM_CTRL);
 
 	/* Wait for power down signal */
-	if (ipu3_hw_wait(base, IMGU_REG_STATE, IMGU_PM_CTRL_CSS_PWRDN,
-			     IMGU_PM_CTRL_CSS_PWRDN))
+	if (ipu3_hw_wait(base, IMGU_REG_STATE, IMGU_STATE_POWER_DOWN,
+			     IMGU_STATE_POWER_DOWN))
 		dev_warn(dev, "failed to set CSS power down\n");
 
 	return 0;
