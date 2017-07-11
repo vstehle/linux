@@ -904,6 +904,13 @@ ap_i2c_audio: &i2c8 {
 
 		/* May run faster once verified. */
 		spi-max-frequency = <10000000>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&mic_int>;
+
+		interrupt-parent = <&gpio1>;
+		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
+		wakeup-source;
 	};
 };
 
