@@ -10,6 +10,7 @@ config VIDEO_IPU3_CIO2
 	depends on VIDEO_DEV && PCI
 	depends on HAS_DMA
 	depends on ACPI
+	depends on 64BIT
 	select VIDEO_IPU3_ACPI
 	select VIDEOBUF2_DMA_SG
 	select V4L2_FWNODE
@@ -25,7 +26,7 @@ config VIDEO_IPU3_IMGU
 	tristate "Intel ipu3-imgu driver"
 	depends on PCI && VIDEO_V4L2 && IOMMU_SUPPORT
 	depends on MEDIA_CONTROLLER && VIDEO_V4L2_SUBDEV_API
-	depends on X86
+	depends on X86_64
 	select INTEL_IPU3_MMU
 	select INTEL_IPU3_DMAMAP
 	select VIDEOBUF2_DMA_SG
