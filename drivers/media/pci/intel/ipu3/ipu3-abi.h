@@ -376,8 +376,6 @@
 #define IMGU_ABI_OSYS_PIN_OUT			1
 #define IMGU_ABI_OSYS_PINS			2
 
-typedef u32 imgu_addr_t;
-
 enum imgu_abi_frame_format {
 	IMGU_ABI_FRAME_FORMAT_NV11,	/* 12 bit YUV 411, Y, UV plane */
 	IMGU_ABI_FRAME_FORMAT_NV12,	/* 12 bit YUV 420, Y, UV plane */
