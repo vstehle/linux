@@ -127,6 +127,8 @@ ap_i2c_bl: &i2c0 {
 		enable-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&bl_en>;
+		arc,led-config-0 = <0x00>;
+		arc,led-config-1 = <0x57>;
 	};
 };
 
