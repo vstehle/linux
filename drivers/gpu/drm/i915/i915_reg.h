@@ -3531,18 +3531,22 @@ enum {
 #define   EDP_PSR_MIN_LINK_ENTRY_TIME_4_LINES	(1<<25)
 #define   EDP_PSR_MIN_LINK_ENTRY_TIME_2_LINES	(2<<25)
 #define   EDP_PSR_MIN_LINK_ENTRY_TIME_0_LINES	(3<<25)
+#define   EDP_PSR_MAX_SLEEP_TIME_MASK           (0x1f<<20)
 #define   EDP_PSR_MAX_SLEEP_TIME_SHIFT		20
 #define   EDP_PSR_SKIP_AUX_EXIT			(1<<12)
 #define   EDP_PSR_TP1_TP2_SEL			(0<<11)
 #define   EDP_PSR_TP1_TP3_SEL			(1<<11)
+#define   EDP_PSR_TP2_TP3_TIME_MASK             (3<<8)
 #define   EDP_PSR_TP2_TP3_TIME_500us		(0<<8)
 #define   EDP_PSR_TP2_TP3_TIME_100us		(1<<8)
 #define   EDP_PSR_TP2_TP3_TIME_2500us		(2<<8)
 #define   EDP_PSR_TP2_TP3_TIME_0us		(3<<8)
+#define   EDP_PSR_TP1_TIME_MASK                 (0x3<<4)
 #define   EDP_PSR_TP1_TIME_500us		(0<<4)
 #define   EDP_PSR_TP1_TIME_100us		(1<<4)
 #define   EDP_PSR_TP1_TIME_2500us		(2<<4)
 #define   EDP_PSR_TP1_TIME_0us			(3<<4)
+#define   EDP_PSR_IDLE_FRAME_MASK               (0xf<<0)
 #define   EDP_PSR_IDLE_FRAME_SHIFT		0
 
 #define EDP_PSR_AUX_CTL				_MMIO(dev_priv->psr_mmio_base + 0x10)
