@@ -1,0 +1,389 @@
+/*
+ * Google Gru-scarlet board device tree source
+ *
+ * Copyright 2017 Google, Inc
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPL or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This file is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This file is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *  Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+#include "rk3399-gru.dtsi"
+
+/{
+	/* REGULATORS */
+
+	/* ppvar_sys children, sorted by name */
+	pp900_s0: pp900-s0 {
+		compatible = "regulator-fixed";
+		regulator-name = "pp900_s0";
+
+		/* EC turns on w/ pp900_s0_en; always on for AP */
+		regulator-always-on;
+		regulator-boot-on;
+
+		regulator-min-microvolt = <900000>;
+		regulator-max-microvolt = <900000>;
+
+		vin-supply = <&ppvar_sys>;
+	};
+
+	/* pp1800 children, sorted by name */
+	pp900_s3: pp900-s3 {
+		compatible = "regulator-fixed";
+		regulator-name = "pp900_s3";
+
+		/* EC turns on w/ pp900_s3_en; always on for AP */
+		regulator-always-on;
+		regulator-boot-on;
+
+		regulator-min-microvolt = <900000>;
+		regulator-max-microvolt = <900000>;
+
+		vin-supply = <&pp1800>;
+	};
+
+	/* EC turns on pp1800_s3_en */
+	pp1800_s3: pp1800 {
+	};
+
+	/* EC turns on pp3300_s3_en */
+	pp3300_s3: pp3300{
+	};
+
+	/* MISC */
+	backlight: backlight {
+		compatible = "pwm-backlight";
+		brightness-levels-scale = <0x10000>;
+		default-brightness-level = <0x828f>; /* arbitrary, ~51% */
+		enable-gpios = <&gpio4 21 GPIO_ACTIVE_HIGH>;
+		backlight-boot-off;
+		pinctrl-names = "default";
+		pinctrl-0 = <&bl_en>;
+		pwms = <&pwm1 0 1000000 0>;
+		pwm-delay-us = <10000>;
+	};
+
+	ppvarn_lcd: ppvarn-lcd {
+		compatible = "regulator-fixed";
+		regulator-name = "ppvarn_lcd";
+		pinctrl-names = "default";
+		pinctrl-0 = <&ppvarn_lcd_en>;
+
+		enable-active-high;
+
+		gpio = <&gpio4 28 GPIO_ACTIVE_HIGH>;
+		vin-supply = <&ppvar_sys>;
+	};
+
+	ppvarp_lcd: ppvarp-lcd {
+		compatible = "regulator-fixed";
+		regulator-name = "ppvarp_lcd";
+		pinctrl-names = "default";
+		pinctrl-0 = <&ppvarp_lcd_en>;
+
+		enable-active-high;
+
+		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
+		vin-supply = <&ppvar_sys>;
+	};
+};
+
+/* REGULATOR OVERRIDES (node deletions first) */
+
+/* On scarlet there's no exact pp900_ap; instead there is pp900_s0 / pp900_s3 */
+/delete-node/ &pp900_ap;
+
+/* Scarlet doesn't have variable centerlogic; folded into pp900_s0 */
+/delete-node/ &ppvar_centerlogic;
+
+/* No more "logic en" pin for turning this on; folded into pp900_s0 */
+/delete-node/ &ppvar_logic;
+
+/delete-node/ &pp1800_audio;
+/delete-node/ &pp3000;
+/delete-node/ &pp1500_ap_io;
+/delete-node/ &pp3300_disp;
+
+/* pp900_s0 aliases */
+pp900_pcie: &pp900_s0 {
+};
+pp900_usb: &pp900_s0 {
+};
+pp900_ddrpll_ap: &pp900_s0 {
+};
+
+/* pp900_s3 aliases */
+pp900_emmcpll: &pp900_s3 {
+};
+
+/* On scarlet PPVAR(big_cpu, lit_cpu, gpu) need to adjust voltage ranges */
+&ppvar_bigcpu {
+
+	/* On scarlet ppvar big cpu use pwm3 */
+	pwms = <&pwm3 0 3337 0>;
+	regulator-min-microvolt = <800074>;
+	regulator-max-microvolt = <1299226>;
+};
+
+&ppvar_gpu {
+	regulator-min-microvolt = <799600>;
+	regulator-max-microvolt = <1099600>;
+};
+
+&ppvar_litcpu {
+	regulator-min-microvolt = <802122>;
+	regulator-max-microvolt = <1199620>;
+};
+
+&ppvar_sd_card_io {
+	states = <1800000 0x0 3300000 0x1>;
+	regulator-max-microvolt = <3300000>;
+};
+
+&pp3000_sd_slot {
+	vin-supply = <&pp3300>;
+};
+
+/* MISC OVERRIDES (node deletions first) */
+/delete-node/ &cros_ec_pwm;
+
+/* No rt5514 */
+/delete-node/ &headsetcodec;
+
+/* No rt5514 */
+/delete-node/ &wacky_spi_audio;
+
+/delete-node/ &mvl_wifi;
+
+&ap_i2c_mic {
+	status = "disabled";
+};
+
+&ap_i2c_tp {
+	status = "disabled";
+};
+
+&ap_i2c_ts {
+	touchscreen: touchscreen@10 {
+		compatible = "elan,ekth3500";
+		reg = <0x10>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&touch_int_l &touch_reset_l>;
+
+		interrupt-parent = <&gpio1>;
+		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
+
+		reset-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&cros_ec {
+	interrupt-parent = <&gpio1>;
+	interrupts = <18 IRQ_TYPE_LEVEL_LOW>;
+};
+
+/* The center supply is fixed to .9V on scarlet */
+&dmc {
+	center-supply = <&pp900_s0>;
+};
+
+/* We don't need .925 V for 928 MHz on scarlet */
+&dmc_opp_table {
+	opp03 {
+		opp-microvolt = <900000>;
+	};
+};
+
+&ec_ap_int_l {
+	rockchip,pins = <1 18 RK_FUNC_GPIO &pcfg_pull_up>;
+};
+
+&firmware {
+	chromeos {
+		write-protect-gpio = <&gpio0 13 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&io_domains {
+	bt656-supply = <&pp1800_s0>;		/* APIO2_VDD;  2a 2b */
+	audio-supply = <&pp1800_s0>;		/* APIO5_VDD;  3d 4a */
+	gpio1830-supply = <&pp1800_s0>;		/* APIO4_VDD;  4c 4d */
+};
+
+&max98357a {
+	sdmode-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+};
+
+&mipi_dsi {
+	panel {
+		compatible = "TODO TODO TODO TODO";
+		reg = <0>;
+		backlight = <&backlight>;
+		power-supply = <&ppvarp_lcd>, <&ppvarn_lcd>;
+	};
+};
+
+&pcie0 {
+	ep-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+};
+
+&sdmmc {
+	cd-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
+};
+
+/*
+ * Override list to remove &headsetcodec from rockchip,codec list since
+ * there's no rt5514.
+ */
+&sound {
+	rockchip,codec = <&max98357a &codec &cdn_dp>;
+};
+
+&spi2 {
+	status = "okay";
+
+/* TODO: there still have some problem with AP and H1 communcation, skip it */
+/*
+	cr50@0 {
+		compatible = "google,cr50";
+
+		interrupt-parent = <&gpio1>;
+		interrupts = <17 IRQ_TYPE_EDGE_RISING>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&h1_int_od_l>;
+
+		reg = <0>;
+		spi-max-frequency = <800000>; // TODO: review later
+	};
+*/
+};
+
+&tcphy1 {
+	status = "disabled";
+};
+
+&usbc_extcon1 {
+	status = "disabled";
+};
+
+&usbdrd3_1 {
+	status = "disabled";
+};
+
+&usbdrd_dwc3_1 {
+	status = "disabled";
+};
+
+&wake_on_bt {
+	gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+};
+
+&wlan_pd_n {
+	gpio = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+};
+
+/* PINCTRL OVERRIDES */
+&ap_fw_wp {
+	rockchip,pins = <0 13 RK_FUNC_GPIO &pcfg_pull_up>;
+};
+
+&bl_en {
+	rockchip,pins = <4 21 RK_FUNC_GPIO &pcfg_pull_none>;
+};
+
+&bt_host_wake_l {
+	rockchip,pins = <1 2 RK_FUNC_GPIO &pcfg_pull_up>;
+};
+
+&ec_ap_int_l {
+	rockchip,pins = <1 18 RK_FUNC_GPIO &pcfg_pull_up>;
+};
+
+&h1_int_od_l {
+	rockchip,pins = <1 17 RK_FUNC_GPIO &pcfg_pull_up>;
+};
+
+/* there is no external pull up, so need to set this pin pull up */
+&sdmmc_cd_gpio {
+	rockchip,pins = <1 11 RK_FUNC_GPIO &pcfg_pull_up>;
+};
+
+&sd_pwr_1800_sel {
+	rockchip,pins = <2 28 RK_FUNC_GPIO &pcfg_pull_up>;
+};
+
+&sdmode_en {
+	rockchip,pins = <0 2 RK_FUNC_GPIO &pcfg_pull_down>;
+};
+
+&touch_reset_l {
+	rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_down>;
+};
+
+&touch_int_l {
+	rockchip,pins = <1 4 RK_FUNC_GPIO &pcfg_pull_down>;
+};
+
+&wlan_host_wake_l {
+	rockchip,pins = <1 3 RK_FUNC_GPIO &pcfg_pull_up>;
+};
+
+&wifi_perst_l {
+	rockchip,pins = <0 3 RK_FUNC_GPIO &pcfg_pull_none>;
+};
+
+/delete-node/ &pp1800_audio_en;
+/delete-node/ &pp1500_en;
+/delete-node/ &pp3300_disp_en;
+/delete-node/ &pp3000_en;
+
+&pinctrl {
+	pinctrl-0 = <
+		&ap_pwroff	/* AP will auto-assert this when in S3 */
+		&clk_32k	/* This pin is always 32k on gru boards */
+	>;
+	ppvarp_lcd_en: ppvarp-lcd-en {
+		rockchip,pins = <4 27 RK_FUNC_GPIO &pcfg_pull_none>;
+	};
+
+	ppvarn_lcd_en: ppvarn-lcd-en {
+		rockchip,pins = <4 28 RK_FUNC_GPIO &pcfg_pull_none>;
+	};
+};
