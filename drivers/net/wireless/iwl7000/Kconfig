@@ -1,6 +1,9 @@
 config IWL7000
 	tristate "Intel Wireless WiFi 7000 series driver (new version)"
 
+	# Only tested with ACPI on 64 bit systems
+	depends on ACPI && 64BIT
+
 	# normal iwlwifi dependencies
 	depends on PCI && HAS_IOMEM
 	select FW_LOADER
