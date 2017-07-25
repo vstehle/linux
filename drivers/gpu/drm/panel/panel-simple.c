@@ -373,6 +373,30 @@ static void panel_simple_shutdown(struct device *dev)
 	panel_simple_disable(&panel->base);
 }
 
+static const struct drm_display_mode hack_nefario_rev0_mode = {
+	.clock = 75000,
+	.hdisplay = 1366,
+	.hsync_start = 1366 + 38,
+	.hsync_end = 1366 + 38 + 22,
+	.htotal = 1366 + 38 + 22 + 177,
+	.vdisplay = 768,
+	.vsync_start = 768 + 3,
+	.vsync_end = 768 + 3 + 6,
+	.vtotal = 768 + 3 + 6 + 16,
+	.vrefresh = 59,
+	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+};
+
+static const struct panel_desc hack_nefario_rev0 = {
+	.modes = &hack_nefario_rev0_mode,
+	.num_modes = 1,
+	.bpc = 6,
+	.size = {
+		.width = 256,
+		.height = 144,
+	},
+};
+
 static const struct drm_display_mode ampire_am800480r3tmqwa1h_mode = {
 	.clock = 33333,
 	.hdisplay = 800,
@@ -1225,6 +1249,9 @@ static const struct panel_desc starry_kr122ea0sra = {
 
 static const struct of_device_id platform_of_match[] = {
 	{
+		.compatible = "hack,nefario-rev0",
+		.data = &hack_nefario_rev0,
+	}, {
 		.compatible = "ampire,am800480r3tmqwa1h",
 		.data = &ampire_am800480r3tmqwa1h,
 	}, {
