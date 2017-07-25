@@ -650,6 +650,7 @@ err_dnld_fw:
 	if (adapter->hw_status == MWIFIEX_HW_STATUS_READY) {
 		pr_debug("info: %s: shutdown mwifiex\n", __func__);
 		mwifiex_shutdown_drv(adapter);
+		mwifiex_free_cmd_buffers(adapter);
 	}
 
 	init_failed = true;
@@ -1397,11 +1398,13 @@ static void mwifiex_uninit_sw(struct mwifiex_adapter *adapter)
 			mwifiex_del_virtual_intf(adapter->wiphy, &priv->wdev);
 		rtnl_unlock();
 	}
-	vfree(adapter->chan_stats);
 
 	wiphy_unregister(adapter->wiphy);
 	wiphy_free(adapter->wiphy);
 	adapter->wiphy = NULL;
+
+	vfree(adapter->chan_stats);
+	mwifiex_free_cmd_buffers(adapter);
 }
 
 /*
@@ -1508,6 +1511,7 @@ err_kmalloc:
 		mwifiex_dbg(adapter, ERROR,
 			    "info: %s: shutdown mwifiex\n", __func__);
 		mwifiex_shutdown_drv(adapter);
+		mwifiex_free_cmd_buffers(adapter);
 	}
 
 	complete_all(adapter->fw_done);
@@ -1657,6 +1661,7 @@ err_registerdev:
 	if (adapter->hw_status == MWIFIEX_HW_STATUS_READY) {
 		pr_debug("info: %s: shutdown mwifiex\n", __func__);
 		mwifiex_shutdown_drv(adapter);
+		mwifiex_free_cmd_buffers(adapter);
 	}
 err_kmalloc:
 	mwifiex_free_adapter(adapter);
