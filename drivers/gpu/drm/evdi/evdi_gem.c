@@ -474,7 +474,7 @@ struct drm_gem_object *evdi_gem_prime_import(struct drm_device *dev,
 	return ERR_PTR(ret);
 }
 
-struct dma_buf *evdi_gem_prime_export(__always_unused struct drm_device *dev,
+struct dma_buf *evdi_gem_prime_export(struct drm_device *dev,
 				      struct drm_gem_object *obj, int flags)
 {
 	struct dma_buf_export_info exp_info = {
@@ -485,5 +485,5 @@ struct dma_buf *evdi_gem_prime_export(__always_unused struct drm_device *dev,
 		.resv = NULL,
 		.priv = obj
 	};
-	return dma_buf_export(&exp_info);
+	return drm_gem_dmabuf_export(dev, &exp_info);
 }
