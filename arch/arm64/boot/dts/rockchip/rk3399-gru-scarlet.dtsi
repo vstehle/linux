@@ -109,6 +109,21 @@
 	pp3300_s3: pp3300 {
 	};
 
+	wlan_3v3: wlan-3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "wlan_3v3";
+
+		/* Note the wlan_pd_1v8_l pinctrl */
+		enable-active-high;
+		gpio = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+		/*
+		 * Require minimum 10ms from power-on (e.g., PD#) to init PCIe.
+		 * TODO (b/64444991): how long to assert PD#?
+		 */
+		regulator-enable-ramp-delay = <10000>;
+		vin-supply = <&pp3300_s3>;
+	};
+
 	/* END REGULATORS */
 
 	/* MISC */
@@ -137,9 +152,12 @@
 /delete-node/ &ppvar_logic;
 
 /delete-node/ &pp1800_audio;
+/delete-node/ &pp1800_pcie;
 /delete-node/ &pp3000;
 /delete-node/ &pp1500_ap_io;
 /delete-node/ &pp3300_disp;
+/delete-node/ &pp3300_wifi_bt;
+/delete-node/ &wlan_pd_n;
 
 /* pp900_s0 aliases */
 pp900_pcie: &pp900_s0 {
@@ -151,6 +169,10 @@ pp900_ddrpll_ap: &pp900_s0 {
 
 /* pp900_s3 aliases */
 pp900_emmcpll: &pp900_s3 {
+};
+
+/* EC turns on; alias for pp1800_s0 */
+pp1800_pcie: &pp1800_s0 {
 };
 
 /* On scarlet PPVAR(big_cpu, lit_cpu, gpu) need to adjust voltage ranges */
@@ -268,6 +290,9 @@ pp900_emmcpll: &pp900_s3 {
 
 &pcie0 {
 	ep-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+
+	vpcie3v3-supply = <&wlan_3v3>;
+	vpcie1v8-supply = <&pp1800_pcie>;
 };
 
 &sdmmc {
@@ -317,10 +342,6 @@ pp900_emmcpll: &pp900_s3 {
 
 &wake_on_bt {
 	gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-};
-
-&wlan_pd_n {
-	gpio = <&gpio0 4 GPIO_ACTIVE_HIGH>;
 };
 
 /* PINCTRL OVERRIDES */
@@ -381,17 +402,36 @@ pp900_emmcpll: &pp900_s3 {
 /delete-node/ &pp1500_en;
 /delete-node/ &pp3300_disp_en;
 /delete-node/ &pp3000_en;
+/delete-node/ &wlan_module_pd_l;
 
 &pinctrl {
 	pinctrl-0 = <
 		&ap_pwroff	/* AP will auto-assert this when in S3 */
+		&bt_rf_kill_1v8_l
 		&clk_32k	/* This pin is always 32k on gru boards */
+		&wlan_pd_1v8_l	/* Drive this low ASAP */
+		&wlan_rf_kill_1v8_l
 	>;
+
+	/* Default pull-up, but just to be clear */
+	bt_rf_kill_1v8_l: bt-rf-kill-1v8-l {
+		rockchip,pins = <0 8 RK_FUNC_GPIO &pcfg_pull_up>;
+	};
+
 	ppvarp_lcd_en: ppvarp-lcd-en {
 		rockchip,pins = <4 27 RK_FUNC_GPIO &pcfg_pull_none>;
 	};
 
 	ppvarn_lcd_en: ppvarn-lcd-en {
 		rockchip,pins = <4 28 RK_FUNC_GPIO &pcfg_pull_none>;
+	};
+
+	wlan_pd_1v8_l: wlan-pd-1v8-l {
+		rockchip,pins = <0 4 RK_FUNC_GPIO &pcfg_output_low>;
+	};
+
+	/* Default pull-up, but just to be clear */
+	wlan_rf_kill_1v8_l: wlan-rf-kill-1v8-l {
+		rockchip,pins = <0 8 RK_FUNC_GPIO &pcfg_pull_up>;
 	};
 };
