@@ -45,17 +45,6 @@ struct sync_timeline {
 	struct list_head	sync_timeline_list;
 };
 
-struct sync_pt *dma_fence_to_sync_pt(struct dma_fence *fence);
-
-struct sync_timeline *sync_timeline_create(const char *name);
-
-struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
-			     unsigned int value);
-
-void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc);
-
-void sync_timeline_put(struct sync_timeline *obj);
-
 static inline struct sync_timeline *dma_fence_parent(struct dma_fence *fence)
 {
 	return container_of(fence->lock, struct sync_timeline, child_list_lock);

@@ -38,11 +38,11 @@
 
 static int kbase_stream_close(struct inode *inode, struct file *file)
 {
-	struct mali_sync_timeline *mtl;
+	struct mali_sync_context *msc;
 
-	mtl = (struct mali_sync_timeline *)file->private_data;
-	BUG_ON(!mtl);
-	kbase_sync_timeline_free(mtl);
+	msc = (struct mali_sync_context *)file->private_data;
+	BUG_ON(!msc);
+	kbase_sync_context_free(msc);
 	return 0;
 }
 
@@ -53,18 +53,18 @@ static const struct file_operations stream_fops = {
 
 int kbase_stream_create(const char *name, int *const out_fd)
 {
-	struct mali_sync_timeline *mtl;
+	struct mali_sync_context *msc;
 
 	BUG_ON(!out_fd);
 
-	mtl = kbase_sync_timeline_alloc(name);
-	if (!mtl)
+	msc = kbase_sync_context_alloc(name);
+	if (!msc)
 		return -EINVAL;
 
-	*out_fd = anon_inode_getfd(name, &stream_fops, mtl, O_RDONLY | O_CLOEXEC);
+	*out_fd = anon_inode_getfd(name, &stream_fops, msc, O_RDONLY | O_CLOEXEC);
 
 	if (*out_fd < 0) {
-		kbase_sync_timeline_free(mtl);
+		kbase_sync_context_free(msc);
 		return -EINVAL;
 	}
 
@@ -73,7 +73,7 @@ int kbase_stream_create(const char *name, int *const out_fd)
 
 int kbase_stream_create_fence(int tl_fd, struct sync_file **rsfile)
 {
-	struct mali_sync_timeline *mtl;
+	struct mali_sync_context *msc;
 	struct dma_fence *fence;
 	struct sync_file *sfile;
 
@@ -89,9 +89,9 @@ int kbase_stream_create_fence(int tl_fd, struct sync_file **rsfile)
 		goto out;
 	}
 
-	mtl = tl_file->private_data;
+	msc = tl_file->private_data;
 
-	fence = kbase_fence_alloc(mtl);
+	fence = kbase_fence_alloc(msc);
 	if (!fence) {
 		fd = -EFAULT;
 		goto out;

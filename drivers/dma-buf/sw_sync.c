@@ -14,7 +14,6 @@
  *
  */
 
-#include <linux/export.h>
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
@@ -71,7 +70,7 @@ struct sw_sync_create_fence_data {
 
 static const struct dma_fence_ops timeline_fence_ops;
 
-struct sync_pt *dma_fence_to_sync_pt(struct dma_fence *fence)
+static inline struct sync_pt *dma_fence_to_sync_pt(struct dma_fence *fence)
 {
 	if (fence->ops != &timeline_fence_ops)
 		return NULL;
@@ -85,7 +84,7 @@ struct sync_pt *dma_fence_to_sync_pt(struct dma_fence *fence)
  * Creates a new sync_timeline. Returns the sync_timeline object or NULL in
  * case of error.
  */
-struct sync_timeline *sync_timeline_create(const char *name)
+static struct sync_timeline *sync_timeline_create(const char *name)
 {
 	struct sync_timeline *obj;
 
@@ -121,7 +120,7 @@ static void sync_timeline_get(struct sync_timeline *obj)
 	kref_get(&obj->kref);
 }
 
-void sync_timeline_put(struct sync_timeline *obj)
+static void sync_timeline_put(struct sync_timeline *obj)
 {
 	kref_put(&obj->kref, sync_timeline_free);
 }
@@ -134,7 +133,7 @@ void sync_timeline_put(struct sync_timeline *obj)
  * A sync implementation should call this any time one of it's fences
  * has signaled or has an error condition.
  */
-void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc)
+static void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc)
 {
 	unsigned long flags;
 	struct sync_pt *pt, *next;
@@ -170,7 +169,6 @@ void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc)
 
 	spin_unlock_irqrestore(&obj->child_list_lock, flags);
 }
-EXPORT_SYMBOL(sync_timeline_signal);
 
 /**
  * sync_pt_create() - creates a sync pt
@@ -183,7 +181,7 @@ EXPORT_SYMBOL(sync_timeline_signal);
  * the generic sync_timeline struct. Returns the sync_pt object or
  * NULL in case of error.
  */
-struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
+static struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
 			     unsigned int value)
 {
 	unsigned long flags;
