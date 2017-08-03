@@ -52,6 +52,25 @@ static void ipu3_css_scaler_setup_lut(unsigned int taps,
 	int phase_sum_left = 0;
 	int phase_sum_right = 0;
 
+	if (input_width == output_width) {
+		for (phase = 0; phase < IMGU_SCALER_PHASES; phase++) {
+			for (tap = 0; tap < taps; tap++) {
+				coeff_lut[phase * IMGU_SCALER_FILTER_TAPS + tap]
+					= 0;
+			}
+		}
+
+		info->phase_step = IMGU_SCALER_PHASES *
+			(1 << IMGU_SCALER_PHASE_COUNTER_PREC_REF);
+		info->exp_shift = 0;
+		info->pad_left = 0;
+		info->pad_right = 0;
+		info->phase_init = 0;
+		info->crop_left = 0;
+		info->crop_top = 0;
+		return;
+	}
+
 	for (phase = 0; phase < IMGU_SCALER_PHASES; phase++) {
 		for (tap = 0; tap < taps; tap++) {
 			/* flip table to for convolution reverse indexing */
@@ -121,7 +140,8 @@ static int ipu3_css_scaler_calc(u32 input_width, u32 input_height,
 				struct ipu3_css_scaler_info *info_luma,
 				struct ipu3_css_scaler_info *info_chroma,
 				unsigned int *output_width,
-				unsigned int *output_height)
+				unsigned int *output_height,
+				unsigned int *procmode)
 {
 	u32 out_width = target_width;
 	u32 out_height = target_height;
@@ -136,6 +156,11 @@ static int ipu3_css_scaler_calc(u32 input_width, u32 input_height,
 	if (target_height * input_width > target_width * input_height)
 		target_width = DIV_ROUND_UP(target_height * input_width,
 			input_height);
+
+	if (input_width == target_width)
+		*procmode = IPU3_UAPI_OSYS_PROCMODE_BYPASS;
+	else
+		*procmode = IPU3_UAPI_OSYS_PROCMODE_DOWNSCALE;
 
 	memset(&cfg->scaler_coeffs_chroma, 0,
 		sizeof(cfg->scaler_coeffs_chroma));
@@ -308,46 +333,21 @@ static int ipu3_css_osys_calc_frame_and_stripe_params(
 	int output_width;
 	int pin, s;
 	u32 input_width, input_height, target_width, target_height;
+	unsigned int procmode = 0;
 
-	input_width = css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width;
-	input_height = css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.height;
+	input_width = css->rect[IPU3_CSS_RECT_GDC].width;
+	input_height = css->rect[IPU3_CSS_RECT_GDC].height;
 	target_width = css->queue[IPU3_CSS_QUEUE_VF].pix_fmt.width;
 	target_height = css->queue[IPU3_CSS_QUEUE_VF].pix_fmt.height;
-
-	if (ipu3_css_scaler_calc(input_width, input_height,
-				 target_width, target_height,
-				 osys, scaler_luma, scaler_chroma,
-				 &reso.pin_width[IMGU_ABI_OSYS_PIN_VF],
-				 &reso.pin_height[IMGU_ABI_OSYS_PIN_VF]))
-		return -EINVAL;
-	output_width = reso.pin_width[IMGU_ABI_OSYS_PIN_VF];
-
-	if (output_width < css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width / 2) {
-		/* Scaling factor <= 0.5 */
-		reso.chunk_width = IMGU_OSYS_BLOCK_WIDTH;
-		reso.block_width = IMGU_OSYS_BLOCK_WIDTH;
-	} else { /* 0.5 <= Scaling factor <= 1.0 */
-		reso.chunk_width = IMGU_OSYS_BLOCK_WIDTH / 2;
-		reso.block_width = IMGU_OSYS_BLOCK_WIDTH;
-	}
-
-	if (output_width <=
-		css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width * 7 / 8) {
-		/* Scaling factor <= 0.875 */
-		reso.chunk_height = IMGU_OSYS_BLOCK_HEIGHT;
-		reso.block_height = IMGU_OSYS_BLOCK_HEIGHT;
-	} else { /* 1.0 <= Scaling factor <= 1.75 */
-		reso.chunk_height = IMGU_OSYS_BLOCK_HEIGHT / 2;
-		reso.block_height = IMGU_OSYS_BLOCK_HEIGHT;
-	}
 
 	/**** Frame params ****/
 
 	/* Input width for Output System is output width of DVS (with GDC) */
-	reso.input_width = css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width;
+	reso.input_width = css->rect[IPU3_CSS_RECT_GDC].width;
 
 	/* Input height for Output System is output height of DVS (with GDC) */
-	reso.input_height = css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.height;
+	reso.input_height = css->rect[IPU3_CSS_RECT_GDC].height;
+
 	reso.input_format =
 		css->queue[IPU3_CSS_QUEUE_OUT].css_fmt->frame_format;
 
@@ -360,6 +360,10 @@ static int ipu3_css_osys_calc_frame_and_stripe_params(
 	reso.pin_format[IMGU_ABI_OSYS_PIN_OUT] =
 		css->queue[IPU3_CSS_QUEUE_OUT].css_fmt->frame_format;
 
+	reso.pin_width[IMGU_ABI_OSYS_PIN_VF] =
+		css->queue[IPU3_CSS_QUEUE_VF].pix_fmt.width;
+	reso.pin_height[IMGU_ABI_OSYS_PIN_VF] =
+		css->queue[IPU3_CSS_QUEUE_VF].pix_fmt.height;
 	reso.pin_stride[IMGU_ABI_OSYS_PIN_VF] =
 		css->queue[IPU3_CSS_QUEUE_VF].width_pad;
 	reso.pin_format[IMGU_ABI_OSYS_PIN_VF] =
@@ -432,6 +436,35 @@ static int ipu3_css_osys_calc_frame_and_stripe_params(
 		frame_params[pin].tiling = tiling;
 		frame_params[pin].stride = reso.pin_stride[pin];
 		frame_params[pin].scaled = scaled;
+	}
+
+	if (ipu3_css_scaler_calc(input_width, input_height,
+				 target_width, target_height,
+				 osys, scaler_luma, scaler_chroma,
+				 &reso.pin_width[IMGU_ABI_OSYS_PIN_VF],
+				 &reso.pin_height[IMGU_ABI_OSYS_PIN_VF],
+				 &procmode))
+		return -EINVAL;
+
+	dev_dbg(css->dev, "osys scaler procmode is %u", procmode);
+	output_width = reso.pin_width[IMGU_ABI_OSYS_PIN_VF];
+
+	if (output_width < reso.input_width / 2) {
+		/* Scaling factor <= 0.5 */
+		reso.chunk_width = IMGU_OSYS_BLOCK_WIDTH;
+		reso.block_width = IMGU_OSYS_BLOCK_WIDTH;
+	} else { /* 0.5 <= Scaling factor <= 1.0 */
+		reso.chunk_width = IMGU_OSYS_BLOCK_WIDTH / 2;
+		reso.block_width = IMGU_OSYS_BLOCK_WIDTH;
+	}
+
+	if (output_width <= reso.input_width * 7 / 8) {
+		/* Scaling factor <= 0.875 */
+		reso.chunk_height = IMGU_OSYS_BLOCK_HEIGHT;
+		reso.block_height = IMGU_OSYS_BLOCK_HEIGHT;
+	} else { /* 1.0 <= Scaling factor <= 1.75 */
+		reso.chunk_height = IMGU_OSYS_BLOCK_HEIGHT / 2;
+		reso.block_height = IMGU_OSYS_BLOCK_HEIGHT;
 	}
 
 	/*
@@ -742,13 +775,7 @@ static int ipu3_css_osys_calc_frame_and_stripe_params(
 			}
 
 			/* If no pin use scale, we use BYPASS mode */
-			if (pin_scale == 0)
-				stripe_params[s].processing_mode =
-					IPU3_UAPI_OSYS_PROCMODE_BYPASS;
-			else
-				stripe_params[s].processing_mode =
-					IPU3_UAPI_OSYS_PROCMODE_DOWNSCALE;
-
+			stripe_params[s].processing_mode = procmode;
 			stripe_params[s].phase_step = scaler_luma->phase_step;
 			stripe_params[s].exp_shift = scaler_luma->exp_shift;
 			stripe_params[s].phase_init_left_y =
@@ -1119,24 +1146,25 @@ static int ipu3_css_osys_calc(struct ipu3_css *css, unsigned int stripes,
 	block_stripes[0].offset = 0;
 	if (stripes <= 1) {
 		block_stripes[0].width = stripe_params[0].input_width;
+		block_stripes[0].height = stripe_params[0].input_height;
 	} else {
 		struct imgu_fw_info *bi =
 				&css->fwp->binary_header[css->current_binary];
 		unsigned int sp_block_width =
 				bi->info.isp.sp.block.block_width *
-				IPU3_UAPI_ISP_VEC_ELEMS;
+					IPU3_UAPI_ISP_VEC_ELEMS;
 
 		block_stripes[0].width =
 			roundup(stripe_params[0].input_width, sp_block_width);
 		block_stripes[1].offset =
-			rounddown(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width
+			rounddown(css->rect[IPU3_CSS_RECT_GDC].width
 			- stripe_params[1].input_width, sp_block_width);
 		block_stripes[1].width =
-			roundup(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width
+			roundup(css->rect[IPU3_CSS_RECT_GDC].width
 			- block_stripes[1].offset, sp_block_width);
+		block_stripes[1].height = block_stripes[0].height =
+			css->rect[IPU3_CSS_RECT_GDC].height;
 	}
-	block_stripes[0].height = block_stripes[1].height =
-			css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.height;
 
 	return 0;
 }
@@ -1870,23 +1898,21 @@ static int ipu3_css_cfg_acc_stripe(
 	acc->stripe.bds_out_stripes[0].offset = 0;
 	if (stripes <= 1) {
 		acc->stripe.bds_out_stripes[0].width =
-			ALIGN(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width, f);
+			ALIGN(css->rect[IPU3_CSS_RECT_BDS].width, f);
 	} else {
 		/* Image processing is divided into two stripes */
 		acc->stripe.bds_out_stripes[0].width =
-		acc->stripe.bds_out_stripes[1].width =
-			(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width
-			/ 2 & ~(f - 1)) + f;
-
+			acc->stripe.bds_out_stripes[1].width =
+			(css->rect[IPU3_CSS_RECT_BDS].width / 2 & ~(f - 1)) + f;
 		/* Sum of width of the two stripes should not be smaller
 		 * than output width and must be even times of overlapping
 		 * unit f.
 		 */
-		if ((css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width / f & 1) !=
-		    !!(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width & (f - 1)))
+		if ((css->rect[IPU3_CSS_RECT_BDS].width / f & 1) !=
+		    !!(css->rect[IPU3_CSS_RECT_BDS].width & (f - 1)))
 			acc->stripe.bds_out_stripes[0].width += f;
-		if ((css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width / f & 1) &&
-		(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width & (f - 1))) {
+		if ((css->rect[IPU3_CSS_RECT_BDS].width / f & 1) &&
+		(css->rect[IPU3_CSS_RECT_BDS].width & (f - 1))) {
 			acc->stripe.bds_out_stripes[0].width += f;
 			acc->stripe.bds_out_stripes[1].width += f;
 		}
@@ -1964,9 +1990,9 @@ static int ipu3_css_cfg_acc_stripe(
 	}
 
 	acc->stripe.output_system_in_frame_width =
-		css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width;
+		css->rect[IPU3_CSS_RECT_GDC].width;
 	acc->stripe.output_system_in_frame_height =
-		css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.height;
+		css->rect[IPU3_CSS_RECT_GDC].height;
 
 	acc->stripe.effective_frame_width =
 				css->rect[IPU3_CSS_RECT_EFFECTIVE].width;
@@ -1987,9 +2013,14 @@ static int ipu3_css_cfg_acc_stripe(
 	acc->stripe.display_frame_height =
 		css->queue[IPU3_CSS_QUEUE_VF].pix_fmt.height;
 	acc->stripe.bds_aligned_frame_width =
-		css->aux_frames[IPU3_CSS_AUX_FRAME_TNR].bytesperline /
-		css->aux_frames[IPU3_CSS_AUX_FRAME_TNR].bytesperpixel;
-	acc->stripe.half_overlap_vectors = IMGU_STRIPE_FIXED_HALF_OVERLAP;
+		roundup(css->rect[IPU3_CSS_RECT_BDS].width,
+			2 * IPU3_UAPI_ISP_VEC_ELEMS);
+
+	if (stripes > 1)
+		acc->stripe.half_overlap_vectors =
+			IMGU_STRIPE_FIXED_HALF_OVERLAP;
+	else
+		acc->stripe.half_overlap_vectors = 0;
 
 	return 0;
 }
@@ -2152,9 +2183,7 @@ int ipu3_css_cfg_acc(struct ipu3_css *css, struct ipu3_uapi_flags *use,
 	const struct imgu_fw_info *bi =
 		&css->fwp->binary_header[css->current_binary];
 	const unsigned int stripes = bi->info.isp.sp.iterator.num_stripes;
-	const unsigned int tnr_frame_width =
-		css->aux_frames[IPU3_CSS_AUX_FRAME_TNR].bytesperline /
-		css->aux_frames[IPU3_CSS_AUX_FRAME_TNR].bytesperpixel;
+	unsigned int tnr_frame_width;
 	const struct ipu3_css_bds_config *cfg_bds;
 	unsigned int bds_ds;
 	unsigned int ofs_x, ofs_y;
@@ -2169,6 +2198,7 @@ int ipu3_css_cfg_acc(struct ipu3_css *css, struct ipu3_uapi_flags *use,
 	if (ret)
 		return ret;
 
+	tnr_frame_width = acc->stripe.bds_aligned_frame_width;
 	/* acc_param: input_feeder_config */
 
 	ofs_x = ((css->queue[IPU3_CSS_QUEUE_IN].pix_fmt.width -

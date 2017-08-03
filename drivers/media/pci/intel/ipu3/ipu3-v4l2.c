@@ -353,6 +353,7 @@ static int mem2mem2_fmt(struct ipu3_mem2mem2_device *m2m2_dev,
 	struct v4l2_rect *rects[IPU3_CSS_RECTS] = { NULL };
 	unsigned int i;
 	int css_q, r;
+	struct v4l2_mbus_framefmt pad_fmt;
 
 	if (m2m2_dev->nodes[IMGU_NODE_PV].enabled &&
 		m2m2_dev->nodes[IMGU_NODE_VF].enabled) {
@@ -387,10 +388,16 @@ static int mem2mem2_fmt(struct ipu3_mem2mem2_device *m2m2_dev,
 	}
 
 	if (!try) {
-		memset(&imgu->rect, 0, sizeof(imgu->rect));
+		/* eff and bds res got by m2m2_s_sel */
 		rects[IPU3_CSS_RECT_EFFECTIVE] = &imgu->rect.eff;
 		rects[IPU3_CSS_RECT_BDS] = &imgu->rect.bds;
+		rects[IPU3_CSS_RECT_GDC] = &imgu->rect.gdc;
 	}
+
+	/* suppose that pad fmt was set by subdev s_fmt before */
+	pad_fmt = m2m2_dev->nodes[IMGU_NODE_IN].pad_fmt;
+	rects[IPU3_CSS_RECT_GDC]->width = pad_fmt.width;
+	rects[IPU3_CSS_RECT_GDC]->height = pad_fmt.height;
 
 	/*
 	 * ipu3_mem2mem2 doesn't set the node to the value given by user
@@ -406,6 +413,55 @@ static int mem2mem2_fmt(struct ipu3_mem2mem2_device *m2m2_dev,
 
 	/* fmt_try returns the binary number in the firmware blob */
 	return r < 0 ? r : 0;
+}
+
+static int mem2mem2_s_selection(struct ipu3_mem2mem2_device *m2m2_dev,
+				     int node, struct v4l2_selection *s)
+{
+	struct imgu_device *const imgu =
+		container_of(m2m2_dev, struct imgu_device, mem2mem2);
+	struct v4l2_rect *rect = NULL;
+
+	if (node != IPU3_CSS_QUEUE_IN)
+		return -ENOIOCTLCMD;
+
+	switch (s->target) {
+	case V4L2_SEL_TGT_CROP:
+		rect = &imgu->rect.eff;
+		break;
+	case V4L2_SEL_TGT_COMPOSE:
+		rect = &imgu->rect.bds;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	*rect = s->r;
+
+	return 0;
+}
+
+static int mem2mem2_g_selection(struct ipu3_mem2mem2_device *m2m2_dev,
+				     int node, struct v4l2_selection *s)
+{
+	struct imgu_device *const imgu =
+		container_of(m2m2_dev, struct imgu_device, mem2mem2);
+
+	if (node != IPU3_CSS_QUEUE_IN)
+		return -ENOIOCTLCMD;
+
+	switch (s->target) {
+	case V4L2_SEL_TGT_CROP:
+		s->r = imgu->rect.eff;
+		break;
+	case V4L2_SEL_TGT_COMPOSE:
+		s->r = imgu->rect.bds;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 static int ipu3_videoc_try_fmt(struct file *file, void *fh,
@@ -429,6 +485,38 @@ static int ipu3_videoc_s_fmt(struct file *file, void *fh,
 		f->fmt = node->vdev_fmt.fmt;
 
 	return r;
+}
+
+static int ipu3_videoc_s_selection(struct file *file, void *fh,
+				     struct v4l2_selection *s)
+{
+	struct ipu3_mem2mem2_device *m2m2 = video_drvdata(file);
+	struct imgu_video_device *node = file_to_intel_ipu3_node(file);
+
+	if (!m2m2->ops)
+		return -ENOIOCTLCMD;
+
+	if (s->type != node->vdev_fmt.type)
+		return -EINVAL;
+
+	return mem2mem2_s_selection(m2m2, node - m2m2->nodes, s);
+
+}
+
+static int ipu3_videoc_g_selection(struct file *file, void *fh,
+				     struct v4l2_selection *s)
+{
+	struct ipu3_mem2mem2_device *m2m2 = video_drvdata(file);
+	struct imgu_video_device *node = file_to_intel_ipu3_node(file);
+
+	if (!m2m2->ops)
+		return -ENOIOCTLCMD;
+
+	if (s->type != node->vdev_fmt.type)
+		return -EINVAL;
+
+	return mem2mem2_g_selection(m2m2, node - m2m2->nodes, s);
+
 }
 
 /******************** function pointers ********************/
@@ -482,6 +570,9 @@ static const struct v4l2_ioctl_ops ipu3_v4l2_ioctl_ops = {
 	.vidioc_g_fmt_vid_cap = ipu3_videoc_g_fmt,
 	.vidioc_s_fmt_vid_cap = ipu3_videoc_s_fmt,
 	.vidioc_try_fmt_vid_cap = ipu3_videoc_try_fmt,
+
+	.vidioc_s_selection = ipu3_videoc_s_selection,
+	.vidioc_g_selection = ipu3_videoc_g_selection,
 
 	.vidioc_g_fmt_vid_out = ipu3_videoc_g_fmt,
 	.vidioc_s_fmt_vid_out = ipu3_videoc_s_fmt,

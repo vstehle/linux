@@ -361,6 +361,7 @@ static int imgu_mem2mem2_s_stream(struct ipu3_mem2mem2_device *m2m2_dev,
 
 	rects[IPU3_CSS_RECT_EFFECTIVE] = &imgu->rect.eff;
 	rects[IPU3_CSS_RECT_BDS] = &imgu->rect.bds;
+	rects[IPU3_CSS_RECT_GDC] = &imgu->rect.gdc;
 
 	r = ipu3_css_fmt_set(&imgu->css, fmts, rects);
 	if (r) {

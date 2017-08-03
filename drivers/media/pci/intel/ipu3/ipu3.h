@@ -170,6 +170,7 @@ struct imgu_device {
 	struct {
 		struct v4l2_rect eff; /* effective resolution */
 		struct v4l2_rect bds; /* bayer-domain scaled resolution*/
+		struct v4l2_rect gdc; /* gdc output resolution */
 	} rect;
 };
 

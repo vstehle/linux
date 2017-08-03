@@ -44,7 +44,8 @@
 #define IPU3_CSS_RECT_EFFECTIVE		0       /* Effective resolution */
 #define IPU3_CSS_RECT_BDS		1       /* Resolution after BDS */
 #define IPU3_CSS_RECT_ENVELOPE		2       /* DVS envelope size */
-#define IPU3_CSS_RECTS			3
+#define IPU3_CSS_RECT_GDC		3       /* gdc output res */
+#define IPU3_CSS_RECTS			4       /* number of rects */
 
 #define IA_CSS_BINARY_MODE_PRIMARY	2
 #define IA_CSS_BINARY_MODE_VIDEO	3

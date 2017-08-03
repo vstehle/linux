@@ -37,6 +37,10 @@
 #define IPU3_CSS_MIN_RES	32
 #define IPU3_CSS_MAX_RES	65535
 
+/* filter size from graph settings is fixed as 4 */
+#define FILTER_SIZE             4
+#define MIN_ENVELOPE            8
+
 /* Formats supported by IPU3 Camera Sub System */
 static const struct ipu3_css_format ipu3_css_formats[] = {
 	{
@@ -776,11 +780,11 @@ static int ipu3_css_pipeline_init(struct ipu3_css *css)
 	cfg_iter->output_info.raw_type = IMGU_ABI_RAW_TYPE_BAYER;
 
 	cfg_iter->vf_info.res.width =
-	    css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width;
+	    css->queue[IPU3_CSS_QUEUE_VF].pix_fmt.width;
 	cfg_iter->vf_info.res.height =
-	    css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.height;
+	    css->queue[IPU3_CSS_QUEUE_VF].pix_fmt.height;
 	cfg_iter->vf_info.padded_width =
-	    css->queue[IPU3_CSS_QUEUE_OUT].width_pad;
+	    css->queue[IPU3_CSS_QUEUE_VF].width_pad;
 	cfg_iter->vf_info.format =
 	    css->queue[IPU3_CSS_QUEUE_VF].css_fmt->frame_format;
 	cfg_iter->vf_info.raw_bit_depth =
@@ -804,7 +808,7 @@ static int ipu3_css_pipeline_init(struct ipu3_css *css)
 
 	cfg_ref->port_b.crop = 0;
 	cfg_ref->port_b.elems = IMGU_ABI_ISP_DDR_WORD_BYTES / BYPC;
-	cfg_ref->port_b.width  = css->rect[IPU3_CSS_RECT_BDS].width;
+	cfg_ref->port_b.width = css->aux_frames[IPU3_CSS_AUX_FRAME_REF].width;
 	cfg_ref->port_b.stride =
 	    css->aux_frames[IPU3_CSS_AUX_FRAME_REF].bytesperline;
 	cfg_ref->width_a_over_b =
@@ -832,10 +836,10 @@ static int ipu3_css_pipeline_init(struct ipu3_css *css)
 		goto bad_firmware;
 
 	cfg_dvs->num_horizontal_blocks =
-	    ALIGN(DIV_ROUND_UP(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width,
+	    ALIGN(DIV_ROUND_UP(css->rect[IPU3_CSS_RECT_GDC].width,
 			       IMGU_DVS_BLOCK_W), 2);
 	cfg_dvs->num_vertical_blocks =
-	    DIV_ROUND_UP(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.height,
+	    DIV_ROUND_UP(css->rect[IPU3_CSS_RECT_GDC].height,
 			     IMGU_DVS_BLOCK_H);
 
 	if (cfg_dvs->num_horizontal_blocks * cfg_dvs->num_vertical_blocks < 0)
@@ -1387,13 +1391,11 @@ error_no_memory:
 	return -ENOMEM;
 }
 
-static u32 ipu3_css_adjust(u32 res, u32 max, u32 align)
+static u32 ipu3_css_adjust(u32 res, u32 align)
 {
 	if (res < IPU3_CSS_MIN_RES)
 		res = IPU3_CSS_MIN_RES;
 	res = roundclosest(res, align);
-	if (res > max)
-		res = round_down(max, align);
 
 	return res;
 }
@@ -1513,58 +1515,6 @@ static int ipu3_css_find_binary(struct ipu3_css *css,
 	return -EINVAL;
 }
 
-static int ipu3_css_fmt_try_calc(u32 in1, u32 in2, u32 out1, u32 out2,
-				 u32 *eff1, u32 *eff2, u32 *bds1, u32 *bds2,
-				 bool hor_first)
-{
-	static const u32 EFF_ALIGN_W = 2;
-	static const u32 BDS_ALIGN_W = 4;
-
-	u32 sf;	/* Scale factor */
-	u32 f;
-	u32 g;
-	u32 gran;
-	u32 gsf;
-	u32 n;
-
-	f = DIV_ROUND_UP(out2, IMGU_BDS_GRANULARITY);
-	sf = in2 / f;
-	if (hor_first && !IS_ALIGNED(f, 2) && !IS_ALIGNED(sf, 2)) {
-		/* Make either f or sf even */
-		f++;
-		sf = in2 / f;
-	}
-	*bds2 = f * IMGU_BDS_GRANULARITY;	/* For width, multiple of 4 */
-	if (sf < IMGU_BDS_MIN_SF_INV) {
-		/* Can not scale upwards, disable scaling */
-		*eff1 = *bds1 = out1;
-		*eff2 = *bds2 = out2;
-	} else {
-		/* Calculate effective and bds resolutions */
-		*eff2 = f * sf;		/* If this is width, it will be even */
-
-		g = gcd(IMGU_BDS_GRANULARITY, sf);
-		gran = IMGU_BDS_GRANULARITY / g;
-		gsf = sf / g;
-		while (!hor_first &&
-			(!IS_ALIGNED(gsf, EFF_ALIGN_W) ||
-			!IS_ALIGNED(gran, BDS_ALIGN_W))) {
-			gsf *= 2;
-			gran *= 2;
-		}
-		/*
-		 * Now gsf is even and gran multiple of 4. When these are used
-		 * as multiplier to get effective and BDS resolution widths,
-		 * respectively, the result will be also even and multiple of 4.
-		 */
-		n = DIV_ROUND_UP(out1, gran);
-		*bds1 = n * gran;
-		*eff1 = n * gsf;
-	}
-
-	return *eff1 <= in1 && *bds1 >= out1 ? 0 : -EINVAL;
-}
-
 /*
  * Check that there is a binary matching requirements. Parameters may be
  * NULL indicating disabled input/output. Return negative if given
@@ -1581,8 +1531,6 @@ int ipu3_css_fmt_try(struct ipu3_css *css,
 	static const u32 OUT_ALIGN_W = 8;
 	static const u32 OUT_ALIGN_H = 4;
 	static const u32 VF_ALIGN_W  = 2;
-	static const unsigned int ENVELOPE_WIDTH = 8;	/* Hard coded for now */
-	static const unsigned int ENVELOPE_HEIGHT = 8;
 	static const char *qnames[IPU3_CSS_QUEUES] = {
 		[IPU3_CSS_QUEUE_IN] = "in",
 		[IPU3_CSS_QUEUE_PARAMS]    = "params",
@@ -1596,6 +1544,7 @@ int ipu3_css_fmt_try(struct ipu3_css *css,
 		[IPU3_CSS_RECT_EFFECTIVE] = "effective resolution",
 		[IPU3_CSS_RECT_BDS]       = "bayer-domain scaled resolution",
 		[IPU3_CSS_RECT_ENVELOPE]  = "DVS envelope size",
+		[IPU3_CSS_RECT_GDC]  = "GDC output res",
 	};
 	struct ipu3_css_queue q[IPU3_CSS_QUEUES];
 	struct v4l2_rect r[IPU3_CSS_RECTS] = { };
@@ -1605,7 +1554,8 @@ int ipu3_css_fmt_try(struct ipu3_css *css,
 	struct v4l2_rect       *const eff = &r[IPU3_CSS_RECT_EFFECTIVE];
 	struct v4l2_rect       *const bds = &r[IPU3_CSS_RECT_BDS];
 	struct v4l2_rect       *const env = &r[IPU3_CSS_RECT_ENVELOPE];
-	int binary, i;
+	struct v4l2_rect       *const gdc = &r[IPU3_CSS_RECT_GDC];
+	int binary, i, s;
 
 	/* Decide which pipe to use */
 	if (css->vf_output_en == IPU3_NODE_PV_ENABLED)
@@ -1664,30 +1614,32 @@ int ipu3_css_fmt_try(struct ipu3_css *css,
 		bds->width = out->width;
 		bds->height = out->height;
 	}
+	if (gdc->width <= 0 || gdc->height <= 0) {
+		gdc->width = out->width;
+		gdc->height = out->height;
+	}
 
-	env->width  = ENVELOPE_WIDTH;
-	env->height = ENVELOPE_HEIGHT;
+	in->width   = ipu3_css_adjust(in->width, 1);
+	in->height  = ipu3_css_adjust(in->height, 1);
+	eff->width  = ipu3_css_adjust(eff->width, EFF_ALIGN_W);
+	eff->height = ipu3_css_adjust(eff->height, 1);
+	bds->width  = ipu3_css_adjust(bds->width, BDS_ALIGN_W);
+	bds->height = ipu3_css_adjust(bds->height, 1);
+	gdc->width  = ipu3_css_adjust(gdc->width, OUT_ALIGN_W);
+	gdc->height = ipu3_css_adjust(gdc->height, OUT_ALIGN_H);
+	out->width  = ipu3_css_adjust(out->width, OUT_ALIGN_W);
+	out->height = ipu3_css_adjust(out->height, OUT_ALIGN_H);
+	vf->width   = ipu3_css_adjust(vf->width, VF_ALIGN_W);
+	vf->height  = ipu3_css_adjust(vf->height, 1);
 
-	in->width   = ipu3_css_adjust(in->width, IPU3_CSS_MAX_RES, 1);
-	in->height  = ipu3_css_adjust(in->height, IPU3_CSS_MAX_RES, 1);
-	eff->width  = ipu3_css_adjust(eff->width, in->width, EFF_ALIGN_W);
-	eff->height = ipu3_css_adjust(eff->height, in->height, 1);
-	bds->width  = ipu3_css_adjust(bds->width, eff->width, BDS_ALIGN_W);
-	bds->height = ipu3_css_adjust(bds->height, eff->height, 1);
-	out->width  = ipu3_css_adjust(out->width, bds->width, OUT_ALIGN_W);
-	out->height = ipu3_css_adjust(out->height, bds->height, OUT_ALIGN_H);
-	vf->width   = ipu3_css_adjust(vf->width, out->width, VF_ALIGN_W);
-	vf->height  = ipu3_css_adjust(vf->height, out->height, 1);
-	if (ipu3_css_fmt_try_calc(in->width, in->height, out->width,
-		out->height, &eff->width, &eff->height, &bds->width,
-		&bds->height, false))
-		ipu3_css_fmt_try_calc(in->height, in->width, out->height,
-			out->width, &eff->height, &eff->width,
-			&bds->height, &bds->width, true);
+	s = (bds->width - gdc->width) / 2 - FILTER_SIZE;
+	env->width = s < MIN_ENVELOPE ? MIN_ENVELOPE : s;
+	s = (bds->height - gdc->height) / 2 - FILTER_SIZE;
+	env->height = s < MIN_ENVELOPE ? MIN_ENVELOPE : s;
 
 	binary = ipu3_css_find_binary(css, q, r);
 	if (binary < 0) {
-		dev_dbg(css->dev, "failed to find suitable binary\n");
+		dev_err(css->dev, "failed to find suitable binary\n");
 		return -EINVAL;
 	}
 
@@ -1709,10 +1661,10 @@ int ipu3_css_fmt_try(struct ipu3_css *css,
 			*rects[i] = r[i];
 
 	dev_dbg(css->dev,
-		"in (%u,%u) eff (%u,%u) bds (%u,%u) out (%u,%u) vf (%u,%u)\n",
-		in->width, in->height, eff->width, eff->height,
-		bds->width, bds->height, out->width, out->height,
-		vf->width, vf->height);
+		"in(%u,%u) if(%u,%u) ds(%u,%u) gdc(%u,%u) out(%u,%u) vf(%u,%u)",
+		 in->width, in->height, eff->width, eff->height,
+		 bds->width, bds->height, gdc->width, gdc->height,
+		 out->width, out->height, vf->width, vf->height);
 
 	return binary;
 }
@@ -1767,11 +1719,11 @@ int ipu3_css_fmt_set(struct ipu3_css *css,
 	/* Reference frames for DVS, FRAME_FORMAT_YUV420_16 */
 	css->aux_frames[IPU3_CSS_AUX_FRAME_REF].bytesperpixel = BYPC;
 	css->aux_frames[IPU3_CSS_AUX_FRAME_REF].width =
-	    css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width;
+	    css->rect[IPU3_CSS_RECT_BDS].width;
 	css->aux_frames[IPU3_CSS_AUX_FRAME_REF].height = h =
-	    ALIGN(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.height,
+	    ALIGN(css->rect[IPU3_CSS_RECT_BDS].height,
 		  IMGU_DVS_BLOCK_H) + 2 * IMGU_GDC_BUF_Y;
-	w = ALIGN(css->queue[IPU3_CSS_QUEUE_OUT].width_pad,
+	w = ALIGN(css->rect[IPU3_CSS_RECT_BDS].width,
 		  2 * IPU3_UAPI_ISP_VEC_ELEMS) + 2 * IMGU_GDC_BUF_X;
 	css->aux_frames[IPU3_CSS_AUX_FRAME_REF].bytesperline =
 	    css->aux_frames[IPU3_CSS_AUX_FRAME_REF].bytesperpixel * w;
@@ -1784,12 +1736,12 @@ int ipu3_css_fmt_set(struct ipu3_css *css,
 	/* TNR frames for temporal noise reduction, FRAME_FORMAT_YUV_LINE */
 	css->aux_frames[IPU3_CSS_AUX_FRAME_TNR].bytesperpixel = 1;
 	css->aux_frames[IPU3_CSS_AUX_FRAME_TNR].width = w =
-	    roundup(css->queue[IPU3_CSS_QUEUE_OUT].width_pad,
-		    bi->info.isp.sp.block.block_width *
-		    IPU3_UAPI_ISP_VEC_ELEMS);
+		roundup(css->rect[IPU3_CSS_RECT_GDC].width,
+			bi->info.isp.sp.block.block_width *
+			IPU3_UAPI_ISP_VEC_ELEMS);
 	css->aux_frames[IPU3_CSS_AUX_FRAME_TNR].height = h =
-	    roundup(css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.height,
-		    bi->info.isp.sp.block.output_block_height);
+		roundup(css->rect[IPU3_CSS_RECT_GDC].height,
+			bi->info.isp.sp.block.output_block_height);
 	css->aux_frames[IPU3_CSS_AUX_FRAME_TNR].bytesperline = w;
 	size = w * ALIGN(h * 3 / 2 + 3, 2);	/* +3 for vf_pp prefetch */
 	for (i = 0; i < IPU3_CSS_AUX_FRAMES; i++)
@@ -2118,8 +2070,8 @@ int ipu3_css_set_parameters(struct ipu3_css *css,
 				css->aux_frames[s].bytesperline /
 				css->aux_frames[s].bytesperpixel,
 				css->aux_frames[s].height,
-				css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.width,
-				css->queue[IPU3_CSS_QUEUE_OUT].pix_fmt.height);
+				css->rect[IPU3_CSS_RECT_GDC].width,
+				css->rect[IPU3_CSS_RECT_GDC].height);
 		}
 	}
 
