@@ -566,20 +566,16 @@ static irqreturn_t imgu_isr_threaded(int irq, void *imgu_ptr)
 	/* Try to queue more buffers for CSS */
 	imgu_queue_buffers(imgu, false);
 
-	return IRQ_NONE;
+	return IRQ_HANDLED;
 }
 
 irqreturn_t imgu_isr(int irq, void *imgu_ptr)
 {
 	struct imgu_device *imgu = imgu_ptr;
-	irqreturn_t r = IRQ_HANDLED;
 
 	/* acknowledge interruption */
-	if (ipu3_css_irq_ack(&imgu->css) >= 0)
-		r = IRQ_NONE;
-
-	if (!imgu->mem2mem2.streaming)
-		return r;
+	if (ipu3_css_irq_ack(&imgu->css) < 0)
+		return IRQ_NONE;
 
 	return IRQ_WAKE_THREAD;
 }
