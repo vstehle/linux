@@ -765,10 +765,10 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 	if (is_yuv_support(fb->format->format) && ((state->src.x1 >> 16) % 2))
 		return -EINVAL;
 
-	if (is_yuv_support(fb->format->format) && state->rotation)
+	if (is_yuv_support(fb->format->format) && (state->rotation != DRM_ROTATE_0))
 		return -EINVAL;
 
-	if (state->rotation && (!((state->rotation == DRM_REFLECT_Y) || (state->rotation == DRM_ROTATE_0))))
+	if (!((state->rotation == DRM_REFLECT_Y) || (state->rotation == DRM_ROTATE_0)))
 		return -EINVAL;
 
 	if (fb->modifier == DRM_FORMAT_MOD_CHROMEOS_ROCKCHIP_AFBC) {
@@ -790,7 +790,7 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 			return -EINVAL;
 		}
 
-		if (state->rotation && state->rotation != DRM_ROTATE_0) {
+		if (state->rotation != DRM_ROTATE_0) {
 			DRM_ERROR("afbdc does not support rotation\n");
 			DRM_ERROR("rotation=%d\n", state->rotation);
 			return -EINVAL;
