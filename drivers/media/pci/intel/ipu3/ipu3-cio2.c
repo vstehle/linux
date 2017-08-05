@@ -547,7 +547,7 @@ static void cio2_buffer_done(struct cio2_device *cio2, unsigned int dma_chan)
 
 		b = q->bufs[q->bufs_first];
 		if (b) {
-			u64 ns = entry[1].second_entry.timestamp * 100;
+			u64 ns = ktime_get_ns();
 			int bytes = entry[1].second_entry.num_of_bytes;
 
 			q->bufs[q->bufs_first] = NULL;
@@ -557,9 +557,7 @@ static void cio2_buffer_done(struct cio2_device *cio2, unsigned int dma_chan)
 
 			/* Fill vb2 buffer entries and tell it's ready */
 			vb2_set_plane_payload(&b->vbb.vb2_buf, 0, bytes);
-			b->vbb.timestamp.tv_sec = ns / 1000000000;
-			ns -= b->vbb.timestamp.tv_sec * 1000000000;
-			b->vbb.timestamp.tv_usec = ns / 1000;
+			b->vbb.timestamp = ns_to_timeval(ns);
 			b->vbb.flags = V4L2_BUF_FLAG_DONE;
 			b->vbb.field = V4L2_FIELD_NONE;
 			memset(&b->vbb.timecode, 0, sizeof(b->vbb.timecode));
