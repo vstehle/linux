@@ -130,6 +130,7 @@ struct pmc_reg_map {
 	const struct pmc_bit_map *pfear_sts;
 	const struct pmc_bit_map *mphy_sts;
 	const struct pmc_bit_map *pll_sts;
+	const struct pmc_bit_map *msr_sts;
 };
 
 /**

@@ -29,10 +29,24 @@
 #include <asm/cpu_device_id.h>
 #include <asm/intel-family.h>
 #include <asm/pmc_core.h>
+#include <asm/msr.h>
 
 #include "intel_pmc_core.h"
 
 static struct pmc_dev pmc;
+
+/* PKGC MSRs are common across Intel Core cpus */
+static const struct pmc_bit_map msr_map[] = {
+	{"Package C2",			MSR_PKG_C2_RESIDENCY},
+	{"Package C3",			MSR_PKG_C3_RESIDENCY},
+	{"Package C6",			MSR_PKG_C6_RESIDENCY},
+	{"Package C7",			MSR_PKG_C7_RESIDENCY},
+	{"Package C8",			MSR_PKG_C8_RESIDENCY},
+	{"Package C9",			MSR_PKG_C9_RESIDENCY},
+	{"Package C10",			MSR_PKG_C10_RESIDENCY},
+	{},
+
+};
 
 static const struct pmc_bit_map spt_pll_map[] = {
 	{"MIPI PLL",			SPT_PMC_BIT_MPHY_CMN_LANE0},
@@ -110,6 +124,7 @@ static const struct pmc_reg_map spt_reg_map = {
 	.pfear_sts = spt_pfear_map,
 	.mphy_sts = spt_mphy_map,
 	.pll_sts = spt_pll_map,
+	.msr_sts = msr_map,
 };
 
 static const struct pci_device_id pmc_pci_ids[] = {
@@ -138,6 +153,17 @@ static inline u32 pmc_core_adjust_slp_s0_step(u32 value)
 {
 	return value * SPT_PMC_SLP_S0_RES_COUNTER_STEP;
 }
+
+int intel_pkgc10_counter_read(u64 *data)
+{
+
+	if (!data)
+		return -EINVAL;
+
+	return rdmsrl_safe(MSR_PKG_C10_RESIDENCY, data);
+
+}
+EXPORT_SYMBOL_GPL(intel_pkgc10_counter_read);
 
 /**
  * intel_pmc_slp_s0_counter_read() - Read SLP_S0 residency.
@@ -441,6 +467,41 @@ static const struct file_operations pmc_core_ltr_ignore_ops = {
 	.release        = single_release,
 };
 
+static int pmc_core_pkgc_show(struct seq_file *s, void *unused)
+{
+	struct pmc_dev *pmcdev = s->private;
+	const struct pmc_bit_map *map = pmcdev->map->msr_sts;
+	u64 pcstate_count;
+	int index, err;
+
+	for (index = 0; map[index].name ; index++) {
+
+		err = rdmsrl_safe(map[index].bit_mask, &pcstate_count);
+		if (err) {
+			pr_debug("Failed to read %s residency MSR",
+							map[index].name);
+			return err;
+		}
+		seq_printf(s, "%s\t : 0x%llx\n", map[index].name,
+						pcstate_count);
+	}
+
+	return 0;
+}
+
+static int pmc_core_pkgc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, pmc_core_pkgc_show, inode->i_private);
+}
+
+static const struct file_operations pmc_core_pkgc_ops = {
+	.open           = pmc_core_pkgc_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+
 static void pmc_core_dbgfs_unregister(struct pmc_dev *pmcdev)
 {
 	debugfs_remove_recursive(pmcdev->dbgfs_dir);
@@ -481,6 +542,13 @@ static int pmc_core_dbgfs_register(struct pmc_dev *pmcdev)
 	file = debugfs_create_file("ltr_ignore",
 				   S_IFREG | S_IRUGO, dir, pmcdev,
 				   &pmc_core_ltr_ignore_ops);
+
+	if (!file)
+		goto err;
+
+	file = debugfs_create_file("package_cstate_residency",
+				   S_IFREG | S_IRUGO, dir, pmcdev,
+				   &pmc_core_pkgc_ops);
 
 	if (!file)
 		goto err;
