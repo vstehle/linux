@@ -841,16 +841,24 @@ static int intel_idle_freeze(struct cpuidle_device *dev,
 	return 0;
 }
 
-static int check_slp_s0(u32 slp_s0_saved_count)
+static int check_slp_s0(u32 slp_s0_saved_count, u64 pc10_saved_count)
 {
 	u32 slp_s0_new_count;
+	u64 pc10_new_count;
 
 	if (intel_pmc_slp_s0_counter_read(&slp_s0_new_count)) {
 		pr_warn("Unable to read SLP S0 residency counter\n");
 		return -EIO;
 	}
 
+	if (intel_pkgc10_counter_read(&pc10_new_count)) {
+		pr_warn("Unable to read PC10 residency counter\n");
+		return -EIO;
+	}
+
 	if (slp_s0_saved_count == slp_s0_new_count) {
+		pr_warn("PC10 residency : \nPrev : 0x%llx\nNew : 0x%llx\n",
+					pc10_saved_count, pc10_new_count);
 		WARN(1, "CPU did not enter SLP S0 for suspend-to-idle.\n");
 		pmc_core_ppfear_display();
 		return -EIO;
@@ -877,6 +885,7 @@ static int intel_idle_freeze_and_check(struct cpuidle_device *dev,
 {
 	bool check_on_this_cpu = false;
 	u32 slp_s0_saved_count;
+	u64 pc10_saved_count;
 	unsigned long flags;
 	int cpu = smp_processor_id();
 	int ret;
@@ -887,7 +896,8 @@ static int intel_idle_freeze_and_check(struct cpuidle_device *dev,
 	if (slp_s0_seconds &&
 	    slp_s0_num_cpus == num_online_cpus() &&
 	    !slp_s0_check_inprogress &&
-	    !intel_pmc_slp_s0_counter_read(&slp_s0_saved_count)) {
+	    !intel_pmc_slp_s0_counter_read(&slp_s0_saved_count) &&
+	    !intel_pkgc10_counter_read(&pc10_saved_count)) {
 		ret = tick_set_freeze_event(cpu, ktime_set(slp_s0_seconds, 0));
 		if (ret < 0) {
 			spin_unlock_irqrestore(&slp_s0_check_lock, flags);
@@ -909,7 +919,7 @@ static int intel_idle_freeze_and_check(struct cpuidle_device *dev,
 		goto out;
 
 	if (check_on_this_cpu && tick_clear_freeze_event(cpu))
-		ret = check_slp_s0(slp_s0_saved_count);
+		ret = check_slp_s0(slp_s0_saved_count, pc10_saved_count);
 
 out:
 	spin_lock_irqsave(&slp_s0_check_lock, flags);
