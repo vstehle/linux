@@ -337,6 +337,10 @@ pp900_emmcpll: &pp900_s3 {
 	rockchip,pins = <1 17 RK_FUNC_GPIO &pcfg_pull_up>;
 };
 
+&headset_int_l {
+	rockchip,pins = <1 23 RK_FUNC_GPIO &pcfg_pull_up>;
+};
+
 /* there is no external pull up, so need to set this pin pull up */
 &sdmmc_cd_gpio {
 	rockchip,pins = <1 11 RK_FUNC_GPIO &pcfg_pull_up>;
