@@ -1159,6 +1159,7 @@ struct i915_psr {
 	bool y_cord_support;
 	bool colorimetry_support;
 	bool alpm;
+	bool has_hw_tracking;
 };
 
 enum intel_pch {

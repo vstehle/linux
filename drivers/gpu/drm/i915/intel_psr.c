@@ -864,6 +864,7 @@ void intel_psr_single_frame_update(struct drm_i915_private *dev_priv,
  * intel_psr_invalidate - Invalidade PSR
  * @dev_priv: i915 device
  * @frontbuffer_bits: frontbuffer plane tracking bits
+ * @origin: which operation caused the invalidated
  *
  * Since the hardware frontbuffer tracking has gaps we need to integrate
  * with the software frontbuffer tracking. This function gets called every
@@ -873,10 +874,14 @@ void intel_psr_single_frame_update(struct drm_i915_private *dev_priv,
  * Dirty frontbuffers relevant to PSR are tracked in busy_frontbuffer_bits."
  */
 void intel_psr_invalidate(struct drm_i915_private *dev_priv,
-			  unsigned frontbuffer_bits)
+			  unsigned frontbuffer_bits, enum fb_op_origin origin)
 {
 	struct drm_crtc *crtc;
 	enum pipe pipe;
+
+	if (dev_priv->psr.has_hw_tracking &&
+	    (origin == ORIGIN_FLIP || origin == ORIGIN_CS))
+		return;
 
 	mutex_lock(&dev_priv->psr.lock);
 	if (!dev_priv->psr.enabled) {
@@ -914,6 +919,10 @@ void intel_psr_flush(struct drm_i915_private *dev_priv,
 {
 	struct drm_crtc *crtc;
 	enum pipe pipe;
+
+	if (dev_priv->psr.has_hw_tracking &&
+	    (origin == ORIGIN_FLIP || origin == ORIGIN_CS))
+		return;
 
 	mutex_lock(&dev_priv->psr.lock);
 	if (!dev_priv->psr.enabled) {
@@ -965,15 +974,17 @@ void intel_psr_init(struct drm_i915_private *dev_priv)
 	}
 
 	/* Set link_standby x link_off defaults */
-	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
+	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
 		/* HSW and BDW require workarounds that we don't implement. */
 		dev_priv->psr.link_standby = false;
-	else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
+	} else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		/* On VLV and CHV only standby mode is supported. */
 		dev_priv->psr.link_standby = true;
-	else
+	} else {
 		/* For new platforms let's respect VBT back again */
 		dev_priv->psr.link_standby = dev_priv->vbt.psr.full_link;
+		dev_priv->psr.has_hw_tracking = true;
+	}
 
 	/* Override link_standby x link_off defaults */
 	if (i915.enable_psr == 2 && !dev_priv->psr.link_standby) {

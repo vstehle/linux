@@ -1601,7 +1601,8 @@ static inline void intel_backlight_device_unregister(struct intel_connector *con
 void intel_psr_enable(struct intel_dp *intel_dp);
 void intel_psr_disable(struct intel_dp *intel_dp);
 void intel_psr_invalidate(struct drm_i915_private *dev_priv,
-			  unsigned frontbuffer_bits);
+			  unsigned frontbuffer_bits,
+			  enum fb_op_origin origin);
 void intel_psr_flush(struct drm_i915_private *dev_priv,
 		     unsigned frontbuffer_bits,
 		     enum fb_op_origin origin);
