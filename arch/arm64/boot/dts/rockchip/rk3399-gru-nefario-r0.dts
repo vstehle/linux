@@ -97,7 +97,7 @@
 
 	backlight: backlight {
 		compatible = "pwm-backlight";
-		pwms = <&cros_ec_pwm 0>;
+		pwms = <&cros_ec_pwm 1>;
 		brightness-levels-scale = <0x10000>;
 		default-brightness-level = <0x828f>; /* arbitrary, ~51% */
 		enable-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
