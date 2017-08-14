@@ -122,7 +122,7 @@ ap_i2c_cam: &i2c2 {
 		pinctrl-0 = <&touch_int_l &touch_reset_l>;
 
 		interrupt-parent = <&gpio3>;
-		interrupts = <13 IRQ_TYPE_EDGE_FALLING>;
+		interrupts = <13 IRQ_TYPE_LEVEL_LOW>;
 
 		reset-gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
 	};

@@ -207,7 +207,7 @@ pp900_emmcpll: &pp900_s3 {
 		pinctrl-0 = <&touch_int_l &touch_reset_l>;
 
 		interrupt-parent = <&gpio1>;
-		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
+		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
 
 		reset-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
 	};
