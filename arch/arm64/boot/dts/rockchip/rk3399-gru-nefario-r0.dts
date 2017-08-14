@@ -189,7 +189,7 @@ pp900_usb: &pp900_s3 {
 		pinctrl-0 = <&trackpad_int_l>;
 
 		interrupt-parent = <&gpio1>;
-		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
+		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
 
 		wakeup-source;
 	};
