@@ -78,8 +78,9 @@ static ssize_t vpd_attrib_read(struct file *filp, struct kobject *kobp,
  *
  * The VPD specification supports only [a-zA-Z0-9_]+ characters in key names but
  * old firmware versions may have entries like "S/N" which are problematic when
- * exporting them as sysfs attributes. These keys present in old firmwares are
- * ignored.
+ * exporting them as sysfs attributes. These keys present in old firmware images
+ * are ignored. Meanwhile, during manufacturing some intermediate VPD values
+ * with "." in name may be created and we do want to export them as well.
  *
  * Returns VPD_OK for a valid key name, VPD_FAIL otherwise.
  *
@@ -93,7 +94,7 @@ static int vpd_section_check_key_name(const u8 *key, s32 key_len)
 	while (key_len-- > 0) {
 		c = *key++;
 
-		if (!isalnum(c) && c != '_')
+		if (!isalnum(c) && c != '_' && c != '.')
 			return VPD_FAIL;
 	}
 
