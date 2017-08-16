@@ -669,14 +669,7 @@ ap_i2c_mic: &i2c1 {
 	headsetcodec: rt5514@57 {
 		compatible = "realtek,rt5514";
 		reg = <0x57>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&mic_int>;
-
-		interrupt-parent = <&gpio1>;
-		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
-
 		realtek,dmic-init-delay = <20>;
-		wakeup-source;
 	};
 };
 
