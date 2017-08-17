@@ -24,6 +24,7 @@
 #include <linux/acpi.h>
 #include <linux/i2c.h>
 #include <linux/platform_data/at24.h>
+#include <linux/pm_runtime.h>
 
 /*
  * I2C EEPROMs from most vendors are inexpensive and mostly interchangeable.
@@ -253,9 +254,19 @@ static ssize_t at24_read(struct at24_data *at24,
 		char *buf, loff_t off, size_t count)
 {
 	ssize_t retval = 0;
+	struct i2c_client *client;
+	int ret;
 
 	if (unlikely(!count))
 		return count;
+
+	client = at24_translate_offset(at24, (unsigned int *)&off);
+
+	ret = pm_runtime_get_sync(&client->dev);
+	if (ret < 0) {
+		pm_runtime_put_noidle(&client->dev);
+		return ret;
+	}
 
 	/*
 	 * Read data from chip, protecting against concurrent updates
@@ -279,6 +290,8 @@ static ssize_t at24_read(struct at24_data *at24,
 	}
 
 	mutex_unlock(&at24->lock);
+
+	pm_runtime_put(&client->dev);
 
 	return retval;
 }
@@ -384,9 +397,19 @@ static ssize_t at24_write(struct at24_data *at24, const char *buf, loff_t off,
 			  size_t count)
 {
 	ssize_t retval = 0;
+	struct i2c_client *client;
+	int ret;
 
 	if (unlikely(!count))
 		return count;
+
+	client = at24_translate_offset(at24, (unsigned int *)&off);
+
+	ret = pm_runtime_get_sync(&client->dev);
+	if (ret < 0) {
+		pm_runtime_put_noidle(&client->dev);
+		return ret;
+	}
 
 	/*
 	 * Write data to chip, protecting against concurrent updates
@@ -410,6 +433,8 @@ static ssize_t at24_write(struct at24_data *at24, const char *buf, loff_t off,
 	}
 
 	mutex_unlock(&at24->lock);
+
+	pm_runtime_put(&client->dev);
 
 	return retval;
 }
@@ -630,6 +655,12 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	i2c_set_clientdata(client, at24);
 
+	/* enable runtime pm */
+	pm_runtime_get_noresume(&client->dev);
+	pm_runtime_set_active(&client->dev);
+	pm_runtime_enable(&client->dev);
+	pm_runtime_put(&client->dev);
+
 	dev_info(&client->dev, "%zu byte %s EEPROM, %s, %u bytes/write\n",
 		at24->bin.size, client->name,
 		writable ? "writable" : "read-only", at24->write_max);
@@ -664,6 +695,9 @@ static int at24_remove(struct i2c_client *client)
 
 	for (i = 1; i < at24->num_addresses; i++)
 		i2c_unregister_device(at24->client[i]);
+
+	pm_runtime_disable(&client->dev);
+	pm_runtime_set_suspended(&client->dev);
 
 	return 0;
 }
