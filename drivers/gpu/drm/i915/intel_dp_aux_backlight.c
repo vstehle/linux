@@ -303,13 +303,15 @@ intel_dp_aux_display_control_heuristic(struct intel_connector *connector)
 	struct intel_dp *intel_dp = enc_to_intel_dp(&connector->encoder->base);
 	uint8_t reg_val;
 
+	/* Enable this for eDP 1.4 panel or later. We probably can't trust the
+	 * content of DPCD register in the older panel.
+	 */
+	if (intel_dp->edp_dpcd[0] < DP_EDP_14)
+		return false;
+
 	/* Panel doesn't support adjusting backlight brightness via PWN pin */
 	if (!(intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_PWM_PIN_CAP))
 		return true;
-
-	/* Enable this for eDP 1.4 panel or later. */
-	if (intel_dp->edp_dpcd[0] < DP_EDP_14)
-		return false;
 
 	/* Panel supports regional backlight brightness adjustment */
 	if (drm_dp_dpcd_readb(&intel_dp->aux, DP_EDP_GENERAL_CAP_3,
