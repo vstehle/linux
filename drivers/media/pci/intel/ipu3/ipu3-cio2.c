@@ -1611,6 +1611,34 @@ static void cio2_queue_exit(struct cio2_device *cio2, struct cio2_queue *q)
 	mutex_destroy(&q->lock);
 }
 
+static int cio2_queues_init(struct cio2_device *cio2)
+{
+	int i, r;
+
+	for (i = 0; i < CIO2_QUEUES; i++) {
+		r = cio2_queue_init(cio2, &cio2->queue[i]);
+		if (r)
+			break;
+	}
+
+	if (i == CIO2_QUEUES)
+		return 0;
+
+	for (i--; i >= 0; i--)
+		cio2_queue_exit(cio2, &cio2->queue[i]);
+
+	return r;
+}
+
+static void cio2_queues_exit(struct cio2_device *cio2)
+{
+	unsigned int i;
+
+	for (i = 0; i < CIO2_QUEUES; i++) {
+		cio2_queue_exit(cio2, &cio2->queue[i]);
+	}
+}
+
 /**************** PCI interface ****************/
 
 static int cio2_pci_config_setup(struct pci_dev *dev)
@@ -1637,7 +1665,7 @@ static int cio2_pci_probe(struct pci_dev *pci_dev,
 	struct cio2_device *cio2;
 	phys_addr_t phys;
 	void __iomem *const *iomap;
-	int i = -1, r = -ENODEV;
+	int r;
 
 	cio2 = devm_kzalloc(&pci_dev->dev, sizeof(*cio2), GFP_KERNEL);
 	if (!cio2)
@@ -1688,42 +1716,40 @@ static int cio2_pci_probe(struct pci_dev *pci_dev,
 	cio2->vb2_alloc_ctx = vb2_dma_sg_init_ctx(&pci_dev->dev);
 	if (IS_ERR(cio2->vb2_alloc_ctx)) {
 		r = PTR_ERR(cio2->vb2_alloc_ctx);
-		goto fail;
+		goto fail_mutex_destroy;
 	}
 	cio2->media_dev.dev = &cio2->pci_dev->dev;
 	strlcpy(cio2->media_dev.model, CIO2_DEVICE_NAME,
 		sizeof(cio2->media_dev.model));
 	snprintf(cio2->media_dev.bus_info, sizeof(cio2->media_dev.bus_info),
 		 "PCI:%s", pci_name(cio2->pci_dev));
-	cio2->media_dev.driver_version = KERNEL_VERSION(4, 11, 0);
+	cio2->media_dev.driver_version = LINUX_VERSION_CODE;
 	cio2->media_dev.hw_revision = 0;
 
 	r = media_device_register(&cio2->media_dev);
 	if (r < 0)
-		goto fail_mutex_destroy;
+		goto fail_vb2_dma_sg_cleanup_ctx;
 
 	cio2->v4l2_dev.mdev = &cio2->media_dev;
 	r = v4l2_device_register(&pci_dev->dev, &cio2->v4l2_dev);
 	if (r) {
 		dev_err(&pci_dev->dev,
 			"failed to register V4L2 device (%d)\n", r);
-		goto fail_mutex_destroy;
+		goto fail_media_device_unregister;
 	}
 
-	for (i = 0; i < CIO2_QUEUES; i++) {
-		r = cio2_queue_init(cio2, &cio2->queue[i]);
-		if (r)
-			goto fail;
-	}
+	r = cio2_queues_init(cio2);
+	if (r)
+		goto fail_v4l2_device_unregister;
 
 	r = cio2_fbpt_init_dummy(cio2);
 	if (r)
-		goto fail;
+		goto fail_cio2_queue_exit;
 
 	/* Register notifier for subdevices we care */
 	r = cio2_notifier_init(cio2);
 	if (r)
-		goto fail;
+		goto fail_cio2_fbpt_exit_dummy;
 
 	r = devm_request_irq(&pci_dev->dev, pci_dev->irq, cio2_irq,
 			     IRQF_SHARED, CIO2_NAME, cio2);
@@ -1739,13 +1765,16 @@ static int cio2_pci_probe(struct pci_dev *pci_dev,
 
 fail:
 	cio2_notifier_exit(cio2);
+fail_cio2_fbpt_exit_dummy:
 	cio2_fbpt_exit_dummy(cio2);
-	for (; i >= 0; i--)
-		cio2_queue_exit(cio2, &cio2->queue[i]);
+fail_cio2_queue_exit:
+	cio2_queues_exit(cio2);
+fail_v4l2_device_unregister:
 	v4l2_device_unregister(&cio2->v4l2_dev);
+fail_media_device_unregister:
 	media_device_unregister(&cio2->media_dev);
-	if (cio2->vb2_alloc_ctx && !IS_ERR(cio2->vb2_alloc_ctx))
-		vb2_dma_sg_cleanup_ctx(cio2->vb2_alloc_ctx);
+fail_vb2_dma_sg_cleanup_ctx:
+	vb2_dma_sg_cleanup_ctx(cio2->vb2_alloc_ctx);
 	cio2->vb2_alloc_ctx = NULL;
 fail_mutex_destroy:
 	mutex_destroy(&cio2->lock);
