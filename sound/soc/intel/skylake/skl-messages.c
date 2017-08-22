@@ -268,8 +268,10 @@ int skl_init_dsp(struct skl *skl)
 	}
 
 	ops = skl_get_dsp_ops(skl->pci->device);
-	if (!ops)
-		return -EIO;
+	if (!ops) {
+		goto unmap_mmio;
+		ret = -EIO;
+	}
 
 	loader_ops = ops->loader_ops();
 	ret = ops->init(bus->dev, mmio_base, irq,
@@ -277,11 +279,24 @@ int skl_init_dsp(struct skl *skl)
 				&skl->skl_sst);
 
 	if (ret < 0)
-		return ret;
+		goto unmap_mmio;
 
 	skl->skl_sst->dsp_ops = ops;
 	cores = &skl->skl_sst->cores;
 	cores->count = ops->num_cores;
+
+	cores->state = kcalloc(cores->count, sizeof(*cores->state), GFP_KERNEL);
+	if (!cores->state) {
+		ret = -ENOMEM;
+		goto unmap_mmio;
+	}
+
+	cores->usage_count = kcalloc(cores->count, sizeof(*cores->usage_count),
+				     GFP_KERNEL);
+	if (!cores->usage_count) {
+		ret = -ENOMEM;
+		goto free_core_state;
+	}
 
 	cores->state = kcalloc(cores->count, sizeof(*cores->state), GFP_KERNEL);
 	if (!cores->state)
@@ -296,6 +311,14 @@ int skl_init_dsp(struct skl *skl)
 
 	skl->skl_sst->dsp_ops = ops;
 	dev_dbg(bus->dev, "dsp registration status=%d\n", ret);
+
+	return 0;
+
+free_core_state:
+	kfree(cores->state);
+
+unmap_mmio:
+	iounmap(mmio_base);
 
 	return ret;
 }
