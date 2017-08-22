@@ -577,6 +577,12 @@ int bxt_sst_dsp_init(struct device *dev, void __iomem *mmio_base, int irq,
 	sst_dsp_mailbox_init(sst, (BXT_ADSP_SRAM0_BASE + SKL_ADSP_W0_STAT_SZ),
 			SKL_ADSP_W0_UP_SZ, BXT_ADSP_SRAM1_BASE, SKL_ADSP_W1_SZ);
 
+	ret = skl_ipc_init(dev, skl);
+	if (ret) {
+		skl_dsp_free(sst);
+		return ret;
+	}
+
 	/* set the D0i3 check */
 	skl = *dsp;
 	skl->ipc.ops.check_dsp_lp_on = skl_ipc_check_D0i0;
