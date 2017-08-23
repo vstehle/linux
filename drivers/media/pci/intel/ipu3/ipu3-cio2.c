@@ -1491,7 +1491,7 @@ int cio2_queue_init(struct cio2_device *cio2, struct cio2_queue *q)
 
 	/* Initialize vbq */
 	vbq->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	vbq->io_modes = VB2_USERPTR | VB2_MMAP;
+	vbq->io_modes = VB2_USERPTR | VB2_MMAP | VB2_DMABUF;
 	vbq->ops = &cio2_vb2_ops;
 	vbq->mem_ops = &vb2_dma_sg_memops;
 	vbq->buf_struct_size = sizeof(struct cio2_buffer);
