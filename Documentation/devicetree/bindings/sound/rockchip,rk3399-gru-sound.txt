@@ -2,7 +2,7 @@ ROCKCHIP with MAX98357A/RT5514/DA7219 codecs and DP via spdif on GRU boards
 
 Required properties:
 - compatible: "rockchip,rk3399-gru-sound"
-- rockchip,cpu: The phandle of the Rockchip I2S controller controller that's
+- rockchip,cpu: The phandle of the Rockchip I2S controller that's
   connected to the codecs
 - rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs and of the
   DP encoder node
