@@ -45,13 +45,11 @@ struct imgu_fw_param_memory_offsets {
 	struct {
 		struct imgu_fw_isp_parameter lin;	/* lin_vmem_params */
 		struct imgu_fw_isp_parameter tnr3;	/* tnr3_vmem_params */
-		struct imgu_fw_isp_parameter tnr3_1;	/* tnr3_1_vmem_params */
 		struct imgu_fw_isp_parameter xnr3;	/* xnr3_vmem_params */
 	} vmem;
 	struct {
 		struct imgu_fw_isp_parameter tnr;
 		struct imgu_fw_isp_parameter tnr3;	/* tnr3_params */
-		struct imgu_fw_isp_parameter tnr3_1;	/* tnr3_1_params */
 		struct imgu_fw_isp_parameter xnr3;	/* xnr3_params */
 		struct imgu_fw_isp_parameter plane_io_config;	/* 192 bytes */
 		struct imgu_fw_isp_parameter rgbir;	/* rgbir_params */
@@ -67,7 +65,6 @@ struct imgu_fw_config_memory_offsets {
 		struct imgu_fw_isp_parameter input_yuv;
 		struct imgu_fw_isp_parameter tnr;
 		struct imgu_fw_isp_parameter tnr3;
-		struct imgu_fw_isp_parameter tnr3_1;
 		struct imgu_fw_isp_parameter ref;
 	} dmem;
 };
@@ -76,7 +73,6 @@ struct imgu_fw_state_memory_offsets {
 	struct {
 		struct imgu_fw_isp_parameter tnr;
 		struct imgu_fw_isp_parameter tnr3;
-		struct imgu_fw_isp_parameter tnr3_1;
 		struct imgu_fw_isp_parameter ref;
 	} dmem;
 };

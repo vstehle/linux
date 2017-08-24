@@ -1006,7 +1006,6 @@ struct imgu_abi_binary_info {
 		u8 output;
 		u8 ref_frame;
 		u8 tnr;
-		u8 tnr3_1;
 		u8 xnr;
 		u8 params;
 		u8 ca_gdc;
