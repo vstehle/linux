@@ -728,7 +728,7 @@ int ipu3_v4l2_register(struct imgu_device *dev)
 		/* Initialize vbq */
 		vbq->type = node->output ?
 		    V4L2_BUF_TYPE_VIDEO_OUTPUT : V4L2_BUF_TYPE_VIDEO_CAPTURE;
-		vbq->io_modes = VB2_USERPTR | VB2_MMAP;
+		vbq->io_modes = VB2_USERPTR | VB2_MMAP | VB2_DMABUF;
 		vbq->ops = &ipu3_vb2_ops;
 		vbq->mem_ops = m2m2->vb2_mem_ops;
 		if (m2m2->buf_struct_size <= 0)
