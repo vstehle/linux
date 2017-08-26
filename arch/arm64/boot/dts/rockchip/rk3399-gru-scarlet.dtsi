@@ -213,6 +213,11 @@ pp900_emmcpll: &pp900_s3 {
 	};
 };
 
+&cdn_dp {
+	extcon = <&usbc_extcon0>;
+	phys = <&tcphy0_dp>;
+};
+
 &cros_ec {
 	interrupt-parent = <&gpio1>;
 	interrupts = <18 IRQ_TYPE_LEVEL_LOW>;
