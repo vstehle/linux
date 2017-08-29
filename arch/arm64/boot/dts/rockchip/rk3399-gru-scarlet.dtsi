@@ -412,18 +412,22 @@ pp1800_pcie: &pp1800_s0 {
 		&wlan_pd_1v8_l	/* Drive this low ASAP */
 		&wlan_rf_kill_1v8_l
 	>;
+};
 
-	/* Default pull-up, but just to be clear */
-	bt_rf_kill_1v8_l: bt-rf-kill-1v8-l {
-		rockchip,pins = <0 8 RK_FUNC_GPIO &pcfg_pull_up>;
-	};
-
+&discrete_regulators {
 	ppvarp_lcd_en: ppvarp-lcd-en {
 		rockchip,pins = <4 27 RK_FUNC_GPIO &pcfg_pull_none>;
 	};
 
 	ppvarn_lcd_en: ppvarn-lcd-en {
 		rockchip,pins = <4 28 RK_FUNC_GPIO &pcfg_pull_none>;
+	};
+};
+
+&wifi {
+	/* Default pull-up, but just to be clear */
+	bt_rf_kill_1v8_l: bt-rf-kill-1v8-l {
+		rockchip,pins = <0 8 RK_FUNC_GPIO &pcfg_pull_up>;
 	};
 
 	wlan_pd_1v8_l: wlan-pd-1v8-l {
