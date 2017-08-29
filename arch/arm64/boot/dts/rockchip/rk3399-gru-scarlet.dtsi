@@ -62,42 +62,6 @@
 		vin-supply = <&ppvar_sys>;
 	};
 
-	/* pp1800 children, sorted by name */
-	pp900_s3: pp900-s3 {
-		compatible = "regulator-fixed";
-		regulator-name = "pp900_s3";
-
-		/* EC turns on w/ pp900_s3_en; always on for AP */
-		regulator-always-on;
-		regulator-boot-on;
-
-		regulator-min-microvolt = <900000>;
-		regulator-max-microvolt = <900000>;
-
-		vin-supply = <&pp1800>;
-	};
-
-	/* EC turns on pp1800_s3_en */
-	pp1800_s3: pp1800 {
-	};
-
-	/* EC turns on pp3300_s3_en */
-	pp3300_s3: pp3300{
-	};
-
-	/* MISC */
-	backlight: backlight {
-		compatible = "pwm-backlight";
-		brightness-levels-scale = <0x10000>;
-		default-brightness-level = <0x828f>; /* arbitrary, ~51% */
-		enable-gpios = <&gpio4 21 GPIO_ACTIVE_HIGH>;
-		backlight-boot-off;
-		pinctrl-names = "default";
-		pinctrl-0 = <&bl_en>;
-		pwms = <&pwm1 0 1000000 0>;
-		pwm-delay-us = <10000>;
-	};
-
 	ppvarn_lcd: ppvarn-lcd {
 		compatible = "regulator-fixed";
 		regulator-name = "ppvarn_lcd";
@@ -120,6 +84,44 @@
 
 		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
 		vin-supply = <&ppvar_sys>;
+	};
+
+	/* pp1800 children, sorted by name */
+	pp900_s3: pp900-s3 {
+		compatible = "regulator-fixed";
+		regulator-name = "pp900_s3";
+
+		/* EC turns on w/ pp900_s3_en; always on for AP */
+		regulator-always-on;
+		regulator-boot-on;
+
+		regulator-min-microvolt = <900000>;
+		regulator-max-microvolt = <900000>;
+
+		vin-supply = <&pp1800>;
+	};
+
+	/* EC turns on pp1800_s3_en */
+	pp1800_s3: pp1800 {
+	};
+
+	/* EC turns on pp3300_s3_en */
+	pp3300_s3: pp3300 {
+	};
+
+	/* END REGULATORS */
+
+	/* MISC */
+	backlight: backlight {
+		compatible = "pwm-backlight";
+		brightness-levels-scale = <0x10000>;
+		default-brightness-level = <0x828f>; /* arbitrary, ~51% */
+		enable-gpios = <&gpio4 21 GPIO_ACTIVE_HIGH>;
+		backlight-boot-off;
+		pinctrl-names = "default";
+		pinctrl-0 = <&bl_en>;
+		pwms = <&pwm1 0 1000000 0>;
+		pwm-delay-us = <10000>;
 	};
 };
 
