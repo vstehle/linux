@@ -120,11 +120,35 @@ static const struct pmc_bit_map spt_pfear_map[] = {
 	{},
 };
 
+static const struct pmc_bit_map spt_pm1_en_sts_map[] = {
+	{"Power Button",		SPT_PMC_BIT_PWRBTN_STS},
+	{"RTC",				SPT_PMC_BIT_RTC_STS},
+	{"PCI Express Wake",		SPT_PMC_BIT_PCIEXP_WAKE_STS},
+	{},
+};
+
+static const struct pmc_bit_map spt_gpe0_sts_map[] = {
+	{"Hot Plug",			BIT(1)},
+	{"Software GPE",		BIT(2)},
+	{"TCO SCI",			BIT(6)},
+	{"SMBus Wake",			BIT(7)},
+	{"PCI Express",			BIT(9)},
+	{"Battery Low",			BIT(10)},
+	{"PME",				BIT(11)},
+	{"PME Bus 0",			BIT(13)},
+	{"GPIO Tier2",			BIT(15)},
+	{"LAN_Wake#",			BIT(16)},
+	{"WADT",			BIT(18)},
+	{},
+};
+
 static const struct pmc_reg_map spt_reg_map = {
 	.pfear_sts = spt_pfear_map,
 	.mphy_sts = spt_mphy_map,
 	.pll_sts = spt_pll_map,
 	.msr_sts = msr_map,
+	.pm1_en_sts = spt_pm1_en_sts_map,
+	.gpe0_sts = spt_gpe0_sts_map,
 };
 
 static const struct pci_device_id pmc_pci_ids[] = {
@@ -507,6 +531,53 @@ static void pmc_core_dbgfs_unregister(struct pmc_dev *pmcdev)
 	debugfs_remove_recursive(pmcdev->dbgfs_dir);
 }
 
+static int pmc_core_wake_source_show(struct seq_file *s, void *unused)
+{
+	int index, reg_index, bit_index;
+	struct pmc_dev *pmcdev = s->private;
+	const struct pmc_bit_map *map1 = pmcdev->map->pm1_en_sts;
+	const struct pmc_bit_map *map2 = pmcdev->map->gpe0_sts;
+
+	for (index = 0; map1[index].name; index++)
+		if (map1[index].bit_mask & pmc.pm1_en_sts_val)
+			seq_printf(s, "%s ", map1[index].name);
+
+	/* Generic GPE0_STS[95:0] wake mapping */
+	for (reg_index = 0;
+	     reg_index < SPT_PMC_GPE0_127_96_REG_INDEX &&
+				pmc.gpe0_sts_val[reg_index];
+	     reg_index++) {
+		unsigned long data = pmc.gpe0_sts_val[reg_index];
+
+		for_each_set_bit(bit_index, &data, 32)
+			seq_printf(s,
+				   "GPE0[%d] ",
+				   (reg_index * 32 + bit_index));
+	}
+
+	/* GPE0_STS_127_96 has specific mapping */
+	for (index = 0; map2[index].name; index++)
+		if (map2[index].bit_mask &
+		    pmc.gpe0_sts_val[SPT_PMC_GPE0_127_96_REG_INDEX])
+			seq_printf(s, "%s ", map2[index].name);
+
+	seq_puts(s, "\n");
+
+	return 0;
+}
+
+static int pmc_core_wake_source_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, pmc_core_wake_source_show, inode->i_private);
+}
+
+static const struct file_operations pmc_core_wake_source_ops = {
+	.open           = pmc_core_wake_source_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
 static int pmc_core_dbgfs_register(struct pmc_dev *pmcdev)
 {
 	struct dentry *dir, *file;
@@ -549,6 +620,13 @@ static int pmc_core_dbgfs_register(struct pmc_dev *pmcdev)
 	file = debugfs_create_file("package_cstate_residency",
 				   S_IFREG | S_IRUGO, dir, pmcdev,
 				   &pmc_core_pkgc_ops);
+
+	if (!file)
+		goto err;
+
+	file = debugfs_create_file("sleep_wake_source",
+				   S_IFREG | S_IRUGO, dir, pmcdev,
+				   &pmc_core_wake_source_ops);
 
 	if (!file)
 		goto err;
@@ -619,6 +697,24 @@ static int pmc_core_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		return -ENOMEM;
 	}
 
+	err = pci_read_config_dword(dev,
+				    SPT_PMC_IO_ADDR_OFFSET,
+				    &pmcdev->io_addr);
+	if (err) {
+		dev_dbg(&dev->dev, "PMC Core: failed to read PCI config space.\n");
+		return pcibios_err_to_errno(err);
+	}
+	pmcdev->io_addr &= PMC_IO_ADDR_MASK;
+	dev_dbg(&dev->dev, "PMC Core: PMC IO BASE is %#x\n", pmcdev->io_addr);
+
+	pmcdev->iobase = devm_ioport_map(ptr_dev,
+					      pmcdev->io_addr,
+					      SPT_PMC_IO_REG_LEN);
+	if (!pmcdev->iobase) {
+		dev_dbg(&dev->dev, "PMC Core: ioport remap failed.\n");
+		return -ENOMEM;
+	}
+
 	mutex_init(&pmcdev->lock);
 	pmcdev->pmc_xram_read_bit = pmc_core_check_read_lock_bit();
 	pmcdev->map = map;
@@ -628,13 +724,80 @@ static int pmc_core_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		dev_warn(&dev->dev, "PMC Core: debugfs register failed.\n");
 
 	pmc.has_slp_s0_res = true;
+
 	return 0;
 }
+
+static void pmc_read_wake_source(void)
+{
+	int i;
+	struct pmc_dev *pmcdev = &pmc;
+	u32 gpe0_en[SPT_PMC_GPE0_REG_LEN];
+
+	/*
+	 * Qualify PM1_EN_STS wake status bits with enable bits
+	 * PM1_EN_STS[15:0] contains wake status bits
+	 * PM1_EN_STS[31:16] contains corresponding enable bits
+	 *
+	 * Exception: Power button cannot be disabled, check PWRBTN_STS
+	 * irrespective of the enable bit.
+	 */
+	pmc.pm1_en_sts_val = ioread32(pmcdev->iobase +
+					SPT_PMC_PM1_EN_STS_OFFSET);
+	pmc.pm1_en_sts_val &= (pmc.pm1_en_sts_val >> 16) |
+					SPT_PMC_BIT_PWRBTN_STS;
+
+	/*
+	 * Qualify GPE0_STS wake status bits with corresponding GPE0_EN
+	 * enable bits
+	 *
+	 * Exception: SMB_WAK (bit7) is always enabled for wake
+	 */
+	for (i = 0; i < SPT_PMC_GPE0_REG_LEN; i++)
+		gpe0_en[i] = ioread32(pmcdev->iobase + SPT_PMC_GPE0_EN_OFFSET +
+					4 * i);
+	gpe0_en[SPT_PMC_GPE0_127_96_REG_INDEX] |= SPT_PMC_BIT_SMB_WAKE_STS;
+
+	for (i = 0; i < SPT_PMC_GPE0_REG_LEN; i++) {
+		pmc.gpe0_sts_val[i] = ioread32(pmcdev->iobase +
+					SPT_PMC_GPE0_STS_OFFSET + 4 * i);
+		pmc.gpe0_sts_val[i] &= gpe0_en[i];
+	}
+}
+
+#ifdef CONFIG_PM_SLEEP
+static int pmc_suspend_noirq(struct device *dev)
+{
+	/* Do nothing */
+	return 0;
+}
+
+static int pmc_resume_noirq(struct device *dev)
+{
+	/*
+	 * Do nothing, but read the PM STS & GPE STS registers for later
+	 * These are used to report the wake source in debugfs
+	 */
+	pmc_read_wake_source();
+	return 0;
+}
+
+static const struct dev_pm_ops pmc_dev_pm_ops = {
+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(pmc_suspend_noirq, pmc_resume_noirq)
+};
+
+#define PMC_DEV_PM_OPS		(&pmc_dev_pm_ops)
+#else
+#define PMC_DEV_PM_OPS		NULL
+#endif /* CONFIG_PM_SLEEP */
 
 static struct pci_driver intel_pmc_core_driver = {
 	.name = "intel_pmc_core",
 	.id_table = pmc_pci_ids,
 	.probe = pmc_core_probe,
+	.driver = {
+		.pm = PMC_DEV_PM_OPS,
+	},
 };
 
 builtin_pci_driver(intel_pmc_core_driver);

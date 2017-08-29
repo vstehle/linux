@@ -24,7 +24,20 @@
 /* Sunrise Point Power Management Controller PCI Device ID */
 #define SPT_PMC_PCI_DEVICE_ID			0x9d21
 
+/* PCI Device non-standard MMIO & IO resouce BAR register offset */
+#define SPT_PMC_IO_ADDR_OFFSET			0x40
 #define SPT_PMC_BASE_ADDR_OFFSET		0x48
+
+/* IO space registers */
+#define SPT_PMC_PM1_EN_STS_OFFSET		0x00
+#define SPT_PMC_GPE0_STS_OFFSET			0x80
+#define SPT_PMC_GPE0_EN_OFFSET			0x90
+#define SPT_PMC_GPE0_STS_127_96_OFFSET		0x8c
+#define SPT_PMC_GPE0_EN_127_96_OFFSET		0x9c
+
+#define SPT_PMC_GPE0_127_96_REG_INDEX		0x03
+#define SPT_PMC_GPE0_REG_LEN			0x04
+
 #define SPT_PMC_SLP_S0_RES_COUNTER_OFFSET	0x13c
 #define SPT_PMC_PM_CFG_OFFSET			0x18
 #define SPT_PMC_PM_STS_OFFSET			0x1c
@@ -35,8 +48,10 @@
 #define SPT_PMC_MPHY_CORE_STS_1			0x1142
 #define SPT_PMC_MPHY_COM_STS_0			0x1155
 #define SPT_PMC_MMIO_REG_LEN			0x1000
+#define SPT_PMC_IO_REG_LEN			0x100
 #define SPT_PMC_SLP_S0_RES_COUNTER_STEP		0x64
 #define PMC_BASE_ADDR_MASK			~(SPT_PMC_MMIO_REG_LEN - 1)
+#define PMC_IO_ADDR_MASK			GENMASK_ULL(31, 8)
 #define MTPMC_MASK				0xffff0000
 #define NUM_ENTRIES				5
 #define SPT_PMC_READ_DISABLE_BIT		0x16
@@ -121,6 +136,19 @@ enum ppfear_regs {
 #define SPT_PMC_BIT_MPHY_CMN_LANE2		BIT(2)
 #define SPT_PMC_BIT_MPHY_CMN_LANE3		BIT(3)
 
+/* PM1_EN_STS register bit definitions */
+#define SPT_PMC_BIT_TMROF_STS			BIT(0)
+#define SPT_PMC_BIT_BM_STS			BIT(4)
+#define SPT_PMC_BIT_GBL_STS			BIT(5)
+#define SPT_PMC_BIT_PWRBTN_STS			BIT(8)
+#define SPT_PMC_BIT_RTC_STS			BIT(10)
+#define SPT_PMC_BIT_PWRBTNOR_STS		BIT(11)
+#define SPT_PMC_BIT_PCIEXP_WAKE_STS		BIT(14)
+#define SPT_PMC_BIT_WAKE_STS			BIT(15)
+
+/* GPE0_STS register bit definitions */
+#define SPT_PMC_BIT_SMB_WAKE_STS		BIT(7)
+
 struct pmc_bit_map {
 	const char *name;
 	u32 bit_mask;
@@ -131,6 +159,8 @@ struct pmc_reg_map {
 	const struct pmc_bit_map *mphy_sts;
 	const struct pmc_bit_map *pll_sts;
 	const struct pmc_bit_map *msr_sts;
+	const struct pmc_bit_map *pm1_en_sts;
+	const struct pmc_bit_map *gpe0_sts;
 };
 
 /**
@@ -141,12 +171,19 @@ struct pmc_reg_map {
  * @feature_available:	flag to indicate whether
  *			the feature is available
  *			on a particular platform or not.
- *
+ * pm1_en_sts_val	pm1_en_sts register value, read during
+ *			resume_early(), used to report wake source
+ *			in debugfs
+ * gpe0_sts_val		gpe0_sts_val register value, read during
+ *			resume_early(), used to report wake source
+ *			in debugfs
  * pmc_dev contains info about power management controller device.
  */
 struct pmc_dev {
 	u32 base_addr;
 	void __iomem *regbase;
+	u32 io_addr;
+	void __iomem *iobase;
 	const struct pmc_reg_map *map;
 #if IS_ENABLED(CONFIG_DEBUG_FS)
 	struct dentry *dbgfs_dir;
@@ -154,6 +191,8 @@ struct pmc_dev {
 	bool has_slp_s0_res;
 	int pmc_xram_read_bit;
 	struct mutex lock; /* generic mutex lock for PMC Core */
+	u32 pm1_en_sts_val;
+	u32 gpe0_sts_val[4];
 };
 
 #endif /* PMC_CORE_H */
