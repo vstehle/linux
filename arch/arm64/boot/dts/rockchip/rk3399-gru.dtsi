@@ -1254,7 +1254,7 @@ ap_i2c_audio: &i2c8 {
 		};
 	};
 
-	wifi {
+	wifi: wifi {
 		wifi_perst_l: wifi-perst-l {
 			rockchip,pins = <2 27 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
