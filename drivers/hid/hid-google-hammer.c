@@ -92,8 +92,10 @@ static int hammer_input_configured(struct hid_device *hdev,
 }
 
 static const struct hid_device_id hammer_devices[] = {
-	{ HID_USB_DEVICE(USB_VENDOR_ID_GOOGLE, USB_DEVICE_ID_GOOGLE_HAMMER) },
-	{ HID_USB_DEVICE(USB_VENDOR_ID_GOOGLE, USB_DEVICE_ID_GOOGLE_STAFF) },
+	{ HID_DEVICE(BUS_USB, HID_GROUP_GENERIC_OVERRIDE,
+		     USB_VENDOR_ID_GOOGLE, USB_DEVICE_ID_GOOGLE_HAMMER) },
+	{ HID_DEVICE(BUS_USB, HID_GROUP_GENERIC_OVERRIDE,
+		     USB_VENDOR_ID_GOOGLE, USB_DEVICE_ID_GOOGLE_STAFF) },
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, hammer_devices);
