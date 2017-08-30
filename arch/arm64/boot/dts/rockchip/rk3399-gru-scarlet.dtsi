@@ -138,6 +138,14 @@
 		pwms = <&pwm1 0 1000000 0>;
 		pwm-delay-us = <10000>;
 	};
+
+	dmic: dmic {
+		compatible = "dmic-codec";
+		pinctrl-names = "default";
+		pinctrl-0 = <&dmic_en>;
+
+		dmicen-gpios = <&gpio4 3 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 /* REGULATOR OVERRIDES (node deletions first) */
@@ -299,12 +307,8 @@ pp1800_pcie: &pp1800_s0 {
 	cd-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
 };
 
-/*
- * Override list to remove &headsetcodec from rockchip,codec list since
- * there's no rt5514.
- */
 &sound {
-	rockchip,codec = <&max98357a &codec &cdn_dp>;
+	rockchip,codec = <&max98357a &dmic &codec &cdn_dp>;
 };
 
 &spi2 {
@@ -412,6 +416,10 @@ pp1800_pcie: &pp1800_s0 {
 		&wlan_pd_1v8_l	/* Drive this low ASAP */
 		&wlan_rf_kill_1v8_l
 	>;
+
+	dmic_en: dmic-en {
+		rockchip,pins = <4 3 RK_FUNC_GPIO &pcfg_pull_none>;
+	};
 };
 
 &discrete_regulators {
