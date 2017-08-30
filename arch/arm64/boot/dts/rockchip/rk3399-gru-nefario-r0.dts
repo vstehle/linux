@@ -107,6 +107,10 @@
 		pwm-delay-us = <10000>;
 	};
 
+	dmic: dmic {
+		compatible = "dmic-codec";
+	};
+
 	edp_panel: edp-panel {
 		compatible = "hack,nefario-rev0";
 		backlight = <&backlight>;
@@ -239,12 +243,8 @@ ap_i2c_ts: &i2c3 {
 	status = "disabled";
 };
 
-/*
- * Override list to remove &headsetcodec from rockchip,codec list since
- * there's no rt5514.
- */
 &sound {
-	rockchip,codec = <&max98357a &codec &cdn_dp>;
+	rockchip,codec = <&max98357a &dmic &codec &cdn_dp>;
 };
 
 &spi0 {
