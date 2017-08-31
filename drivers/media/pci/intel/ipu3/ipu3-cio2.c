@@ -561,9 +561,10 @@ static void cio2_buffer_done(struct cio2_device *cio2, unsigned int dma_chan)
 			b->vbb.flags = V4L2_BUF_FLAG_DONE;
 			b->vbb.field = V4L2_FIELD_NONE;
 			memset(&b->vbb.timecode, 0, sizeof(b->vbb.timecode));
-			b->vbb.sequence = entry[0].first_entry.frame_num;
+			b->vbb.sequence = atomic_read(&q->frame_sequence);
 			vb2_buffer_done(&b->vbb.vb2_buf, VB2_BUF_STATE_DONE);
 		}
+		atomic_inc(&q->frame_sequence);
 		cio2_fbpt_entry_init_dummy(cio2, entry);
 		q->bufs_first = (q->bufs_first + 1) % CIO2_MAX_BUFFERS;
 		buffers_found++;
@@ -580,7 +581,7 @@ static void cio2_queue_event_sof(struct cio2_device *cio2, struct cio2_queue *q)
 	struct v4l2_event event = {
 		.type = V4L2_EVENT_FRAME_SYNC,
 		.u.frame_sync.frame_sequence =
-			atomic_inc_return(&q->frame_sequence) - 1,
+			atomic_read(&q->frame_sequence),
 	};
 	v4l2_event_queue(q->subdev.devnode, &event);
 }
