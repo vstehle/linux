@@ -204,6 +204,8 @@ int ipu3_css_buf_queue(struct ipu3_css *css, struct ipu3_css_buffer *b);
 struct ipu3_css_buffer *ipu3_css_buf_dequeue(struct ipu3_css *css);
 int ipu3_css_start_streaming(struct ipu3_css *css);
 void ipu3_css_stop_streaming(struct ipu3_css *css);
+bool ipu3_css_queue_empty(struct ipu3_css *css);
+bool ipu3_css_is_streaming(struct ipu3_css *css);
 
 /******************* css hw *******************/
 int ipu3_css_set_powerup(struct device *dev, void __iomem *base);

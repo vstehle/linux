@@ -167,11 +167,17 @@ struct imgu_device {
 	 * m2m2_buf.list and css->queue
 	 */
 	struct mutex lock;
+	/* Forbit streaming and buffer queuing during system suspend. */
+	struct mutex qbuf_lock;
 	struct {
 		struct v4l2_rect eff; /* effective resolution */
 		struct v4l2_rect bds; /* bayer-domain scaled resolution*/
 		struct v4l2_rect gdc; /* gdc output resolution */
 	} rect;
+	/* Indicate if system suspend take place while imgu is streaming. */
+	bool suspend_in_stream;
+	/* Used to wait for FW buffer queue drain. */
+	wait_queue_head_t buf_drain_wq;
 };
 
 int imgu_node_to_queue(int node);

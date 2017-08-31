@@ -213,6 +213,9 @@ int imgu_queue_buffers(struct imgu_device *imgu, bool initial)
 	int r = 0;
 	struct imgu_buffer *ibuf;
 
+	if (!ipu3_css_is_streaming(&imgu->css))
+		return 0;
+
 	mutex_lock(&imgu->lock);
 
 	/* Buffer set is queued to FW only when input buffer is ready */
@@ -296,6 +299,17 @@ failed:
 	}
 
 	return r;
+}
+
+static bool imgu_buffer_drain(struct imgu_device *imgu)
+{
+	bool drain;
+
+	mutex_lock(&imgu->lock);
+	drain = ipu3_css_queue_empty(&imgu->css);
+	mutex_unlock(&imgu->lock);
+
+	return drain;
 }
 
 static int imgu_powerup(struct imgu_device *imgu)
@@ -588,10 +602,23 @@ static irqreturn_t imgu_isr_threaded(int irq, void *imgu_ptr)
 				ipu3_css_buf_state(&buf->css_buf) ==
 				IPU3_CSS_BUFFER_DONE ?
 				VB2_BUF_STATE_DONE : VB2_BUF_STATE_ERROR);
+		mutex_lock(&imgu->lock);
+		if (ipu3_css_queue_empty(&imgu->css))
+			wake_up_all(&imgu->buf_drain_wq);
+		mutex_unlock(&imgu->lock);
 	} while (1);
 
-	/* Try to queue more buffers for CSS */
-	imgu_queue_buffers(imgu, false);
+	/*
+	 * Try to queue more buffers for CSS.
+	 * qbuf_lock is used to disable new buffers
+	 * to be queued to CSS. mutex_trylock is used
+	 * to avoid blocking irq thread processing
+	 * remaining buffers.
+	 */
+	if (mutex_trylock(&imgu->qbuf_lock)) {
+		imgu_queue_buffers(imgu, false);
+		mutex_unlock(&imgu->qbuf_lock);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -738,6 +765,8 @@ static int imgu_pci_probe(struct pci_dev *pci_dev,
 		return r;
 
 	mutex_init(&imgu->lock);
+	mutex_init(&imgu->qbuf_lock);
+	init_waitqueue_head(&imgu->buf_drain_wq);
 
 	r = imgu_dma_dev_init(imgu);
 	if (r) {
@@ -831,6 +860,68 @@ static void imgu_pci_remove(struct pci_dev *pci_dev)
 	imgu_dma_dev_exit(imgu);
 	ipu3_mmu_exit(imgu->mmu);
 	mutex_destroy(&imgu->lock);
+	mutex_destroy(&imgu->qbuf_lock);
+}
+
+static int __maybe_unused imgu_suspend(struct device *dev)
+{
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	struct imgu_device *imgu = pci_get_drvdata(pci_dev);
+
+	dev_dbg(dev, "enter imgu_suspend.\n");
+	imgu->suspend_in_stream = ipu3_css_is_streaming(&imgu->css);
+	if (!imgu->suspend_in_stream)
+		goto out;
+	/* Block new buffers to be queued to CSS. */
+	mutex_lock(&imgu->qbuf_lock);
+	/* Wait until all buffers in CSS are done. */
+	if (!wait_event_timeout(imgu->buf_drain_wq,
+		imgu_buffer_drain(imgu), msecs_to_jiffies(1000)))
+		dev_err(dev, "wait buffer drain timeout.\n");
+
+	ipu3_css_stop_streaming(&imgu->css);
+	synchronize_irq(pci_dev->irq);
+	mutex_unlock(&imgu->qbuf_lock);
+	imgu_powerdown(imgu);
+	pm_runtime_force_suspend(dev);
+out:
+	dev_dbg(dev, "leave imgu_suspend\n");
+	return 0;
+}
+
+static int __maybe_unused imgu_resume(struct device *dev)
+{
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	struct imgu_device *imgu = pci_get_drvdata(pci_dev);
+	int r = 0;
+
+	dev_dbg(dev, "enter imgu_resume\n");
+
+	if (!imgu->suspend_in_stream)
+		goto out;
+
+	pm_runtime_force_resume(dev);
+
+	r = imgu_powerup(imgu);
+	if (r) {
+		dev_err(dev, "failed to power up imgu\n");
+		goto out;
+	}
+
+	/* Start CSS streaming */
+	r = ipu3_css_start_streaming(&imgu->css);
+	if (r) {
+		dev_err(dev, "failed to resume css streaming (%d)", r);
+		goto out;
+	}
+
+	r = imgu_queue_buffers(imgu, true);
+	if (r)
+		dev_err(dev, "failed to queue buffers (%d)", r);
+out:
+	dev_dbg(dev, "leave imgu_resume\n");
+
+	return r;
 }
 
 /*
@@ -844,6 +935,7 @@ static int imgu_rpm_dummy_cb(struct device *dev)
 
 static const struct dev_pm_ops imgu_pm_ops = {
 	SET_RUNTIME_PM_OPS(&imgu_rpm_dummy_cb, &imgu_rpm_dummy_cb, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(&imgu_suspend, &imgu_resume)
 };
 
 static const struct pci_device_id imgu_pci_tbl[] = {

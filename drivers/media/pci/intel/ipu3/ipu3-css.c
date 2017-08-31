@@ -1269,6 +1269,9 @@ void ipu3_css_stop_streaming(struct ipu3_css *css)
 	struct ipu3_css_buffer *b, *b0;
 	int q;
 
+	if (!css->streaming)
+		return;
+
 	ipu3_css_hw_cleanup(css);
 
 	ipu3_css_pipeline_cleanup(css);
@@ -1280,6 +1283,21 @@ void ipu3_css_stop_streaming(struct ipu3_css *css)
 		}
 
 	css->streaming = false;
+}
+
+bool ipu3_css_queue_empty(struct ipu3_css *css)
+{
+	int q;
+
+	for (q = 0; q < IPU3_CSS_QUEUES; q++)
+		if (!list_empty(&css->queue[q].bufs))
+			return false;
+	return true;
+}
+
+bool ipu3_css_is_streaming(struct ipu3_css *css)
+{
+	return css->streaming;
 }
 
 /* Free binary-specific resources which were allocated in ipu3_css_fmt_set */
