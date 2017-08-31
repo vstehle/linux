@@ -221,9 +221,16 @@ fail:
 
 void kbase_sync_signal_fence(struct dma_fence *fence, int result)
 {
-	if (result < 0)
-		dma_fence_set_error(fence, result);
-	dma_fence_signal(fence);
+	unsigned long flags;
+
+	spin_lock_irqsave(fence->lock, flags);
+
+	if (dma_fence_get_status_locked(fence) == 0) {
+		if (result < 0)
+			dma_fence_set_error(fence, result);
+		dma_fence_signal_locked(fence);
+	}
+	spin_unlock_irqrestore(fence->lock, flags);
 }
 
 #endif				/* CONFIG_SW_SYNC */
