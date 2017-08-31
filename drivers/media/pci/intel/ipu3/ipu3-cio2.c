@@ -194,6 +194,51 @@ static int cio2_fbpt_init(struct cio2_device *cio2, struct cio2_queue *q)
 	return 0;
 }
 
+static int cio2_fbpt_rearrange(struct cio2_device *cio2, struct cio2_queue *q)
+{
+	struct cio2_fbpt_entry *fbpt_temp = vmalloc(CIO2_FBPT_SIZE);
+	int i, j;
+	int size, entries;
+	struct cio2_buffer *bufs[CIO2_MAX_BUFFERS];
+
+	if (!fbpt_temp) {
+		dev_err(&cio2->pci_dev->dev, "Out of memory.\n");
+		return -ENOMEM;
+	}
+
+	for (i = 0, j = q->bufs_first; i < CIO2_MAX_BUFFERS;
+		i++, j = (j + 1) % CIO2_MAX_BUFFERS)
+		if (q->bufs[j])
+			break;
+
+	if (i == CIO2_MAX_BUFFERS)
+		return 0;
+
+	entries = (CIO2_MAX_BUFFERS - j) * CIO2_MAX_LOPS;
+	size = entries * sizeof(struct cio2_fbpt_entry);
+
+	memcpy(fbpt_temp, q->fbpt + j * CIO2_MAX_LOPS, size);
+	memcpy(fbpt_temp + entries, q->fbpt, CIO2_FBPT_SIZE - size);
+	memcpy(q->fbpt, fbpt_temp, CIO2_FBPT_SIZE);
+	memcpy(bufs, q->bufs + j, (CIO2_MAX_BUFFERS - j) * sizeof(*bufs));
+	memcpy(bufs + CIO2_MAX_BUFFERS - j, q->bufs, j * sizeof(*bufs));
+	memcpy(q->bufs, bufs, CIO2_MAX_BUFFERS * sizeof(*bufs));
+
+	/*
+	 * DMA clears the valid bit when accessing the buffer.
+	 * When stopping stream in suspend callback, some of the buffers
+	 * may be in invalid state. After resume, when DMA meets the inavlid
+	 * buffer, it will halt and stop receiving new data.
+	 * To avoid DMA halting, set the valid bit for all buffers in FBPT.
+	 */
+	for (i = 0; i < CIO2_MAX_BUFFERS; i++)
+		cio2_fbpt_entry_enable(cio2, q->fbpt + i * CIO2_MAX_LOPS);
+
+	vfree(fbpt_temp);
+
+	return 0;
+}
+
 static void cio2_fbpt_exit(struct cio2_queue *q, struct device *dev)
 {
 	dma_free_coherent(dev, CIO2_FBPT_SIZE, q->fbpt, q->fbpt_bus_addr);
@@ -953,6 +998,7 @@ static int cio2_vb2_start_streaming(struct vb2_queue *vq, unsigned int count)
 	if (r)
 		goto fail_sensor_subdev;
 
+	cio2->streaming = true;
 	return 0;
 
 fail_sensor_subdev:
@@ -986,6 +1032,7 @@ static void cio2_vb2_stop_streaming(struct vb2_queue *vq)
 	cio2_vb2_return_all_buffers(q, VB2_BUF_STATE_ERROR);
 	media_entity_pipeline_stop(&q->vdev.entity);
 	pm_runtime_put(&cio2->pci_dev->dev);
+	cio2->streaming = false;
 }
 
 static const struct vb2_ops cio2_vb2_ops = {
@@ -1759,9 +1806,57 @@ static int cio2_runtime_resume(struct device *dev)
 	return 0;
 }
 
+static int cio2_suspend(struct device *dev)
+{
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	struct cio2_device *cio2 = pci_get_drvdata(pci_dev);
+	struct cio2_queue *q = cio2->cur_queue;
+
+	dev_dbg(dev, "cio2 suspend\n");
+	if (!cio2->streaming)
+		return 0;
+
+	/* Stop stream */
+	cio2_hw_exit(cio2, q);
+	pm_runtime_force_suspend(dev);
+	return 0;
+}
+
+static int cio2_resume(struct device *dev)
+{
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	struct cio2_device *cio2 = pci_get_drvdata(pci_dev);
+	int r = 0;
+	struct cio2_queue *q = cio2->cur_queue;
+
+	dev_dbg(dev, "cio2 resume\n");
+	if (!cio2->streaming)
+		return 0;
+	/* Start stream */
+	r = pm_runtime_force_resume(&cio2->pci_dev->dev);
+	if (r < 0) {
+		dev_err(&cio2->pci_dev->dev,
+			"failed to set power %d\n", r);
+		return r;
+	}
+
+	r = cio2_fbpt_rearrange(cio2, q);
+	if (r)
+		return r;
+
+	q->bufs_first = 0;
+	q->bufs_next = 0;
+	r = cio2_hw_init(cio2, q);
+	if (r)
+		dev_err(dev, "fail to init cio2 hw\n");
+
+	return r;
+}
+
 static const struct dev_pm_ops cio2_pm_ops = {
 	SET_RUNTIME_PM_OPS(&cio2_runtime_suspend,
 		&cio2_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(&cio2_suspend, &cio2_resume)
 };
 
 static const struct pci_device_id cio2_pci_id_table[] = {

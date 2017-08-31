@@ -347,6 +347,7 @@ struct cio2_device {
 	/* mutex to be used by video_device */
 	struct mutex lock;
 	void *vb2_alloc_ctx;
+	bool streaming;
 
 	struct v4l2_async_notifier notifier;
 	struct v4l2_async_subdev *async_subdevs[CIO2_MAX_SUBDEVS];
