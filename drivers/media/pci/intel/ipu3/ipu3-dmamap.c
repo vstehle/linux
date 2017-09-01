@@ -149,80 +149,27 @@ static int ipu3_dmamap_get_sgtable(struct device *dev, struct sg_table *sgt,
 					 GFP_KERNEL);
 }
 
-static void ipu3_dmamap_sync_single_for_cpu(struct device *dev,
-					dma_addr_t dev_addr, size_t size,
-					enum dma_data_direction dir)
-{
-	phys_addr_t phys;
-
-	phys = iommu_iova_to_phys(iommu_get_domain_for_dev(dev), dev_addr);
-	clflush_cache_range(phys_to_virt(phys), size);
-}
-
-static void ipu3_dmamap_sync_single_for_device(struct device *dev,
-					   dma_addr_t dev_addr, size_t size,
-					   enum dma_data_direction dir)
-{
-	phys_addr_t phys;
-
-	phys = iommu_iova_to_phys(iommu_get_domain_for_dev(dev), dev_addr);
-	clflush_cache_range(phys_to_virt(phys), size);
-}
-
 static dma_addr_t ipu3_dmamap_map_page(struct device *dev, struct page *page,
 				   unsigned long offset, size_t size,
 				   enum dma_data_direction dir,
 				   struct dma_attrs *attrs)
 {
 	int prot = dma_direction_to_prot(dir, false);
-	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
 
-	if (!iommu_dma_mapping_error(dev, dev_addr) &&
-	    (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs)) == 0)
-		ipu3_dmamap_sync_single_for_device(dev, dev_addr, size, dir);
-
-	return dev_addr;
+	return iommu_dma_map_page(dev, page, offset, size, prot);
 }
 
 static void ipu3_dmamap_unmap_page(struct device *dev, dma_addr_t dev_addr,
 			       size_t size, enum dma_data_direction dir,
 			       struct dma_attrs *attrs)
 {
-	if ((dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs)) == 0)
-		ipu3_dmamap_sync_single_for_cpu(dev, dev_addr, size, dir);
-
 	iommu_dma_unmap_page(dev, dev_addr, size, dir, attrs);
-}
-
-static void ipu3_dmamap_sync_sg_for_cpu(struct device *dev,
-				    struct scatterlist *sgl, int nelems,
-				    enum dma_data_direction dir)
-{
-	struct scatterlist *sg;
-	int i;
-
-	for_each_sg(sgl, sg, nelems, i)
-		clflush_cache_range(sg_virt(sg), sg->length);
-}
-
-static void ipu3_dmamap_sync_sg_for_device(struct device *dev,
-				       struct scatterlist *sgl, int nelems,
-				       enum dma_data_direction dir)
-{
-	struct scatterlist *sg;
-	int i;
-
-	for_each_sg(sgl, sg, nelems, i)
-		clflush_cache_range(sg_virt(sg), sg->length);
 }
 
 static int ipu3_dmamap_map_sg(struct device *dev, struct scatterlist *sgl,
 			      int nents, enum dma_data_direction dir,
 			      struct dma_attrs *attrs)
 {
-	if ((dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs)) == 0)
-		ipu3_dmamap_sync_sg_for_device(dev, sgl, nents, dir);
-
 	return iommu_dma_map_sg(dev, sgl, nents,
 				dma_direction_to_prot(dir, false));
 }
@@ -231,9 +178,6 @@ static void ipu3_dmamap_unmap_sg(struct device *dev, struct scatterlist *sgl,
 				 int nents, enum dma_data_direction dir,
 				 struct dma_attrs *attrs)
 {
-	if ((dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs)) == 0)
-		ipu3_dmamap_sync_sg_for_cpu(dev, sgl, nents, dir);
-
 	iommu_dma_unmap_sg(dev, sgl, nents, dir, attrs);
 }
 
@@ -246,10 +190,6 @@ static struct dma_map_ops ipu3_dmamap_ops = {
 	.unmap_page = ipu3_dmamap_unmap_page,
 	.map_sg = ipu3_dmamap_map_sg,
 	.unmap_sg = ipu3_dmamap_unmap_sg,
-	.sync_single_for_cpu = ipu3_dmamap_sync_single_for_cpu,
-	.sync_single_for_device = ipu3_dmamap_sync_single_for_device,
-	.sync_sg_for_cpu = ipu3_dmamap_sync_sg_for_cpu,
-	.sync_sg_for_device = ipu3_dmamap_sync_sg_for_device,
 	.mapping_error = iommu_dma_mapping_error,
 };
 
