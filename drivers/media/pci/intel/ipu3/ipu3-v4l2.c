@@ -228,13 +228,17 @@ static void ipu3_return_all_buffers(struct ipu3_mem2mem2_device *m2m2,
 					struct imgu_video_device *node,
 					enum vb2_buffer_state state)
 {
+	struct imgu_device *imgu =
+		container_of(m2m2, struct imgu_device, mem2mem2);
 	struct ipu3_mem2mem2_buffer *b, *b0;
 
 	/* Return all buffers */
+	mutex_lock(&imgu->lock);
 	list_for_each_entry_safe(b, b0, &node->buffers, list) {
 		list_del(&b->list);
 		vb2_buffer_done(&b->vbb.vb2_buf, state);
 	}
+	mutex_unlock(&imgu->lock);
 }
 
 static int ipu3_vb2_start_streaming(struct vb2_queue *vq, unsigned int count)
