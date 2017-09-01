@@ -239,7 +239,7 @@ static int ipu3_hw_wait(void __iomem *base, int reg, u32 mask, u32 cmp)
 
 int ipu3_css_set_powerup(struct device *dev, void __iomem *base)
 {
-	static const unsigned int freq = 320;
+	static const unsigned int freq = 450;
 	u32 pm_ctrl, state, val;
 
 	dev_dbg(dev, "power up.\n");
