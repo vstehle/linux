@@ -27,7 +27,6 @@
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/of.h>
-#include <soc/rockchip/rk3399_dmc.h>
 
 #include "rockchip-dfi.h"
 #include "../governor.h"
@@ -282,8 +281,7 @@ static int rockchip_dfi_get_event(struct devfreq_event_dev *edev,
 static irqreturn_t ddrmon_thread_isr(int irq, void *data)
 {
 	struct rockchip_dfi *info = data;
-	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(&info->edev->dev);
-	struct devfreq *devfreq = dmcfreq->devfreq;
+	struct devfreq *devfreq = dev_get_drvdata(&info->edev->dev);
 
 	mutex_lock(&devfreq->lock);
 	if (info->enabled)
@@ -296,12 +294,12 @@ static irqreturn_t ddrmon_thread_isr(int irq, void *data)
 static irqreturn_t ddrmon_isr(int irq, void *dev_id)
 {
 	struct rockchip_dfi *info = dev_id;
-	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(&info->edev->dev);
+	struct devfreq *devfreq = dev_get_drvdata(&info->edev->dev);
 	void __iomem *dfi_regs = info->regs;
 	irqreturn_t ret = IRQ_NONE;
 	u32 val;
 
-	if (!dmcfreq || !dmcfreq->devfreq)
+	if (!devfreq)
 		return IRQ_HANDLED;
 
 	val = readl_relaxed(dfi_regs + DDRMON_INT_STATUS);

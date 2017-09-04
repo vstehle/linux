@@ -840,12 +840,6 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
 
 	rk3399_devfreq_dmc_profile.initial_freq = data->rate;
 
-	ret = devfreq_add_governor(&rk3399_dfi_governor);
-	if (ret < 0) {
-		dev_err(dev, "Failed to add dfi governor\n");
-		return ret;
-	}
-
 	data->dev = dev;
 	platform_set_drvdata(pdev, data);
 	data->devfreq = devm_devfreq_add_device(dev,
@@ -915,11 +909,16 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
 		per_cpu(cpufreq_cur, cpu_tmp) = policy.cur;
 	}
 
-	/* The dfi irq won't trigger a frequency update until this is done. */
-	dev_set_drvdata(&data->edev->dev, data);
+	dev_set_drvdata(&data->edev->dev, data->devfreq);
+	ret = devfreq_add_governor(&rk3399_dfi_governor);
+	if (ret < 0) {
+		dev_err(dev, "Failed to add dfi governor\n");
+		goto cpu_notifier_unregister;
+	}
 
 	return 0;
-
+cpu_notifier_unregister:
+	unregister_cpu_notifier(&data->cpu_hotplug_nb);
 trans_unregister:
 	cpufreq_unregister_notifier(&data->cpufreq_trans_nb,
 				    CPUFREQ_TRANSITION_NOTIFIER);
