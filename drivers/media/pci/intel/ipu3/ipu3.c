@@ -343,9 +343,11 @@ static int imgu_mem2mem2_s_stream(struct ipu3_mem2mem2_device *m2m2_dev,
 	if (!enable) {
 		/* Stop streaming */
 		dev_dbg(dev, "stream off\n");
-		mutex_lock(&imgu->lock);
+		/* Block new buffers to be queued to CSS. */
+		mutex_lock(&imgu->qbuf_lock);
 		ipu3_css_stop_streaming(&imgu->css);
-		mutex_unlock(&imgu->lock);
+		synchronize_irq(imgu->pci_dev->irq);
+		mutex_unlock(&imgu->qbuf_lock);
 		imgu_dummybufs_cleanup(imgu);
 		imgu_powerdown(imgu);
 		pm_runtime_put(&imgu->pci_dev->dev);
