@@ -232,14 +232,19 @@ static void kbase_fence_callback(struct dma_fence *fence, struct dma_fence_cb *c
 static int kbase_sync_file_wait_async(struct sync_file *sfile,
 				      struct dma_fence_cb *cb)
 {
-	if (dma_fence_is_signaled(sfile->fence)) {
-		if (sfile->fence->error < 0)
-			return sfile->fence->error;
-		return 1;
-	}
+	int ret;
 
-	dma_fence_add_callback(sfile->fence, cb, kbase_fence_callback);
-	return false;
+	ret = dma_fence_get_status(sfile->fence);
+	if (ret != 0)
+		return ret;
+
+	ret = dma_fence_add_callback(sfile->fence, cb, kbase_fence_callback);
+	if (ret == -ENOENT)
+		return dma_fence_get_status(sfile->fence);
+	else if (ret < 0)
+		return ret;
+
+	return 0;
 }
 
 static int kbase_sync_file_cancel_async(struct sync_file *sfile,
