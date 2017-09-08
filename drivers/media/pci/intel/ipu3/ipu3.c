@@ -298,6 +298,24 @@ failed:
 	return r;
 }
 
+static int imgu_powerup(struct imgu_device *imgu)
+{
+	int r;
+
+	r = ipu3_css_set_powerup(&imgu->pci_dev->dev, imgu->base);
+	if (r)
+		return r;
+
+	ipu3_mmu_resume(imgu->mmu);
+	return 0;
+}
+
+static int imgu_powerdown(struct imgu_device *imgu)
+{
+	ipu3_mmu_suspend(imgu->mmu);
+	return ipu3_css_set_powerdown(&imgu->pci_dev->dev, imgu->base);
+}
+
 static int imgu_mem2mem2_s_stream(struct ipu3_mem2mem2_device *m2m2_dev,
 				int enable)
 {
@@ -315,6 +333,7 @@ static int imgu_mem2mem2_s_stream(struct ipu3_mem2mem2_device *m2m2_dev,
 		ipu3_css_stop_streaming(&imgu->css);
 		mutex_unlock(&imgu->lock);
 		imgu_dummybufs_cleanup(imgu);
+		imgu_powerdown(imgu);
 		pm_runtime_put(&imgu->pci_dev->dev);
 
 		return 0;
@@ -373,6 +392,13 @@ static int imgu_mem2mem2_s_stream(struct ipu3_mem2mem2_device *m2m2_dev,
 	r = pm_runtime_get_sync(dev);
 	if (r < 0) {
 		dev_err(dev, "failed to set imgu power\n");
+		pm_runtime_put(dev);
+		return r;
+	}
+
+	r = imgu_powerup(imgu);
+	if (r) {
+		dev_err(dev, "failed to power up imgu\n");
 		pm_runtime_put(dev);
 		return r;
 	}
@@ -807,32 +833,17 @@ static void imgu_pci_remove(struct pci_dev *pci_dev)
 	mutex_destroy(&imgu->lock);
 }
 
-static int imgu_runtime_suspend(struct device *dev)
+/*
+ * PCI rpm framework checks the existance of driver rpm callbacks.
+ * Place a dummy callback here to avoid rpm going into error state.
+ */
+static int imgu_rpm_dummy_cb(struct device *dev)
 {
-	struct pci_dev *pci_dev = to_pci_dev(dev);
-	struct imgu_device *imgu = pci_get_drvdata(pci_dev);
-
-	ipu3_mmu_suspend(imgu->mmu);
-
-	return ipu3_css_set_powerdown(dev, imgu->base);
-}
-
-static int imgu_runtime_resume(struct device *dev)
-{
-	struct pci_dev *pci_dev = to_pci_dev(dev);
-	struct imgu_device *imgu = pci_get_drvdata(pci_dev);
-	int r;
-
-	r = ipu3_css_set_powerup(dev, imgu->base);
-	if (r)
-		return r;
-
-	ipu3_mmu_resume(imgu->mmu);
 	return 0;
 }
 
 static const struct dev_pm_ops imgu_pm_ops = {
-	SET_RUNTIME_PM_OPS(&imgu_runtime_suspend, &imgu_runtime_resume, NULL)
+	SET_RUNTIME_PM_OPS(&imgu_rpm_dummy_cb, &imgu_rpm_dummy_cb, NULL)
 };
 
 static const struct pci_device_id imgu_pci_tbl[] = {
