@@ -417,8 +417,10 @@ pp1800_pcie: &pp1800_s0 {
 		&wlan_rf_kill_1v8_l
 	>;
 
-	dmic_en: dmic-en {
-		rockchip,pins = <4 3 RK_FUNC_GPIO &pcfg_pull_none>;
+	dmic {
+		dmic_en: dmic-en {
+			rockchip,pins = <4 3 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
 	};
 };
 
