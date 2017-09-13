@@ -277,6 +277,10 @@ pp1800_pcie: &pp1800_s0 {
 	};
 };
 
+&i2c_tunnel {
+	google,remote-bus = <0>;
+};
+
 &io_domains {
 	bt656-supply = <&pp1800_s0>;		/* APIO2_VDD;  2a 2b */
 	audio-supply = <&pp1800_s0>;		/* APIO5_VDD;  3d 4a */
