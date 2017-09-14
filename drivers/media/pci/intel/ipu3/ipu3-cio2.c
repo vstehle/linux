@@ -196,15 +196,10 @@ static int cio2_fbpt_init(struct cio2_device *cio2, struct cio2_queue *q)
 
 static int cio2_fbpt_rearrange(struct cio2_device *cio2, struct cio2_queue *q)
 {
-	struct cio2_fbpt_entry *fbpt_temp = vmalloc(CIO2_FBPT_SIZE);
+	struct cio2_fbpt_entry *fbpt_temp;
 	int i, j;
 	int size, entries;
 	struct cio2_buffer *bufs[CIO2_MAX_BUFFERS];
-
-	if (!fbpt_temp) {
-		dev_err(&cio2->pci_dev->dev, "Out of memory.\n");
-		return -ENOMEM;
-	}
 
 	for (i = 0, j = q->bufs_first; i < CIO2_MAX_BUFFERS;
 		i++, j = (j + 1) % CIO2_MAX_BUFFERS)
@@ -213,6 +208,12 @@ static int cio2_fbpt_rearrange(struct cio2_device *cio2, struct cio2_queue *q)
 
 	if (i == CIO2_MAX_BUFFERS)
 		return 0;
+
+	fbpt_temp = vmalloc(CIO2_FBPT_SIZE);
+	if (!fbpt_temp) {
+		dev_err(&cio2->pci_dev->dev, "Out of memory.\n");
+		return -ENOMEM;
+	}
 
 	entries = (CIO2_MAX_BUFFERS - j) * CIO2_MAX_LOPS;
 	size = entries * sizeof(struct cio2_fbpt_entry);
