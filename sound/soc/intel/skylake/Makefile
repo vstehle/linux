@@ -8,3 +8,8 @@ snd-soc-skl-ipc-objs := skl-sst-ipc.o skl-sst-dsp.o skl-sst-cldma.o \
 		skl-sst.o bxt-sst.o skl-sst-utils.o
 
 obj-$(CONFIG_SND_SOC_INTEL_SKYLAKE) += snd-soc-skl-ipc.o
+
+#Skylake Clock device support
+snd-soc-skl-ssp-clk-objs := skl-ssp-clk.o
+
+obj-$(CONFIG_SND_SOC_INTEL_SKYLAKE_SSP_CLK) += snd-soc-skl-ssp-clk.o

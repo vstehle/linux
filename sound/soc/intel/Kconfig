@@ -208,6 +208,13 @@ config SND_SOC_INTEL_KBL_RT5663_RT5514_MAX98927_MACH
           Say Y if you have such a device.
           If unsure select "N".
 
+config SND_SOC_INTEL_SKYLAKE_SSP_CLK
+	tristate
+	help
+	   Enabling this will make the clk driver to be compiled and allow to
+	   control MCLK/SCLK/FS clocks independent of the stream. It should be
+	   enabled by the respective machine driver.
+
 config SND_SOC_INTEL_SKYLAKE
 	tristate
 	select SND_HDA_EXT_CORE
