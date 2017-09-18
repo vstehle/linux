@@ -1275,3 +1275,89 @@ int skl_get_module_params(struct skl_sst *ctx, u32 *params, int size,
 
 	return skl_ipc_get_large_config(&ctx->ipc, &msg, params);
 }
+
+void skl_fill_clk_ipc(struct skl_clk_rate_cfg_table *rcfg, u8 clk_type)
+{
+	struct nhlt_fmt_cfg *fmt_cfg;
+	struct wav_fmt *wfmt;
+	union skl_clk_ctrl_ipc *ipc;
+
+	if (!rcfg)
+		return;
+
+	ipc = &rcfg->dma_ctl_ipc;
+	if (clk_type == SKL_SCLK_FS) {
+		fmt_cfg = (struct nhlt_fmt_cfg *)rcfg->config;
+		wfmt = &fmt_cfg->fmt_ext.fmt;
+
+		/* Remove TLV Header size */
+		ipc->sclk_fs.hdr.size = sizeof(struct skl_dmactrl_sclkfs_cfg) -
+						sizeof(struct skl_tlv_hdr);
+		ipc->sclk_fs.sampling_frequency = wfmt->samples_per_sec;
+		ipc->sclk_fs.bit_depth = wfmt->bits_per_sample;
+		ipc->sclk_fs.valid_bit_depth =
+			fmt_cfg->fmt_ext.sample.valid_bits_per_sample;
+		ipc->sclk_fs.number_of_channels = wfmt->channels;
+	} else {
+		ipc->mclk.hdr.type = DMA_CLK_CONTROLS;
+		/* Remove TLV Header size */
+		ipc->mclk.hdr.size = sizeof(struct skl_dmactrl_mclk_cfg) -
+						sizeof(struct skl_tlv_hdr);
+	}
+}
+
+/* Sends dma control IPC to turn the clock ON/OFF */
+int skl_send_clk_dma_control(struct skl *skl, struct skl_clk_rate_cfg_table
+				*rcfg, u32 vbus_id, u8 clk_type, bool enable)
+{
+	struct nhlt_fmt_cfg *fmt_cfg;
+	struct nhlt_specific_cfg *sp_cfg;
+	union skl_clk_ctrl_ipc *ipc;
+	void *i2s_config = NULL;
+	u8 *data, size;
+	u32 i2s_config_size, node_id = 0;
+	int ret;
+
+	if (!rcfg)
+		return -EIO;
+
+	ipc = &rcfg->dma_ctl_ipc;
+	fmt_cfg = (struct nhlt_fmt_cfg *)rcfg->config;
+	sp_cfg = &fmt_cfg->config;
+	if (clk_type == SKL_SCLK_FS) {
+		ipc->sclk_fs.hdr.type =
+			enable ? DMA_TRANSMITION_START : DMA_TRANSMITION_STOP;
+		data = (u8 *)&ipc->sclk_fs;
+		size = sizeof(struct skl_dmactrl_sclkfs_cfg);
+	} else {
+		/* 1 to enable mclk, 0 to enable sclk */
+		if (clk_type == SKL_SCLK)
+			ipc->mclk.mclk = 0;
+		else
+			ipc->mclk.mclk = 1;
+
+		ipc->mclk.keep_running = enable;
+		ipc->mclk.warm_up_over = enable;
+		ipc->mclk.clk_stop_over = !enable;
+		data = (u8 *)&ipc->mclk;
+		size = sizeof(struct skl_dmactrl_mclk_cfg);
+	}
+
+	i2s_config_size = sp_cfg->size + size;
+	i2s_config = kzalloc(i2s_config_size, GFP_KERNEL);
+	if (!i2s_config)
+		return -ENOMEM;
+
+	/* copy blob */
+	memcpy(i2s_config, sp_cfg->caps, sp_cfg->size);
+
+	/* copy additional dma controls information */
+	memcpy(i2s_config + sp_cfg->size, data, size);
+
+	node_id = ((SKL_DMA_I2S_LINK_INPUT_CLASS << 8) | (vbus_id << 4));
+	ret = skl_dsp_set_dma_control(skl->skl_sst, (u32 *)i2s_config,
+					i2s_config_size, node_id);
+	kfree(i2s_config);
+
+	return ret;
+}
