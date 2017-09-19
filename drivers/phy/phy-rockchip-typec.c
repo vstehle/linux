@@ -681,8 +681,8 @@ static void tcphy_dp_aux_calibration(struct rockchip_typec_phy *tcphy)
 	 */
 	writel(0, tcphy->base + TX_ANA_CTRL_REG_4);
 
-	/* Set voltage swing to 400 mV peak to peak (differential) */
-	writel(LOW_POWER_SWING_EN, tcphy->base + TXDA_COEFF_CALC_CTRL);
+	/* Don't set voltage swing to 400 mV peak to peak (differential) */
+	writel(0, tcphy->base + TXDA_COEFF_CALC_CTRL);
 
 	/* Init TXDA_CYA_AUXDA_CYA for unknown magic reasons */
 	writel(0, tcphy->base + TXDA_CYA_AUXDA_CYA);
