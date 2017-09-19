@@ -2,7 +2,6 @@
 
 / {
 	description = "Chrome OS kernel image with one or more FDT blobs";
-	#address-cells = <1>;
 
 	images {
 		kernel@1 {
@@ -17,8 +16,8 @@
 		};
 
 		fdt@1 {
-			description = "rk3399-gru-kevin.dtb";
-			data = /incbin/("arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dtb");
+			description = "rk3399-gru-kevin-r6.dtb";
+			data = /incbin/("arch/arm64/boot/dts/rockchip/rk3399-gru-kevin-r6.dtb");
 			type = "flat_dt";
 			arch = "arm64";
 			compression = "none";
