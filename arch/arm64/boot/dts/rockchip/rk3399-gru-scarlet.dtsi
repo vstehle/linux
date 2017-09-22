@@ -185,6 +185,9 @@ pp1800_pcie: &pp1800_s0 {
 
 /* On scarlet PPVAR(big_cpu, lit_cpu, gpu) need to adjust voltage ranges */
 &ppvar_bigcpu {
+	/* No pesky OVP here. */
+	/delete-property/ slowest-decay-rate;
+	/delete-property/ safe-fall-percent;
 
 	/* On scarlet ppvar big cpu use pwm3 */
 	pwms = <&pwm3 0 3337 0>;
@@ -193,11 +196,19 @@ pp1800_pcie: &pp1800_s0 {
 };
 
 &ppvar_gpu {
+	/* No pesky OVP here. */
+	/delete-property/ slowest-decay-rate;
+	/delete-property/ safe-fall-percent;
+
 	regulator-min-microvolt = <799600>;
 	regulator-max-microvolt = <1099600>;
 };
 
 &ppvar_litcpu {
+	/* No pesky OVP here. */
+	/delete-property/ slowest-decay-rate;
+	/delete-property/ safe-fall-percent;
+
 	regulator-min-microvolt = <802122>;
 	regulator-max-microvolt = <1199620>;
 };
