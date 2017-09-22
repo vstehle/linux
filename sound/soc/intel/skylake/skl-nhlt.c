@@ -344,8 +344,10 @@ void skl_get_ssp_clks(struct skl *skl, struct skl_ssp_clk *ssp_clks,
 					SKL_MNDSS_DIV_CLK_SRC_SHIFT;
 
 			parent = skl_get_parent_clk(clk_src);
-			sclk[id].parent_name = parent->name;
-			sclkfs[id].parent_name = parent->name;
+			if (parent) {
+				sclk[id].parent_name = parent->name;
+				sclkfs[id].parent_name = parent->name;
+			}
 
 			rate_index++;
 		}
@@ -379,6 +381,9 @@ void skl_get_mclk(struct skl *skl, struct skl_ssp_clk *mclk,
 
 	/* Calculate MCLK rate from source using div value */
 	parent = skl_get_parent_clk(clk_src);
+	if (parent == NULL)
+		return;
+
 	mclk[id].rate_cfg[0].rate = parent->rate/div_ratio;
 	mclk[id].rate_cfg[0].config = &fmt->fmt_config[0];
 	mclk[id].parent_name = parent->name;
