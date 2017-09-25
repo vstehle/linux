@@ -275,6 +275,7 @@ static void virtio_gpu_crtc_atomic_flush(struct drm_crtc *crtc,
 	spin_lock_irqsave(&crtc->dev->event_lock, flags);
 	if (crtc->state->event)
 		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+	crtc->state->event = NULL;
 	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
 }
 
