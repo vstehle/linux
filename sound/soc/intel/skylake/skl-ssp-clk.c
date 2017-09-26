@@ -93,7 +93,8 @@ static int skl_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	return ret;
 }
 
-unsigned long skl_clk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+static unsigned long skl_clk_recalc_rate(struct clk_hw *hw,
+					 unsigned long parent_rate)
 {
 	struct skl_clk *clkdev = to_skl_clk(hw);
 
