@@ -368,17 +368,6 @@ static void intel_enable_source_psr2(struct intel_dp *intel_dp)
 	else
 		val |= EDP_PSR2_TP2_TIME_50;
 
-	/*
-	 * HACK: b/65096022 Look like the data read from VBT register above is
-	 * broken. Force setting known good value below.
-	 * - TP2 time to be 50 us.
-	 * - 3 frames before selective update entry.
-	 */
-	val &= ~EDP_PSR2_TP2_TIME_MASK;
-	val |= EDP_PSR2_TP2_TIME_50;
-	val &= ~EDP_PSR2_FRAME_BEFORE_SU_MASK;
-	val |= (3 << EDP_PSR2_FRAME_BEFORE_SU_SHIFT);
-
 	I915_WRITE(EDP_PSR2_CTL, val);
 }
 
