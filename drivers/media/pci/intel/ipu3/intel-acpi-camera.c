@@ -222,36 +222,36 @@ static struct intel_acpi_camera_pmic_config supported_sensors_pmic[] = {
 	 },
 };
 
-static struct intel_acpi_camera_ssdb *intel_acpi_camera_ssdb(acpi_handle
-							     ahandle)
+static int intel_acpi_camera_ssdb(acpi_handle ahandle,
+				  struct intel_acpi_camera_ssdb *ssdb)
 {
 	struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
 	union acpi_object *obj;
-	struct intel_acpi_camera_ssdb *ssdb;
+	struct intel_acpi_camera_ssdb *s;
 	int r;
 
-	if (!ahandle)
-		return NULL;
+	if (!ahandle || !ssdb)
+		return -EINVAL;
 
 	r = acpi_evaluate_object(ahandle, "SSDB", NULL, &buf);
 	obj = buf.pointer;
 	if (ACPI_FAILURE(r) || !obj)
-		return NULL;
-	if (obj->type != ACPI_TYPE_BUFFER) {
-		kfree(obj);
-		return NULL;
-	}
-	ssdb = (struct intel_acpi_camera_ssdb *)obj->buffer.pointer;
-	if (!ssdb || obj->buffer.length < sizeof(*ssdb)) {
-		kfree(obj);
-		return NULL;
-	}
+		return -EINVAL;
+	if (obj->type != ACPI_TYPE_BUFFER)
+		goto error;
+	s = (struct intel_acpi_camera_ssdb *)obj->buffer.pointer;
+	if (!s || obj->buffer.length < sizeof(*s))
+		goto error;
+	if (s->mipi_define != 0x01)
+		goto error;
 
-	if (ssdb->mipi_define != 0x01)
-		ssdb = NULL;
-
+	*ssdb = *s;
 	kfree(obj);
-	return ssdb;
+	return 0;
+
+error:
+	kfree(obj);
+	return -EINVAL;
 }
 
 u64 intel_acpi_camera_camd(acpi_handle ahandle)
@@ -326,18 +326,15 @@ static acpi_status crlmodule_acpi_pmic_walk(acpi_handle ahandle, u32 lvl,
 int intel_acpi_camera_i2c(struct device *dev,
 			  struct intel_acpi_camera_i2c *info)
 {
-	struct intel_acpi_camera_ssdb *ssdb =
-	    intel_acpi_camera_ssdb(ACPI_HANDLE(dev));
+	struct intel_acpi_camera_ssdb ssdb;
+	int ret = intel_acpi_camera_ssdb(ACPI_HANDLE(dev), &ssdb);
 
-	if (!ssdb)
-		return -ENODEV;
-
-	if (ssdb->mipi_define != 0x01)
+	if (ret)
 		return -ENODEV;
 
 	memset(info, 0, sizeof(*info));
-	info->mclk = ssdb->mclk;
-	info->lanes = ssdb->lanes_used;
+	info->mclk = ssdb.mclk;
+	info->lanes = ssdb.lanes_used;
 	info->xshutdown = -1;
 	info->hid = acpi_device_hid(ACPI_COMPANION(dev));
 
@@ -354,14 +351,15 @@ EXPORT_SYMBOL_GPL(intel_acpi_camera_i2c);
 int intel_acpi_camera_csi2(acpi_handle ahandle,
 			   struct intel_acpi_camera_csi2 *info)
 {
-	struct intel_acpi_camera_ssdb *ssdb = intel_acpi_camera_ssdb(ahandle);
+	struct intel_acpi_camera_ssdb ssdb;
+	int ret = intel_acpi_camera_ssdb(ahandle, &ssdb);
 
-	if (!ssdb)
+	if (ret)
 		return -ENODEV;
 
 	memset(info, 0, sizeof(*info));
-	info->port = ssdb->link_used;
-	info->lanes = ssdb->lanes_used;
+	info->port = ssdb.link_used;
+	info->lanes = ssdb.lanes_used;
 	return 0;
 }
 
