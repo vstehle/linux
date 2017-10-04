@@ -410,8 +410,10 @@ static int fastop(struct x86_emulate_ctxt *ctxt, void (*fop)(struct fastop *));
 /* Special case for SETcc - 1 instruction per cc */
 #define FOP_SETCC(op) ".align 4; " #op " %al; ret \n\t"
 
-asm(".global kvm_fastop_exception \n"
-    "kvm_fastop_exception: xor %esi, %esi; ret");
+asm(".pushsection .fixup, \"ax\"\n"
+    ".global kvm_fastop_exception \n"
+    "kvm_fastop_exception: xor %esi, %esi; ret\n"
+    ".popsection");
 
 FOP_START(setcc)
 FOP_SETCC(seto)
