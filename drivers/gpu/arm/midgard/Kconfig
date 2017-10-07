@@ -16,8 +16,8 @@
 
 menuconfig MALI_MIDGARD
 	tristate "Mali Midgard series support"
-	depends on ARM || ARM64
 	default n
+	depends on BROKEN
 	help
 	  Enable this option to build support for a ARM Mali Midgard GPU.
 
@@ -60,7 +60,6 @@ endchoice
 config MALI_MIDGARD_DVFS
 	bool "Enable legacy DVFS"
 	depends on MALI_MIDGARD && !MALI_DEVFREQ && !MALI_PLATFORM_DEVICETREE
-	depends on BROKEN
 	default n
 	help
 	  Choose this option to enable legacy DVFS in the Mali Midgard DDK.
@@ -167,7 +166,6 @@ config MALI_DEBUG
 config MALI_NO_MALI
 	bool "No Mali"
 	depends on MALI_MIDGARD && MALI_EXPERT
-	depends on BROKEN
 	default n
 	help
 	  This can be used to test the driver in a simulated environment
@@ -180,7 +178,6 @@ config MALI_NO_MALI
 config MALI_ERROR_INJECT
 	bool "Error injection"
 	depends on MALI_MIDGARD && MALI_EXPERT && MALI_NO_MALI
-	depends on BROKEN
 	default n
 	help
 	  Enables insertion of errors to test module failure and recovery mechanisms.
@@ -188,7 +185,6 @@ config MALI_ERROR_INJECT
 config MALI_TRACE_TIMELINE
 	bool "Timeline tracing"
 	depends on MALI_MIDGARD && MALI_EXPERT
-	depends on BROKEN
 	default n
 	help
 	  Enables timeline tracing through the kernel tracepoint system.

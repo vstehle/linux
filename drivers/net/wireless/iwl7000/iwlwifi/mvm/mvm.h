@@ -1433,6 +1433,8 @@ void iwl_mvm_rx_missed_beacons_notif(struct iwl_mvm *mvm,
 				     struct iwl_rx_cmd_buffer *rxb);
 void iwl_mvm_rx_stored_beacon_notif(struct iwl_mvm *mvm,
 				    struct iwl_rx_cmd_buffer *rxb);
+void iwl_mvm_mu_mimo_grp_notif(struct iwl_mvm *mvm,
+			       struct iwl_rx_cmd_buffer *rxb);
 void iwl_mvm_window_status_notif(struct iwl_mvm *mvm,
 				 struct iwl_rx_cmd_buffer *rxb);
 void iwl_mvm_mac_ctxt_recalc_tsf_id(struct iwl_mvm *mvm,
@@ -1850,6 +1852,10 @@ int iwl_mvm_configure_bcast_filter(struct iwl_mvm *mvm);
 
 void iwl_mvm_active_rx_filters(struct iwl_mvm *mvm);
 
+void iwl_mvm_vendor_lqm_notif(struct iwl_mvm *mvm,
+			      struct iwl_rx_cmd_buffer *rxb);
+void iwl_mvm_lqm_notif_iterator(void *_data, u8 *mac,
+				struct ieee80211_vif *vif);
 #endif
 
 /* NAN */

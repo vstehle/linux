@@ -44,7 +44,6 @@
 
 #define CHARGER_DIR_NAME		"CROS_USB_PD_CHARGER%d"
 #define CHARGER_DIR_NAME_LENGTH		sizeof(CHARGER_DIR_NAME)
-#define DRV_NAME "cros-usb-pd-charger"
 
 #define MANUFACTURER_MODEL_LENGTH	32
 
@@ -648,20 +647,22 @@ static int cros_usb_pd_charger_probe(struct platform_device *pd)
 
 	dev_dbg(dev, "cros_usb_pd_charger_probe\n");
 	if (!ec_dev) {
-		dev_err(dev, "No EC dev found\n");
+		WARN(1, "%s: No EC dev found\n", dev_name(dev));
 		return -EINVAL;
 	}
 
 	ec_device = ec_dev->ec_dev;
 	if (!ec_device) {
-		dev_err(dev, "No EC device found.\n");
+		WARN(1, "%s: No EC device found\n", dev_name(dev));
 		return -EINVAL;
 	}
 
 	charger = devm_kzalloc(dev, sizeof(struct charger_data),
 				    GFP_KERNEL);
-	if (!charger)
+	if (!charger) {
+		dev_err(dev, "Failed to alloc charger. Failing probe.\n");
 		return -ENOMEM;
+	}
 
 	charger->dev = dev;
 	charger->ec_dev = ec_dev;
@@ -937,14 +938,13 @@ struct attribute_group cros_usb_pd_charger_attr_group = {
 	.name = "usb-pd-charger",
 	.attrs = __ext_power_cmds_attrs,
 };
-EXPORT_SYMBOL(cros_usb_pd_charger_attr_group);
 
 static SIMPLE_DEV_PM_OPS(cros_usb_pd_charger_pm_ops,
 	cros_usb_pd_charger_suspend, cros_usb_pd_charger_resume);
 
 static struct platform_driver cros_usb_pd_charger_driver = {
 	.driver = {
-		.name = DRV_NAME,
+		.name = "cros-usb-pd-charger",
 		.owner = THIS_MODULE,
 		.pm = &cros_usb_pd_charger_pm_ops,
 	},
@@ -956,4 +956,4 @@ module_platform_driver(cros_usb_pd_charger_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Chrome USB PD charger");
-MODULE_ALIAS("platform:" DRV_NAME);
+MODULE_ALIAS("power_supply:cros-usb-pd-charger");

@@ -939,8 +939,7 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
 	struct mtk_pinctrl *pctl = dev_get_drvdata(chip->parent);
 	int eint_num, virq, eint_offset;
 	unsigned int set_offset, bit, clr_bit, clr_offset, rst, i, unmask, dbnc;
-	static const unsigned int debounce_time[] = {500, 1000, 16000, 32000, 64000,
-						128000, 256000};
+	static const unsigned int dbnc_arr[] = {0 , 1, 16, 32, 64, 128, 256};
 	const struct mtk_desc_pin *pin;
 	struct irq_data *d;
 
@@ -958,9 +957,9 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
 	if (!mtk_eint_can_en_debounce(pctl, eint_num))
 		return -ENOSYS;
 
-	dbnc = ARRAY_SIZE(debounce_time);
-	for (i = 0; i < ARRAY_SIZE(debounce_time); i++) {
-		if (debounce <= debounce_time[i]) {
+	dbnc = ARRAY_SIZE(dbnc_arr);
+	for (i = 0; i < ARRAY_SIZE(dbnc_arr); i++) {
+		if (debounce <= dbnc_arr[i]) {
 			dbnc = i;
 			break;
 		}
@@ -1191,10 +1190,9 @@ static void mtk_eint_irq_handler(struct irq_desc *desc)
 	const struct mtk_desc_pin *pin;
 
 	chained_irq_enter(chip, desc);
-	for (eint_num = 0;
-	     eint_num < pctl->devdata->ap_num;
-	     eint_num += 32, reg += 4) {
+	for (eint_num = 0; eint_num < pctl->devdata->ap_num; eint_num += 32) {
 		status = readl(reg);
+		reg += 4;
 		while (status) {
 			offset = __ffs(status);
 			index = eint_num + offset;

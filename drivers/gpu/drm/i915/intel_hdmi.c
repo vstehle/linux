@@ -638,7 +638,7 @@ static bool intel_hdmi_set_gcp_infoframe(struct drm_encoder *encoder)
 		reg = HSW_TVIDEO_DIP_GCP(crtc->config->cpu_transcoder);
 	else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		reg = VLV_TVIDEO_DIP_GCP(crtc->pipe);
-	else if (HAS_PCH_SPLIT(dev_priv))
+	else if (HAS_PCH_SPLIT(dev_priv->dev))
 		reg = TVIDEO_DIP_GCP(crtc->pipe);
 	else
 		return false;
@@ -880,18 +880,15 @@ static bool intel_hdmi_get_hw_state(struct intel_encoder *encoder,
 	struct intel_hdmi *intel_hdmi = enc_to_intel_hdmi(&encoder->base);
 	enum intel_display_power_domain power_domain;
 	u32 tmp;
-	bool ret;
 
 	power_domain = intel_display_port_power_domain(encoder);
-	if (!intel_display_power_get_if_enabled(dev_priv, power_domain))
+	if (!intel_display_power_is_enabled(dev_priv, power_domain))
 		return false;
-
-	ret = false;
 
 	tmp = I915_READ(intel_hdmi->hdmi_reg);
 
 	if (!(tmp & SDVO_ENABLE))
-		goto out;
+		return false;
 
 	if (HAS_PCH_CPT(dev))
 		*pipe = PORT_TO_PIPE_CPT(tmp);
@@ -900,12 +897,7 @@ static bool intel_hdmi_get_hw_state(struct intel_encoder *encoder,
 	else
 		*pipe = PORT_TO_PIPE(tmp);
 
-	ret = true;
-
-out:
-	intel_display_power_put(dev_priv, power_domain);
-
-	return ret;
+	return true;
 }
 
 static void intel_hdmi_get_config(struct intel_encoder *encoder,
@@ -951,6 +943,9 @@ static void intel_hdmi_get_config(struct intel_encoder *encoder,
 
 	if (pipe_config->pixel_multiplier)
 		dotclock /= pipe_config->pixel_multiplier;
+
+	if (HAS_PCH_SPLIT(dev_priv->dev))
+		ironlake_check_encoder_dotclock(pipe_config, dotclock);
 
 	pipe_config->base.adjusted_mode.crtc_clock = dotclock;
 }
@@ -1412,16 +1407,8 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 				hdmi_to_dig_port(intel_hdmi));
 	}
 
-	if (!live_status) {
-		DRM_DEBUG_KMS("HDMI live status down\n");
-		/*
-		 * Live status register is not reliable on all intel platforms.
-		 * So consider live_status only for certain platforms, for
-		 * others, read EDID to determine presence of sink.
-		 */
-		if (INTEL_INFO(dev_priv)->gen < 7 || IS_IVYBRIDGE(dev_priv))
-			live_status = true;
-	}
+	if (!live_status)
+		DRM_DEBUG_KMS("Live status not up!");
 
 	intel_hdmi_unset_edid(connector);
 

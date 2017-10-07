@@ -204,13 +204,8 @@ static void cx_auto_reboot_notify(struct hda_codec *codec)
 {
 	struct conexant_spec *spec = codec->spec;
 
-	switch (codec->core.vendor_id) {
-	case 0x14f150f2: /* CX20722 */
-	case 0x14f150f4: /* CX20724 */
-		break;
-	default:
+	if (codec->core.vendor_id != 0x14f150f2)
 		return;
-	}
 
 	/* Turn the CX20722 codec into D3 to avoid spurious noises
 	   from the internal speaker during (and after) reboot */

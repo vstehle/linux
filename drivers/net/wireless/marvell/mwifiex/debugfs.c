@@ -95,7 +95,8 @@ mwifiex_info_read(struct file *file, char __user *ubuf,
 
 	mwifiex_drv_get_driver_version(priv->adapter, fmt, sizeof(fmt) - 1);
 
-	mwifiex_get_ver_ext(priv, 0);
+	if (!priv->version_str[0])
+		mwifiex_get_ver_ext(priv);
 
 	p += sprintf(p, "driver_name = " "\"mwifiex\"\n");
 	p += sprintf(p, "driver_version = %s", fmt);
@@ -595,52 +596,6 @@ done:
 	return ret;
 }
 
-/* debugfs verext file write handler.
- * This function is called when the 'verext' file is opened for write
- */
-static ssize_t
-mwifiex_verext_write(struct file *file, const char __user *ubuf,
-		     size_t count, loff_t *ppos)
-{
-	int ret;
-	u32 versionstrsel;
-	struct mwifiex_private *priv = (void *)file->private_data;
-	char buf[16];
-
-	memset(buf, 0, sizeof(buf));
-
-	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
-		return -EFAULT;
-
-	ret = kstrtou32(buf, 10, &versionstrsel);
-	if (ret)
-		return ret;
-
-	priv->versionstrsel = versionstrsel;
-
-	return count;
-}
-
-/* Proc verext file read handler.
- * This function is called when the 'verext' file is opened for reading
- * This function can be used read driver exteneed verion string.
- */
-static ssize_t
-mwifiex_verext_read(struct file *file, char __user *ubuf,
-		    size_t count, loff_t *ppos)
-{
-	struct mwifiex_private *priv =
-		(struct mwifiex_private *)file->private_data;
-	char buf[256];
-	int ret;
-
-	mwifiex_get_ver_ext(priv, priv->versionstrsel);
-	ret = snprintf(buf, sizeof(buf), "version string: %s\n",
-		       priv->version_str);
-
-	return simple_read_from_buffer(ubuf, count, ppos, buf, ret);
-}
-
 /* Proc memrw file write handler.
  * This function is called when the 'memrw' file is opened for writing
  * This function can be used to write to a memory location.
@@ -951,32 +906,6 @@ mwifiex_timeshare_coex_write(struct file *file, const char __user *ubuf,
 		return count;
 }
 
-static ssize_t
-mwifiex_reset_write(struct file *file,
-		    const char __user *ubuf, size_t count, loff_t *ppos)
-{
-	struct mwifiex_private *priv = file->private_data;
-	struct mwifiex_adapter *adapter = priv->adapter;
-	bool result;
-	int rc;
-
-	rc = kstrtobool_from_user(ubuf, count, &result);
-	if (rc)
-		return rc;
-
-	if (!result)
-		return -EINVAL;
-
-	if (adapter->if_ops.card_reset) {
-		dev_info(adapter->dev, "Resetting per request\n");
-		adapter->hw_status = MWIFIEX_HW_STATUS_RESET;
-		mwifiex_cancel_all_pending_cmd(adapter);
-		adapter->if_ops.card_reset(adapter);
-	}
-
-	return count;
-}
-
 #define MWIFIEX_DFS_ADD_FILE(name) do {                                 \
 	if (!debugfs_create_file(#name, 0644, priv->dfs_dev_dir,        \
 			priv, &mwifiex_dfs_##name##_fops))              \
@@ -1014,8 +943,6 @@ MWIFIEX_DFS_FILE_OPS(hscfg);
 MWIFIEX_DFS_FILE_OPS(histogram);
 MWIFIEX_DFS_FILE_OPS(debug_mask);
 MWIFIEX_DFS_FILE_OPS(timeshare_coex);
-MWIFIEX_DFS_FILE_WRITE_OPS(reset);
-MWIFIEX_DFS_FILE_OPS(verext);
 
 /*
  * This function creates the debug FS directory structure and the files.
@@ -1043,8 +970,6 @@ mwifiex_dev_debugfs_init(struct mwifiex_private *priv)
 	MWIFIEX_DFS_ADD_FILE(histogram);
 	MWIFIEX_DFS_ADD_FILE(debug_mask);
 	MWIFIEX_DFS_ADD_FILE(timeshare_coex);
-	MWIFIEX_DFS_ADD_FILE(reset);
-	MWIFIEX_DFS_ADD_FILE(verext);
 }
 
 /*

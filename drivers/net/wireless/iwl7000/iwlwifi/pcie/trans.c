@@ -1228,12 +1228,47 @@ static void _iwl_trans_pcie_stop_device(struct iwl_trans *trans, bool low_power)
 	iwl_pcie_prepare_card_hw(trans);
 }
 
+static void iwl_pcie_synchronize_irqs(struct iwl_trans *trans)
+{
+	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
+
+	if (trans_pcie->msix_enabled) {
+		int i;
+
+		for (i = 0; i < trans_pcie->allocated_vector; i++)
+			synchronize_irq(trans_pcie->msix_entries[i].vector);
+	} else {
+		synchronize_irq(trans_pcie->pci_dev->irq);
+	}
+}
+
 static int iwl_trans_pcie_start_fw(struct iwl_trans *trans,
 				   const struct fw_img *fw, bool run_in_rfkill)
 {
 	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 	bool hw_rfkill;
 	int ret;
+
+	/* This may fail if AMT took ownership of the device */
+	if (iwl_pcie_prepare_card_hw(trans)) {
+		IWL_WARN(trans, "Exit HW not ready\n");
+		ret = -EIO;
+		goto out;
+	}
+
+	iwl_enable_rfkill_int(trans);
+
+	iwl_write32(trans, CSR_INT, 0xFFFFFFFF);
+
+	/*
+	 * We enabled the RF-Kill interrupt and the handler may very
+	 * well be running. Disable the interrupts to make sure no other
+	 * interrupt can be fired.
+	 */
+	iwl_disable_interrupts(trans);
+
+	/* Make sure it finished running */
+	iwl_pcie_synchronize_irqs(trans);
 
 	mutex_lock(&trans_pcie->mutex);
 
@@ -1253,24 +1288,7 @@ static int iwl_trans_pcie_start_fw(struct iwl_trans *trans,
 	if (trans_pcie->is_down) {
 		IWL_WARN(trans,
 			 "Can't start_fw since the HW hasn't been started\n");
-		ret = EIO;
-		goto out;
-	}
-
-	/* This may fail if AMT took ownership of the device */
-	if (iwl_pcie_prepare_card_hw(trans)) {
-		IWL_WARN(trans, "Exit HW not ready\n");
 		ret = -EIO;
-		goto out;
-	}
-
-	iwl_enable_rfkill_int(trans);
-
-	iwl_write32(trans, CSR_INT, 0xFFFFFFFF);
-
-	ret = iwl_pcie_nic_init(trans);
-	if (ret) {
-		IWL_ERR(trans, "Unable to init nic\n");
 		goto out;
 	}
 
@@ -1281,7 +1299,21 @@ static int iwl_trans_pcie_start_fw(struct iwl_trans *trans,
 
 	/* clear (again), then enable host interrupts */
 	iwl_write32(trans, CSR_INT, 0xFFFFFFFF);
-	iwl_enable_interrupts(trans);
+
+	ret = iwl_pcie_nic_init(trans);
+	if (ret) {
+		IWL_ERR(trans, "Unable to init nic\n");
+		goto out;
+	}
+
+	/*
+	 * Now, we load the firmware and don't want to be interrupted, even
+	 * by the RF-Kill interrupt (hence mask all the interrupt besides the
+	 * FH_TX interrupt which is needed to load the firmware). If the
+	 * RF-Kill switch is toggled, we will find out after having loaded
+	 * the firmware and return the proper value to the caller.
+	 */
+	iwl_enable_fw_load_int(trans);
 
 	/* really make sure rfkill handshake bits are cleared */
 	iwl_write32(trans, CSR_UCODE_DRV_GP1_CLR, CSR_UCODE_SW_BIT_RFKILL);
@@ -1292,6 +1324,18 @@ static int iwl_trans_pcie_start_fw(struct iwl_trans *trans,
 		ret = iwl_pcie_load_given_ucode_8000(trans, fw);
 	else
 		ret = iwl_pcie_load_given_ucode(trans, fw);
+	iwl_enable_interrupts(trans);
+
+	/* re-check RF-Kill state since we may have missed the interrupt */
+	hw_rfkill = iwl_is_rfkill_set(trans);
+	if (hw_rfkill)
+		set_bit(STATUS_RFKILL, &trans->status);
+	else
+		clear_bit(STATUS_RFKILL, &trans->status);
+
+	iwl_trans_pcie_rf_kill(trans, hw_rfkill);
+	if (hw_rfkill && !run_in_rfkill)
+		ret = -ERFKILL;
 
 out:
 	mutex_unlock(&trans_pcie->mutex);
@@ -1322,20 +1366,6 @@ void iwl_trans_pcie_rf_kill(struct iwl_trans *trans, bool state)
 
 	if (iwl_op_mode_hw_rf_kill(trans->op_mode, state))
 		_iwl_trans_pcie_stop_device(trans, true);
-}
-
-static inline void iwl_pcie_synchronize_irqs(struct iwl_trans *trans)
-{
-	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
-
-	if (trans_pcie->msix_enabled) {
-		int i;
-
-		for (i = 0; i < trans_pcie->allocated_vector; i++)
-			synchronize_irq(trans_pcie->msix_entries[i].vector);
-	} else {
-		synchronize_irq(trans_pcie->pci_dev->irq);
-	}
 }
 
 static void iwl_trans_pcie_d3_suspend(struct iwl_trans *trans, bool test,
@@ -1787,6 +1817,7 @@ void iwl_trans_pcie_free(struct iwl_trans *trans)
 	}
 
 	free_percpu(trans_pcie->tso_hdr_page);
+	mutex_destroy(&trans_pcie->mutex);
 	iwl_trans_free(trans);
 }
 

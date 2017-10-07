@@ -1405,9 +1405,9 @@ static int atmel_sha_probe(struct platform_device *pdev)
 	}
 
 	sha_dd->io_base = devm_ioremap_resource(&pdev->dev, sha_res);
-	if (IS_ERR(sha_dd->io_base)) {
+	if (!sha_dd->io_base) {
 		dev_err(dev, "can't ioremap\n");
-		err = PTR_ERR(sha_dd->io_base);
+		err = -ENOMEM;
 		goto res_err;
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Google Gru-Kevin Rev 1 board device tree source
+ * Google Gru-Kevin Rev 1+ board device tree source
  *
  * Copyright 2016 Google, Inc
  *
@@ -43,44 +43,28 @@
  */
 
 /dts-v1/;
-#include "rk3399-gru-kevin.dtsi"
+#include "rk3399-gru.dtsi"
 
 / {
-	model = "Google Kevin Rev 1";
-	compatible = "google,kevin-rev1", "google,kevin",
+	model = "Google Kevin";
+	compatible = "google,kevin-rev15", "google,kevin-rev14",
+		     "google,kevin-rev13", "google,kevin-rev12",
+		     "google,kevin-rev11", "google,kevin-rev10",
+		     "google,kevin-rev9", "google,kevin-rev8",
+		     "google,kevin-rev7", "google,kevin-rev6",
+		     "google,kevin-rev5", "google,kevin-rev4",
+		     "google,kevin-rev3", "google,kevin-rev2",
+		     "google,kevin-rev1", "google,kevin",
 		     "google,gru", "rockchip,rk3399";
 };
 
-&cluster0_opp {
-       /delete-node/opp04;
-       /delete-node/opp05;
-};
-&ppvar_bigcpu {
-       regulator-microvolt-offset = <200000>;
-};
-&ppvar_centerlogic {
-       regulator-microvolt-offset = <200000>;
-};
-&ppvar_gpu {
-       regulator-microvolt-offset = <200000>;
-};
-&ppvar_litcpu {
-       regulator-microvolt-offset = <200000>;
-};
+/* PINCTRL: always below everything else */
 
-/* GPIO overrides for -r1; in same order as parent */
-
-&digitizer {
-	interrupt-parent = <&gpio3>;
-	interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
-};
-
-/* Pinctrl overrides for -r1; in same order as parent */
-
-&cpu1_dig_irq_l {
-	rockchip,pins = <3 15 RK_FUNC_GPIO &pcfg_pull_up>;
-};
-
-&cpu1_dig_pdct_l {
-	rockchip,pins = <3 16 RK_FUNC_GPIO &pcfg_pull_up>;
+&pinctrl {
+	pen-eject {
+		pen_eject_l: pen-eject-l {
+			rockchip,pins = <RK_GPIO0 13 RK_FUNC_GPIO
+				&pcfg_pull_up>;
+		};
+	};
 };

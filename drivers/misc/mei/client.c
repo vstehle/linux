@@ -1735,10 +1735,6 @@ void mei_cl_complete(struct mei_cl *cl, struct mei_cl_cb *cb)
 			wake_up(&cl->wait);
 
 		break;
-	case MEI_FOP_DISCONNECT_RSP:
-		mei_io_cb_free(cb);
-		mei_cl_set_disconnected(cl);
-		break;
 	default:
 		BUG_ON(0);
 	}

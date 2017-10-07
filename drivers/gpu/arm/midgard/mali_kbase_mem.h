@@ -143,7 +143,7 @@ struct kbase_mem_phy_alloc {
 			unsigned long nr_pages;
 			struct page **pages;
 			unsigned int current_mapping_usage_count;
-			struct mm_struct *mm;
+			struct task_struct *owner;
 			dma_addr_t *dma_addrs;
 		} user_buf;
 	} imported;

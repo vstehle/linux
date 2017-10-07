@@ -14,8 +14,7 @@ struct alt_sys_call_table {
 	char name[ALT_SYS_CALL_NAME_MAX + 1];
 	sys_call_ptr_t *table;
 	int size;
-#if defined(CONFIG_IA32_EMULATION) || \
-    (defined(CONFIG_ARM64) && defined(CONFIG_COMPAT))
+#ifdef CONFIG_IA32_EMULATION
 	sys_call_ptr_t *compat_table;
 	int compat_size;
 #endif

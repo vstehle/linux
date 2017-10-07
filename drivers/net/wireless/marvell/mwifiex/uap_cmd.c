@@ -192,7 +192,7 @@ mwifiex_set_ht_params(struct mwifiex_private *priv,
 		}
 		priv->ap_11n_enabled = 1;
 	} else {
-		memset(&bss_cfg->ht_cap, 0, sizeof(struct ieee80211_ht_cap));
+		memset(&bss_cfg->ht_cap , 0, sizeof(struct ieee80211_ht_cap));
 		bss_cfg->ht_cap.cap_info = cpu_to_le16(MWIFIEX_DEF_HT_CAP);
 		bss_cfg->ht_cap.ampdu_params_info = MWIFIEX_DEF_AMPDU;
 	}
@@ -694,7 +694,7 @@ static int mwifiex_uap_custom_ie_prepare(u8 *tlv, void *cmd_buf, u16 *ie_size)
 	struct mwifiex_ie_list *ap_ie = cmd_buf;
 	struct mwifiex_ie_types_header *tlv_ie = (void *)tlv;
 
-	if (!ap_ie || !ap_ie->len)
+	if (!ap_ie || !ap_ie->len || !ap_ie->ie_list)
 		return -1;
 
 	*ie_size += le16_to_cpu(ap_ie->len) +
@@ -848,9 +848,9 @@ int mwifiex_config_start_uap(struct mwifiex_private *priv,
 
 	if (mwifiex_send_cmd(priv, HostCmd_CMD_UAP_SYS_CONFIG,
 			     HostCmd_ACT_GEN_SET,
-			     UAP_BSS_PARAMS_I, bss_cfg, true)) {
+			     UAP_BSS_PARAMS_I, bss_cfg, false)) {
 		mwifiex_dbg(priv->adapter, ERROR,
-			    "Failed to set AP configuration\n");
+			    "Failed to set the SSID\n");
 		return -1;
 	}
 
@@ -865,7 +865,7 @@ int mwifiex_config_start_uap(struct mwifiex_private *priv,
 	}
 
 	if (mwifiex_send_cmd(priv, HostCmd_CMD_UAP_BSS_START,
-			     HostCmd_ACT_GEN_SET, 0, NULL, true)) {
+			     HostCmd_ACT_GEN_SET, 0, NULL, false)) {
 		mwifiex_dbg(priv->adapter, ERROR,
 			    "Failed to start the BSS\n");
 		return -1;

@@ -717,8 +717,7 @@ static struct kbase_va_region *kbase_mem_from_user_buffer(
 	reg->gpu_alloc->imported.user_buf.nr_pages = faulted_pages;
 	reg->gpu_alloc->imported.user_buf.pages = kmalloc_array(faulted_pages,
 			sizeof(struct page *), GFP_KERNEL);
-	reg->gpu_alloc->imported.user_buf.mm = current->mm;
-	atomic_inc(&current->mm->mm_count);
+	reg->gpu_alloc->imported.user_buf.owner = current;
 
 	if (!reg->gpu_alloc->imported.user_buf.pages)
 		goto no_page_array;

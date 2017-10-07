@@ -215,7 +215,7 @@ static int kbase_jd_user_buf_map(struct kbase_context *kctx,
 	long i;
 	int err = -ENOMEM;
 	unsigned long address;
-	struct mm_struct *mm;
+	struct task_struct *owner;
 	struct device *dev;
 	unsigned long offset;
 	unsigned long local_size;
@@ -223,19 +223,19 @@ static int kbase_jd_user_buf_map(struct kbase_context *kctx,
 	alloc = reg->gpu_alloc;
 	pa = kbase_get_gpu_phy_pages(reg);
 	address = alloc->imported.user_buf.address;
-	mm = alloc->imported.user_buf.mm;
+	owner = alloc->imported.user_buf.owner;
 
 	KBASE_DEBUG_ASSERT(alloc->type == KBASE_MEM_TYPE_IMPORTED_USER_BUF);
 
 	pages = alloc->imported.user_buf.pages;
 
-	down_read(&mm->mmap_sem);
-	pinned_pages = get_user_pages(NULL, mm,
+	down_read(&owner->mm->mmap_sem);
+	pinned_pages = get_user_pages(owner, owner->mm,
 			address,
 			alloc->imported.user_buf.nr_pages,
 			reg->flags & KBASE_REG_GPU_WR,
 			0, pages, NULL);
-	up_read(&mm->mmap_sem);
+	up_read(&owner->mm->mmap_sem);
 
 	if (pinned_pages <= 0)
 		return pinned_pages;
@@ -754,20 +754,13 @@ static int kbase_jd_pre_external_resources(struct kbase_jd_atom *katom, const st
 				struct kds_resource *kds_res;
 
 				kds_res = get_dma_buf_kds_resource(reg->gpu_alloc->imported.umm.dma_buf);
-				if (kds_res
-#ifdef CONFIG_SYNC
-				    && katom->kctx->jctx.implicit_sync
-#endif
+				if (kds_res)
 					add_kds_resource(kds_res, kds_resources, &kds_res_count, kds_access_bitmap, res->ext_resource & BASE_EXT_RES_ACCESS_EXCLUSIVE);
 #endif
 #ifdef CONFIG_DRM_DMA_SYNC
 				struct reservation_object *resv =
 					reg->gpu_alloc->imported.umm.dma_buf->resv;
-				if (resv
-#ifdef CONFIG_SYNC
-				    && katom->kctx->jctx.implicit_sync
-#endif
-				) {
+				if (resv) {
 					drm_add_reservation(resv,
 						resvs, excl_resvs_bitmap,
 						&num_resvs,
@@ -2105,9 +2098,6 @@ int kbase_jd_init(struct kbase_context *kctx)
 	kctx->jctx.fence_context = fence_context_alloc(1);
 	atomic_set(&kctx->jctx.fence_seqno, 0);
 #endif
-#if (defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)) && defined(CONFIG_SYNC)
-	kctx->jctx.implicit_sync = true;
-#endif				/* CONFIG_KDS or CONFIG_DRM_DMA_SYNC */
 	kctx->jctx.job_nr = 0;
 	INIT_LIST_HEAD(&kctx->completed_jobs);
 	atomic_set(&kctx->work_count, 0);

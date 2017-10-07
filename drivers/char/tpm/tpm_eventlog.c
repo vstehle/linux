@@ -232,7 +232,7 @@ static int tpm_binary_bios_measurements_show(struct seq_file *m, void *v)
 {
 	struct tcpa_event *event = v;
 	struct tcpa_event temp_event;
-	char *temp_ptr;
+	char *tempPtr;
 	int i;
 
 	memcpy(&temp_event, event, sizeof(struct tcpa_event));
@@ -242,16 +242,10 @@ static int tpm_binary_bios_measurements_show(struct seq_file *m, void *v)
 	temp_event.event_type = do_endian_conversion(event->event_type);
 	temp_event.event_size = do_endian_conversion(event->event_size);
 
-	temp_ptr = (char *) &temp_event;
+	tempPtr = (char *)&temp_event;
 
-	for (i = 0; i < (sizeof(struct tcpa_event) - 1) ; i++)
-		seq_putc(m, temp_ptr[i]);
-
-	temp_ptr = (char *) v;
-
-	for (i = (sizeof(struct tcpa_event) - 1);
-	     i < (sizeof(struct tcpa_event) + temp_event.event_size); i++)
-		seq_putc(m, temp_ptr[i]);
+	for (i = 0; i < sizeof(struct tcpa_event) + temp_event.event_size; i++)
+		seq_putc(m, tempPtr[i]);
 
 	return 0;
 
@@ -403,7 +397,7 @@ static int is_bad(void *p)
 	return 0;
 }
 
-struct dentry **tpm_bios_log_setup(const char *name)
+struct dentry **tpm_bios_log_setup(char *name)
 {
 	struct dentry **ret = NULL, *tpm_dir, *bin_file, *ascii_file;
 

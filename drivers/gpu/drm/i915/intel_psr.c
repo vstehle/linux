@@ -507,8 +507,7 @@ static void hsw_psr_disable(struct intel_dp *intel_dp)
 
 		/* Wait till PSR is idle */
 		if (_wait_for((I915_READ(EDP_PSR_STATUS_CTL) &
-			       EDP_PSR_STATUS_STATE_MASK) == 0,
-			       2 * USEC_PER_SEC, 10 * USEC_PER_MSEC))
+			       EDP_PSR_STATUS_STATE_MASK) == 0, 2000, 10))
 			DRM_ERROR("Timed out waiting for PSR Idle State\n");
 
 		dev_priv->psr.active = false;
@@ -563,7 +562,7 @@ static void intel_psr_work(struct work_struct *work)
 	 * PSR might take some time to get fully disabled
 	 * and be ready for re-enable.
 	 */
-	if (HAS_DDI(dev_priv)) {
+	if (HAS_DDI(dev_priv->dev)) {
 		if (wait_for((I915_READ(EDP_PSR_STATUS_CTL) &
 			      EDP_PSR_STATUS_STATE_MASK) == 0, 50)) {
 			DRM_ERROR("Timed out waiting for PSR Idle for re-enable\n");
@@ -781,7 +780,8 @@ void intel_psr_init(struct drm_device *dev)
 
 	/* Per platform default */
 	if (i915.enable_psr == -1) {
-		if (IS_HASWELL(dev) || IS_BROADWELL(dev))
+		if (IS_HASWELL(dev) || IS_BROADWELL(dev) ||
+		    IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev))
 			i915.enable_psr = 1;
 		else
 			i915.enable_psr = 0;

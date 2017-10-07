@@ -44,6 +44,7 @@
 struct radeon_fbdev {
 	struct drm_fb_helper helper;
 	struct radeon_framebuffer rfb;
+	struct list_head fbdev_list;
 	struct radeon_device *rdev;
 };
 

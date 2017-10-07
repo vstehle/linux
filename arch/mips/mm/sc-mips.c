@@ -164,13 +164,11 @@ static int __init mips_sc_probe_cm3(void)
 
 	sets = cfg & CM_GCR_L2_CONFIG_SET_SIZE_MSK;
 	sets >>= CM_GCR_L2_CONFIG_SET_SIZE_SHF;
-	if (sets)
-		c->scache.sets = 64 << sets;
+	c->scache.sets = 64 << sets;
 
 	line_sz = cfg & CM_GCR_L2_CONFIG_LINE_SIZE_MSK;
 	line_sz >>= CM_GCR_L2_CONFIG_LINE_SIZE_SHF;
-	if (line_sz)
-		c->scache.linesz = 2 << line_sz;
+	c->scache.linesz = 2 << line_sz;
 
 	assoc = cfg & CM_GCR_L2_CONFIG_ASSOC_MSK;
 	assoc >>= CM_GCR_L2_CONFIG_ASSOC_SHF;
@@ -178,12 +176,9 @@ static int __init mips_sc_probe_cm3(void)
 	c->scache.waysize = c->scache.sets * c->scache.linesz;
 	c->scache.waybit = __ffs(c->scache.waysize);
 
-	if (c->scache.linesz) {
-		c->scache.flags &= ~MIPS_CACHE_NOT_PRESENT;
-		return 1;
-	}
+	c->scache.flags &= ~MIPS_CACHE_NOT_PRESENT;
 
-	return 0;
+	return 1;
 }
 
 void __weak platform_early_l2_init(void)

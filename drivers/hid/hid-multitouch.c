@@ -396,11 +396,6 @@ static void mt_feature_mapping(struct hid_device *hdev,
 			td->is_buttonpad = true;
 
 		break;
-	case 0xff0000c5:
-		/* Retrieve the Win8 blob once to enable some devices */
-		if (usage->usage_index == 0)
-			mt_get_feature(hdev, field->report);
-		break;
 	}
 }
 
@@ -449,6 +444,16 @@ static int mt_touch_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 	/* count the buttons on touchpads */
 	if ((usage->hid & HID_USAGE_PAGE) == HID_UP_BUTTON)
 		td->buttons_count++;
+
+	/* Only map fields from TouchScreen or TouchPad collections.
+         * We need to ignore fields that belong to other collections
+         * such as Mouse that might have the same GenericDesktop usages. */
+	if (field->application == HID_DG_TOUCHSCREEN)
+		set_bit(INPUT_PROP_DIRECT, hi->input->propbit);
+	else if (field->application == HID_DG_TOUCHPAD)
+		set_bit(INPUT_PROP_POINTER, hi->input->propbit);
+	else
+		return 0;
 
 	if (usage->usage_index)
 		prev_usage = &field->usage[usage->usage_index - 1];

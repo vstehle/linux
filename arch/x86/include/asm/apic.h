@@ -638,8 +638,8 @@ static inline void entering_irq(void)
 
 static inline void entering_ack_irq(void)
 {
-	entering_irq();
 	ack_APIC_irq();
+	entering_irq();
 }
 
 static inline void ipi_entering_ack_irq(void)

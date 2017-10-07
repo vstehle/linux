@@ -277,10 +277,13 @@ static void __init omap4_init_voltages(void)
 
 static inline void omap_init_cpufreq(void)
 {
-	struct platform_device_info devinfo = { .name = "omap-cpufreq" };
+	struct platform_device_info devinfo = { };
 
 	if (!of_have_populated_dt())
-		platform_device_register_full(&devinfo);
+		devinfo.name = "omap-cpufreq";
+	else
+		devinfo.name = "cpufreq-dt";
+	platform_device_register_full(&devinfo);
 }
 
 static int __init omap2_common_pm_init(void)

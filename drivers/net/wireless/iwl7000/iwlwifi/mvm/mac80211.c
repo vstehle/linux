@@ -7,6 +7,7 @@
  *
  * Copyright(c) 2012 - 2014 Intel Corporation. All rights reserved.
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
+ * Copyright(c) 2016 Intel Deutschland GmbH
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU General Public License as
@@ -1464,6 +1465,20 @@ static int iwl_mvm_mac_add_interface(struct ieee80211_hw *hw,
 	iwl_mvm_tcm_add_vif(mvm, vif);
 #endif
 
+#ifdef CPTCFG_IWLMVM_VENDOR_CMDS
+	/*
+	 * lqm_active on a new interface means that we had a FW restart
+	 * inform the CAM.
+	 */
+	if (mvmvif->lqm_active) {
+		struct iwl_link_qual_msrmnt_notif empty_lqm_notif = {
+			.mac_id = cpu_to_le32(mvmvif->id),
+			.status = cpu_to_le32(LQM_STATUS_ABORT),
+		};
+		iwl_mvm_lqm_notif_iterator(&empty_lqm_notif, vif->addr, vif);
+	}
+#endif
+
 	iwl_mvm_vif_dbgfs_register(mvm, vif);
 	goto out_unlock;
 
@@ -1957,6 +1972,34 @@ static int iwl_mvm_update_mu_groups(struct iwl_mvm *mvm,
 				    0, sizeof(cmd), &cmd);
 }
 
+static void iwl_mvm_mu_mimo_iface_iterator(void *_data, u8 *mac,
+					   struct ieee80211_vif *vif)
+{
+	if (vif->mu_mimo_owner) {
+		struct iwl_mu_group_mgmt_notif *notif = _data;
+
+		/*
+		 * MU-MIMO Group Id action frame is little endian. We treat
+		 * the data received from firmware as if it came from the
+		 * action frame, so no conversion is needed.
+		 */
+		ieee80211_update_mu_groups(vif,
+					   (u8 *)&notif->membership_status,
+					   (u8 *)&notif->user_position);
+	}
+}
+
+void iwl_mvm_mu_mimo_grp_notif(struct iwl_mvm *mvm,
+			       struct iwl_rx_cmd_buffer *rxb)
+{
+	struct iwl_rx_packet *pkt = rxb_addr(rxb);
+	struct iwl_mu_group_mgmt_notif *notif = (void *)pkt->data;
+
+	ieee80211_iterate_active_interfaces_atomic(
+			mvm->hw, IEEE80211_IFACE_ITER_NORMAL,
+			iwl_mvm_mu_mimo_iface_iterator, notif);
+}
+
 static void iwl_mvm_bss_info_changed_station(struct iwl_mvm *mvm,
 					     struct ieee80211_vif *vif,
 					     struct ieee80211_bss_conf *bss_conf,
@@ -2072,10 +2115,10 @@ static void iwl_mvm_bss_info_changed_station(struct iwl_mvm *mvm,
 
 		/*
 		 * The firmware tracks the MU-MIMO group on its own.
-		 * However, on HW restart we should restore this data
+		 * However, on HW restart we should restore this data.
 		 */
 		if (test_bit(IWL_MVM_STATUS_IN_HW_RESTART, &mvm->status) &&
-		    changes & BSS_CHANGED_MU_GROUPS) {
+		    (changes & BSS_CHANGED_MU_GROUPS) && vif->mu_mimo_owner) {
 			ret = iwl_mvm_update_mu_groups(mvm, vif);
 			if (ret)
 				IWL_ERR(mvm,

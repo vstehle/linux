@@ -1404,18 +1404,8 @@ static int aac_acquire_resources(struct aac_dev *dev)
 
 	aac_adapter_enable_int(dev);
 
-	/*max msix may change  after EEH
-	 * Re-assign vectors to fibs
-	 */
-	aac_fib_vector_assign(dev);
-
-	if (!dev->sync_mode) {
-		/* After EEH recovery or suspend resume, max_msix count
-		 * may change, therfore updating in init as well.
-		 */
+	if (!dev->sync_mode)
 		aac_adapter_start(dev);
-		dev->init->Sa_MSIXVectors = cpu_to_le32(dev->max_msix);
-	}
 	return 0;
 
 error_iounmap:

@@ -122,7 +122,6 @@ static int intelfb_alloc(struct drm_fb_helper *helper,
 	struct drm_framebuffer *fb;
 	struct drm_device *dev = helper->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	struct drm_mode_fb_cmd2 mode_cmd = {};
 	struct drm_i915_gem_object *obj = NULL;
 	int size, ret;
@@ -147,7 +146,7 @@ static int intelfb_alloc(struct drm_fb_helper *helper,
 	/* If the FB is too big, just don't use it since fbdev is not very
 	 * important and we should probably use that space with FBC or other
 	 * features. */
-	if (size * 2 < ggtt->stolen_usable_size)
+	if (size * 2 < dev_priv->gtt.stolen_usable_size)
 		obj = i915_gem_object_create_stolen(dev, size);
 	if (obj == NULL)
 		obj = i915_gem_alloc_object(dev, size);
@@ -161,6 +160,13 @@ static int intelfb_alloc(struct drm_fb_helper *helper,
 	if (IS_ERR(fb)) {
 		drm_gem_object_unreference(&obj->base);
 		ret = PTR_ERR(fb);
+		goto out;
+	}
+
+	/* Flush everything out, we'll be doing GTT only from now on */
+	ret = intel_pin_and_fence_fb_obj(NULL, fb, NULL);
+	if (ret) {
+		DRM_ERROR("failed to pin obj: %d\n", ret);
 		goto out;
 	}
 
@@ -182,8 +188,7 @@ static int intelfb_create(struct drm_fb_helper *helper,
 		container_of(helper, struct intel_fbdev, helper);
 	struct intel_framebuffer *intel_fb = ifbdev->fb;
 	struct drm_device *dev = helper->dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct i915_ggtt *ggtt = &dev_priv->ggtt;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct fb_info *info;
 	struct drm_framebuffer *fb;
 	struct drm_i915_gem_object *obj;
@@ -218,17 +223,8 @@ static int intelfb_create(struct drm_fb_helper *helper,
 
 	mutex_lock(&dev->struct_mutex);
 
-	/* Pin the GGTT vma for our access via info->screen_base.
-	 * This also validates that any existing fb inherited from the
-	 * BIOS is suitable for own access.
-	 */
-	ret = intel_pin_and_fence_fb_obj(&ifbdev->fb->base, BIT(DRM_ROTATE_0));
-	if (ret)
-		goto out_unlock;
-
 	info = drm_fb_helper_alloc_fbi(helper);
 	if (IS_ERR(info)) {
-		DRM_ERROR("Failed to allocate fb_info\n");
 		ret = PTR_ERR(info);
 		goto out_unpin;
 	}
@@ -246,16 +242,15 @@ static int intelfb_create(struct drm_fb_helper *helper,
 
 	/* setup aperture base/size for vesafb takeover */
 	info->apertures->ranges[0].base = dev->mode_config.fb_base;
-	info->apertures->ranges[0].size = ggtt->mappable_end;
+	info->apertures->ranges[0].size = dev_priv->gtt.mappable_end;
 
 	info->fix.smem_start = dev->mode_config.fb_base + i915_gem_obj_ggtt_offset(obj);
 	info->fix.smem_len = size;
 
 	info->screen_base =
-		ioremap_wc(ggtt->mappable_base + i915_gem_obj_ggtt_offset(obj),
+		ioremap_wc(dev_priv->gtt.mappable_base + i915_gem_obj_ggtt_offset(obj),
 			   size);
 	if (!info->screen_base) {
-		DRM_ERROR("Failed to remap framebuffer into virtual memory\n");
 		ret = -ENOSPC;
 		goto out_destroy_fbi;
 	}
@@ -288,7 +283,7 @@ out_destroy_fbi:
 	drm_fb_helper_release_fbi(helper);
 out_unpin:
 	i915_gem_object_ggtt_unpin(obj);
-out_unlock:
+	drm_gem_object_unreference(&obj->base);
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
@@ -368,12 +363,12 @@ static bool intel_fb_initial_config(struct drm_fb_helper *fb_helper,
 	uint64_t conn_configured = 0, mask;
 	int pass = 0;
 
-	save_enabled = kcalloc(fb_helper->connector_count, sizeof(bool),
+	save_enabled = kcalloc(dev->mode_config.num_connector, sizeof(bool),
 			       GFP_KERNEL);
 	if (!save_enabled)
 		return false;
 
-	memcpy(save_enabled, enabled, fb_helper->connector_count);
+	memcpy(save_enabled, enabled, dev->mode_config.num_connector);
 	mask = (1 << fb_helper->connector_count) - 1;
 retry:
 	for (i = 0; i < fb_helper->connector_count; i++) {
@@ -381,7 +376,6 @@ retry:
 		struct drm_connector *connector;
 		struct drm_encoder *encoder;
 		struct drm_fb_helper_crtc *new_crtc;
-		struct intel_crtc *intel_crtc;
 
 		fb_conn = fb_helper->connector_info[i];
 		connector = fb_conn->connector;
@@ -422,13 +416,6 @@ retry:
 		}
 
 		num_connectors_enabled++;
-
-		intel_crtc = to_intel_crtc(connector->state->crtc);
-		for (j = 0; j < 256; j++) {
-			intel_crtc->lut_r[j] = j;
-			intel_crtc->lut_g[j] = j;
-			intel_crtc->lut_b[j] = j;
-		}
 
 		new_crtc = intel_fb_helper_crtc(fb_helper, connector->state->crtc);
 
@@ -520,7 +507,7 @@ retry:
 	if (fallback) {
 bail:
 		DRM_DEBUG_KMS("Not using firmware configuration\n");
-		memcpy(enabled, save_enabled, fb_helper->connector_count);
+		memcpy(enabled, save_enabled, dev->mode_config.num_connector);
 		kfree(save_enabled);
 		return false;
 	}
@@ -539,10 +526,6 @@ static const struct drm_fb_helper_funcs intel_fb_helper_funcs = {
 static void intel_fbdev_destroy(struct drm_device *dev,
 				struct intel_fbdev *ifbdev)
 {
-	/* We rely on the object-free to release the VMA pinning for
-	 * the info->screen_base mmaping. Leaking the VMA is simpler than
-	 * trying to rectify all the possible error paths leading here.
-	 */
 
 	drm_fb_helper_unregister_fbi(&ifbdev->helper);
 	drm_fb_helper_release_fbi(&ifbdev->helper);
@@ -733,9 +716,7 @@ static void intel_fbdev_initial_config(void *data, async_cookie_t cookie)
 	struct intel_fbdev *ifbdev = dev_priv->fbdev;
 
 	/* Due to peculiar init order wrt to hpd handling this is separate. */
-	if (drm_fb_helper_initial_config(&ifbdev->helper,
-					 ifbdev->preferred_bpp))
-		intel_fbdev_fini(dev_priv->dev);
+	drm_fb_helper_initial_config(&ifbdev->helper, ifbdev->preferred_bpp);
 }
 
 void intel_fbdev_initial_config_async(struct drm_device *dev)
@@ -751,8 +732,7 @@ void intel_fbdev_fini(struct drm_device *dev)
 
 	flush_work(&dev_priv->fbdev_suspend_work);
 
-	if (!current_is_async())
-		async_synchronize_full();
+	async_synchronize_full();
 	intel_fbdev_destroy(dev, dev_priv->fbdev);
 	kfree(dev_priv->fbdev);
 	dev_priv->fbdev = NULL;

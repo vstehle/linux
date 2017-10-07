@@ -4086,10 +4086,8 @@ commit_trans:
 		    !atomic_read(&root->fs_info->open_ioctl_trans)) {
 			need_commit--;
 
-			if (need_commit > 0) {
-				btrfs_start_delalloc_roots(fs_info, 0, -1);
+			if (need_commit > 0)
 				btrfs_wait_ordered_roots(fs_info, -1);
-			}
 
 			trans = btrfs_join_transaction(root);
 			if (IS_ERR(trans))
@@ -4102,12 +4100,11 @@ commit_trans:
 				if (ret)
 					return ret;
 				/*
-				 * The cleaner kthread might still be doing iput
-				 * operations. Wait for it to finish so that
-				 * more space is released.
+				 * make sure that all running delayed iput are
+				 * done
 				 */
-				mutex_lock(&root->fs_info->cleaner_delayed_iput_mutex);
-				mutex_unlock(&root->fs_info->cleaner_delayed_iput_mutex);
+				down_write(&root->fs_info->delayed_iput_sem);
+				up_write(&root->fs_info->delayed_iput_sem);
 				goto again;
 			} else {
 				btrfs_end_transaction(trans, root);

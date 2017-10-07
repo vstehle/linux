@@ -238,7 +238,6 @@ out_unlock:
 out:
 	return error;
 }
-EXPORT_SYMBOL(sys_setpriority);
 
 /*
  * Ugh. To avoid negative return values, "getpriority()" will

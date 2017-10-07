@@ -84,7 +84,6 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_MC13783 if MFD_MC13XXX
 	select SND_SOC_ML26124 if I2C
 	select SND_SOC_NAU8825 if I2C
-	select SND_SOC_HDMI_CODEC
 	select SND_SOC_PCM1681 if I2C
 	select SND_SOC_PCM1792A if SPI_MASTER
 	select SND_SOC_PCM3008
@@ -92,7 +91,6 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_PCM512x_SPI if SPI_MASTER
 	select SND_SOC_RT286 if I2C
 	select SND_SOC_RT298 if I2C
-	select SND_SOC_RT5514 if I2C
 	select SND_SOC_RT5616 if I2C
 	select SND_SOC_RT5631 if I2C
 	select SND_SOC_RT5640 if I2C
@@ -459,12 +457,6 @@ config SND_SOC_BT_SCO
 config SND_SOC_DMIC
 	tristate
 
-config SND_SOC_HDMI_CODEC
-	tristate
-	select SND_PCM_ELD
-	select SND_PCM_IEC958
-	select HDMI
-
 config SND_SOC_ES8328
 	tristate "Everest Semi ES8328 CODEC"
 
@@ -543,14 +535,12 @@ config SND_SOC_PCM512x_SPI
 
 config SND_SOC_RL6231
 	tristate
-	default y if SND_SOC_RT5514=y
 	default y if SND_SOC_RT5616=y
 	default y if SND_SOC_RT5640=y
 	default y if SND_SOC_RT5645=y
 	default y if SND_SOC_RT5651=y
 	default y if SND_SOC_RT5670=y
 	default y if SND_SOC_RT5677=y
-	default m if SND_SOC_RT5514=m
 	default m if SND_SOC_RT5616=m
 	default m if SND_SOC_RT5640=m
 	default m if SND_SOC_RT5645=m
@@ -572,12 +562,6 @@ config SND_SOC_RT286
 config SND_SOC_RT298
 	tristate
 	depends on I2C
-
-config SND_SOC_RT5514
-	tristate
-
-config SND_SOC_RT5514_SPI
-	tristate
 
 config SND_SOC_RT5616
 	tristate

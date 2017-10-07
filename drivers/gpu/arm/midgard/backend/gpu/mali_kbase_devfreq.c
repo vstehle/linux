@@ -124,7 +124,7 @@ static int
 kbase_devfreq_status(struct device *dev, struct devfreq_dev_status *stat)
 {
 	struct kbase_device *kbdev = dev_get_drvdata(dev);
-	struct devfreq __maybe_unused *df = kbdev->devfreq;
+
 	stat->current_frequency = kbdev->current_freq;
 
 	kbase_pm_get_dvfs_utilisation(kbdev,
@@ -134,7 +134,8 @@ kbase_devfreq_status(struct device *dev, struct devfreq_dev_status *stat)
 
 #ifdef CONFIG_DEVFREQ_THERMAL
 	if (kbdev->devfreq_cooling)
-		memcpy(&df->last_status, stat, sizeof(*stat));
+		memcpy(&kbdev->devfreq_cooling->last_status, stat,
+				sizeof(*stat));
 #endif
 
 	return 0;

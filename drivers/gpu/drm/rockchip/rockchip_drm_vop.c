@@ -36,18 +36,15 @@
 #include "rockchip_drm_fb.h"
 #include "rockchip_drm_vop.h"
 
-#define __REG_SET_RELAXED(x, off, mask, shift, v, write_mask) \
-		vop_mask_write(x, off, mask, shift, v, write_mask, true)
-
-#define __REG_SET_NORMAL(x, off, mask, shift, v, write_mask) \
-		vop_mask_write(x, off, mask, shift, v, write_mask, false)
+#define __REG_SET_RELAXED(x, off, mask, shift, v) \
+		vop_mask_write_relaxed(x, off, (mask) << shift, (v) << shift)
+#define __REG_SET_NORMAL(x, off, mask, shift, v) \
+		vop_mask_write(x, off, (mask) << shift, (v) << shift)
 
 #define REG_SET(x, base, reg, v, mode) \
-		__REG_SET_##mode(x, base + reg.offset, \
-				 reg.mask, reg.shift, v, reg.write_mask)
+		__REG_SET_##mode(x, base + reg.offset, reg.mask, reg.shift, v)
 #define REG_SET_MASK(x, base, reg, mask, v, mode) \
-		__REG_SET_##mode(x, base + reg.offset, \
-				 mask, reg.shift, v, reg.write_mask)
+		__REG_SET_##mode(x, base + reg.offset, mask, reg.shift, v)
 
 #define VOP_WIN_SET(x, win, name, v) \
 		REG_SET(x, win->base, win->phy->name, v, RELAXED)
@@ -163,25 +160,27 @@ static inline uint32_t vop_read_reg(struct vop *vop, uint32_t base,
 }
 
 static inline void vop_mask_write(struct vop *vop, uint32_t offset,
-				  uint32_t mask, uint32_t shift, uint32_t v,
-				  bool write_mask, bool relaxed)
+				  uint32_t mask, uint32_t v)
 {
-	if (!mask)
-		return;
-
-	if (write_mask) {
-		v = (v << shift) | (mask << (shift + 16));
-	} else {
+	if (mask) {
 		uint32_t cached_val = vop->regsbak[offset >> 2];
 
-		v = (cached_val & ~(mask << shift)) | (v << shift);
-		vop->regsbak[offset >> 2] = v;
+		cached_val = (cached_val & ~mask) | v;
+		writel(cached_val, vop->regs + offset);
+		vop->regsbak[offset >> 2] = cached_val;
 	}
+}
 
-	if (relaxed)
-		writel_relaxed(v, vop->regs + offset);
-	else
-		writel(v, vop->regs + offset);
+static inline void vop_mask_write_relaxed(struct vop *vop, uint32_t offset,
+					  uint32_t mask, uint32_t v)
+{
+	if (mask) {
+		uint32_t cached_val = vop->regsbak[offset >> 2];
+
+		cached_val = (cached_val & ~mask) | v;
+		writel_relaxed(cached_val, vop->regs + offset);
+		vop->regsbak[offset >> 2] = cached_val;
+	}
 }
 
 static inline uint32_t vop_get_intr_type(struct vop *vop,
@@ -311,7 +310,7 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
 	uint16_t vsu_mode;
 	uint16_t lb_mode;
 	uint32_t val;
-	int vskiplines = 0;
+	int vskiplines;
 
 	if (dst_w > 3840) {
 		DRM_ERROR("Maximum destination width (3840) exceeded\n");
@@ -561,22 +560,6 @@ static void vop_plane_destroy(struct drm_plane *plane)
 	drm_plane_cleanup(plane);
 }
 
-static int vop_plane_prepare_fb(struct drm_plane *plane,
-				const struct drm_plane_state *new_state)
-{
-	if (plane->state->fb)
-		drm_framebuffer_reference(plane->state->fb);
-
-	return 0;
-}
-
-static void vop_plane_cleanup_fb(struct drm_plane *plane,
-				 const struct drm_plane_state *old_state)
-{
-	if (old_state->fb)
-		drm_framebuffer_unreference(old_state->fb);
-}
-
 static int vop_plane_atomic_check(struct drm_plane *plane,
 			   struct drm_plane_state *state)
 {
@@ -773,8 +756,6 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
 }
 
 static const struct drm_plane_helper_funcs plane_helper_funcs = {
-	.prepare_fb = vop_plane_prepare_fb,
-	.cleanup_fb = vop_plane_cleanup_fb,
 	.atomic_check = vop_plane_atomic_check,
 	.atomic_update = vop_plane_atomic_update,
 	.atomic_disable = vop_plane_atomic_disable,
@@ -836,6 +817,38 @@ static const struct drm_plane_funcs vop_plane_funcs = {
 	.atomic_duplicate_state = vop_atomic_plane_duplicate_state,
 	.atomic_destroy_state = vop_atomic_plane_destroy_state,
 };
+
+int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc,
+				  int connector_type,
+				  int out_mode)
+{
+	struct vop *vop = to_vop(crtc);
+
+	if (WARN_ON(!vop->is_enabled))
+		return -EINVAL;
+
+	switch (connector_type) {
+	case DRM_MODE_CONNECTOR_LVDS:
+		VOP_CTRL_SET(vop, rgb_en, 1);
+		break;
+	case DRM_MODE_CONNECTOR_eDP:
+		VOP_CTRL_SET(vop, edp_en, 1);
+		break;
+	case DRM_MODE_CONNECTOR_HDMIA:
+		VOP_CTRL_SET(vop, hdmi_en, 1);
+		break;
+	case DRM_MODE_CONNECTOR_DSI:
+		VOP_CTRL_SET(vop, mipi_en, 1);
+		break;
+	default:
+		DRM_ERROR("unsupport connector_type[%d]\n", connector_type);
+		return -EINVAL;
+	};
+	VOP_CTRL_SET(vop, out_mode, out_mode);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(rockchip_drm_crtc_mode_config);
 
 static int vop_crtc_enable_vblank(struct drm_crtc *crtc)
 {
@@ -918,7 +931,6 @@ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
 static void vop_crtc_enable(struct drm_crtc *crtc)
 {
 	struct vop *vop = to_vop(crtc);
-	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
 	struct drm_display_mode *adjusted_mode = &crtc->state->adjusted_mode;
 	u16 hsync_len = adjusted_mode->hsync_end - adjusted_mode->hsync_start;
 	u16 hdisplay = adjusted_mode->hdisplay;
@@ -930,7 +942,7 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
 	u16 vsync_len = adjusted_mode->vsync_end - adjusted_mode->vsync_start;
 	u16 vact_st = adjusted_mode->vtotal - adjusted_mode->vsync_start;
 	u16 vact_end = vact_st + vdisplay;
-	uint32_t pin_pol, val;
+	uint32_t val;
 
 	vop_enable(crtc);
 	/*
@@ -969,32 +981,10 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
 		vop_dsp_hold_valid_irq_disable(vop);
 	}
 
-	pin_pol = 0x8;
-	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
-	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
-	VOP_CTRL_SET(vop, pin_pol, pin_pol);
-
-	switch (s->output_type) {
-	case DRM_MODE_CONNECTOR_LVDS:
-		VOP_CTRL_SET(vop, rgb_en, 1);
-		VOP_CTRL_SET(vop, rgb_pin_pol, pin_pol);
-		break;
-	case DRM_MODE_CONNECTOR_eDP:
-		VOP_CTRL_SET(vop, edp_pin_pol, pin_pol);
-		VOP_CTRL_SET(vop, edp_en, 1);
-		break;
-	case DRM_MODE_CONNECTOR_HDMIA:
-		VOP_CTRL_SET(vop, hdmi_pin_pol, pin_pol);
-		VOP_CTRL_SET(vop, hdmi_en, 1);
-		break;
-	case DRM_MODE_CONNECTOR_DSI:
-		VOP_CTRL_SET(vop, mipi_pin_pol, pin_pol);
-		VOP_CTRL_SET(vop, mipi_en, 1);
-		break;
-	default:
-		DRM_ERROR("unsupport connector_type[%d]\n", s->output_type);
-	}
-	VOP_CTRL_SET(vop, out_mode, s->output_mode);
+	val = 0x8;
+	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
+	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
+	VOP_CTRL_SET(vop, pin_pol, val);
 
 	VOP_CTRL_SET(vop, htotal_pw, (htotal << 16) | hsync_len);
 	val = hact_st << 16;
@@ -1054,34 +1044,13 @@ static void vop_crtc_destroy(struct drm_crtc *crtc)
 	drm_crtc_cleanup(crtc);
 }
 
-static struct drm_crtc_state *vop_crtc_duplicate_state(struct drm_crtc *crtc)
-{
-	struct rockchip_crtc_state *rockchip_state;
-
-	rockchip_state = kzalloc(sizeof(*rockchip_state), GFP_KERNEL);
-	if (!rockchip_state)
-		return NULL;
-
-	__drm_atomic_helper_crtc_duplicate_state(crtc, &rockchip_state->base);
-	return &rockchip_state->base;
-}
-
-static void vop_crtc_destroy_state(struct drm_crtc *crtc,
-				   struct drm_crtc_state *state)
-{
-	struct rockchip_crtc_state *s = to_rockchip_crtc_state(state);
-
-	__drm_atomic_helper_crtc_destroy_state(crtc, &s->base);
-	kfree(s);
-}
-
 static const struct drm_crtc_funcs vop_crtc_funcs = {
 	.set_config = drm_atomic_helper_set_config,
 	.page_flip = drm_atomic_helper_page_flip,
 	.destroy = vop_crtc_destroy,
 	.reset = drm_atomic_helper_crtc_reset,
-	.atomic_duplicate_state = vop_crtc_duplicate_state,
-	.atomic_destroy_state = vop_crtc_destroy_state,
+	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
 };
 
 static bool vop_win_pending_is_complete(struct vop_win *vop_win)
@@ -1298,7 +1267,7 @@ static int vop_initial(struct vop *vop)
 {
 	const struct vop_data *vop_data = vop->data;
 	const struct vop_reg_data *init_table = vop_data->init_table;
-	struct reset_control *ahb_rst, *axi_rst;
+	struct reset_control *ahb_rst;
 	int i, ret;
 
 	vop->hclk = devm_clk_get(vop->dev, "hclk_vop");
@@ -1335,19 +1304,6 @@ static int vop_initial(struct vop *vop)
 		dev_err(vop->dev, "failed to prepare/enable aclk\n");
 		goto err_disable_hclk;
 	}
-
-	/*
-	 * do aclk_reset, reset all vop registers.
-	 */
-	axi_rst = devm_reset_control_get(vop->dev, "axi");
-	if (IS_ERR(axi_rst)) {
-		dev_err(vop->dev, "failed to get axi reset\n");
-		ret = PTR_ERR(axi_rst);
-		goto err_disable_aclk;
-	}
-	reset_control_assert(axi_rst);
-	usleep_range(10, 20);
-	reset_control_deassert(axi_rst);
 
 	/*
 	 * do hclk_reset, reset all vop registers.

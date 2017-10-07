@@ -83,36 +83,11 @@ static int fib_map_alloc(struct aac_dev *dev)
 
 void aac_fib_map_free(struct aac_dev *dev)
 {
-	if (dev->hw_fib_va && dev->max_fib_size) {
-		pci_free_consistent(dev->pdev,
-		(dev->max_fib_size *
-		(dev->scsi_host_ptr->can_queue + AAC_NUM_MGT_FIB)),
-		dev->hw_fib_va, dev->hw_fib_pa);
-	}
+	pci_free_consistent(dev->pdev,
+	  dev->max_fib_size * (dev->scsi_host_ptr->can_queue + AAC_NUM_MGT_FIB),
+	  dev->hw_fib_va, dev->hw_fib_pa);
 	dev->hw_fib_va = NULL;
 	dev->hw_fib_pa = 0;
-}
-
-void aac_fib_vector_assign(struct aac_dev *dev)
-{
-	u32 i = 0;
-	u32 vector = 1;
-	struct fib *fibptr = NULL;
-
-	for (i = 0, fibptr = &dev->fibs[i];
-		i < (dev->scsi_host_ptr->can_queue + AAC_NUM_MGT_FIB);
-		i++, fibptr++) {
-		if ((dev->max_msix == 1) ||
-		  (i > ((dev->scsi_host_ptr->can_queue + AAC_NUM_MGT_FIB - 1)
-			- dev->vector_cap))) {
-			fibptr->vector_no = 0;
-		} else {
-			fibptr->vector_no = vector;
-			vector++;
-			if (vector == dev->max_msix)
-				vector = 1;
-		}
-	}
 }
 
 /**
@@ -176,12 +151,6 @@ int aac_fib_setup(struct aac_dev * dev)
 		hw_fib_pa = hw_fib_pa +
 			dev->max_fib_size + sizeof(struct aac_fib_xporthdr);
 	}
-
-	/*
-	 *Assign vector numbers to fibs
-	 */
-	aac_fib_vector_assign(dev);
-
 	/*
 	 *	Add the fib chain to the free list
 	 */
@@ -611,10 +580,10 @@ int aac_fib_send(u16 command, struct fib *fibptr, unsigned long size,
 					}
 					return -EFAULT;
 				}
-				/*
-				 * Allow other processes / CPUS to use core
-				 */
-				schedule();
+				/* We used to udelay() here but that absorbed
+				 * a CPU when a timeout occured. Not very
+				 * useful. */
+				cpu_relax();
 			}
 		} else if (down_interruptible(&fibptr->event_wait)) {
 			/* Do nothing ... satisfy
@@ -1970,10 +1939,6 @@ int aac_command_thread(void *data)
 		if (difference <= 0)
 			difference = 1;
 		set_current_state(TASK_INTERRUPTIBLE);
-
-		if (kthread_should_stop())
-			break;
-
 		schedule_timeout(difference);
 
 		if (kthread_should_stop())

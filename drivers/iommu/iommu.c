@@ -848,8 +848,7 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 	if (!group->default_domain) {
 		group->default_domain = __iommu_domain_alloc(dev->bus,
 							     IOMMU_DOMAIN_DMA);
-		if (!group->domain)
-			group->domain = group->default_domain;
+		group->domain = group->default_domain;
 	}
 
 	ret = iommu_group_add_device(group, dev);

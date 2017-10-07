@@ -144,7 +144,7 @@ static void show_backtrace(struct task_struct *task, const struct pt_regs *regs)
 	if (!task)
 		task = current;
 
-	if (raw_show_trace || user_mode(regs) || !__kernel_text_address(pc)) {
+	if (raw_show_trace || !__kernel_text_address(pc)) {
 		show_raw_backtrace(sp);
 		return;
 	}
@@ -690,15 +690,15 @@ static int simulate_sync(struct pt_regs *regs, unsigned int opcode)
 asmlinkage void do_ov(struct pt_regs *regs)
 {
 	enum ctx_state prev_state;
-	siginfo_t info = {
-		.si_signo = SIGFPE,
-		.si_code = FPE_INTOVF,
-		.si_addr = (void __user *)regs->cp0_epc,
-	};
+	siginfo_t info;
 
 	prev_state = exception_enter();
 	die_if_kernel("Integer overflow", regs);
 
+	info.si_code = FPE_INTOVF;
+	info.si_signo = SIGFPE;
+	info.si_errno = 0;
+	info.si_addr = (void __user *) regs->cp0_epc;
 	force_sig_info(SIGFPE, &info, current);
 	exception_exit(prev_state);
 }
@@ -874,7 +874,7 @@ out:
 void do_trap_or_bp(struct pt_regs *regs, unsigned int code,
 	const char *str)
 {
-	siginfo_t info = { 0 };
+	siginfo_t info;
 	char b[40];
 
 #ifdef CONFIG_KGDB_LOW_LEVEL_TRAP
@@ -903,6 +903,7 @@ void do_trap_or_bp(struct pt_regs *regs, unsigned int code,
 		else
 			info.si_code = FPE_INTOVF;
 		info.si_signo = SIGFPE;
+		info.si_errno = 0;
 		info.si_addr = (void __user *) regs->cp0_epc;
 		force_sig_info(SIGFPE, &info, current);
 		break;
@@ -1241,7 +1242,7 @@ static int enable_restore_fp_context(int msa)
 		err = init_fpu();
 		if (msa && !err) {
 			enable_msa();
-			init_msa_upper();
+			_init_msa_upper();
 			set_thread_flag(TIF_USEDMSA);
 			set_thread_flag(TIF_MSA_CTX_LIVE);
 		}
@@ -1304,7 +1305,7 @@ static int enable_restore_fp_context(int msa)
 	 */
 	prior_msa = test_and_set_thread_flag(TIF_MSA_CTX_LIVE);
 	if (!prior_msa && was_fpu_owner) {
-		init_msa_upper();
+		_init_msa_upper();
 
 		goto out;
 	}
@@ -1321,7 +1322,7 @@ static int enable_restore_fp_context(int msa)
 		 * of each vector register such that it cannot see data left
 		 * behind by another task.
 		 */
-		init_msa_upper();
+		_init_msa_upper();
 	} else {
 		/* We need to restore the vector context. */
 		restore_msa(current);

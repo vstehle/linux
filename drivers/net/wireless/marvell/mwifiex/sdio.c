@@ -181,7 +181,7 @@ static int mwifiex_sdio_resume(struct device *dev)
 
 	/* Disable Host Sleep */
 	mwifiex_cancel_hs(mwifiex_get_priv(adapter, MWIFIEX_BSS_ROLE_STA),
-			  MWIFIEX_SYNC_CMD);
+			  MWIFIEX_ASYNC_CMD);
 
 	return 0;
 }
@@ -796,8 +796,8 @@ mwifiex_sdio_interrupt(struct sdio_func *func)
 
 	card = sdio_get_drvdata(func);
 	if (!card || !card->adapter) {
-		pr_err("int: func=%p card=%p adapter=%p\n",
-		       func, card, card ? card->adapter : NULL);
+		pr_debug("int: func=%p card=%p adapter=%p\n",
+			 func, card, card ? card->adapter : NULL);
 		return;
 	}
 	adapter = card->adapter;
@@ -1039,14 +1039,19 @@ done:
 
 /*
  * This function checks the firmware status in card.
+ *
+ * The winner interface is also determined by this function.
  */
 static int mwifiex_check_fw_status(struct mwifiex_adapter *adapter,
 				   u32 poll_num)
 {
+	struct sdio_mmc_card *card = adapter->card;
 	int ret = 0;
 	u16 firmware_stat;
 	u32 tries;
+	u8 winner_status;
 
+	/* Wait for firmware initialization event */
 	for (tries = 0; tries < poll_num; tries++) {
 		ret = mwifiex_sdio_read_fw_status(adapter, &firmware_stat);
 		if (ret)
@@ -1060,25 +1065,16 @@ static int mwifiex_check_fw_status(struct mwifiex_adapter *adapter,
 		}
 	}
 
-	return ret;
-}
+	if (ret) {
+		if (mwifiex_read_reg
+		    (adapter, card->reg->status_reg_0, &winner_status))
+			winner_status = 0;
 
-/* This function checks if WLAN is the winner.
- */
-static int mwifiex_check_winner_status(struct mwifiex_adapter *adapter)
-{
-	int ret = 0;
-	u8 winner = 0;
-	struct sdio_mmc_card *card = adapter->card;
-
-	if (mwifiex_read_reg(adapter, card->reg->status_reg_0, &winner))
-		return -1;
-
-	if (winner)
-		adapter->winner = 0;
-	else
-		adapter->winner = 1;
-
+		if (winner_status)
+			adapter->winner = 0;
+		else
+			adapter->winner = 1;
+	}
 	return ret;
 }
 
@@ -1123,8 +1119,8 @@ static void mwifiex_deaggr_sdio_pkt(struct mwifiex_adapter *adapter,
 				    __func__, pkt_len, blk_size);
 			break;
 		}
-
-		skb_deaggr = mwifiex_alloc_dma_align_buf(pkt_len, GFP_KERNEL);
+		skb_deaggr = mwifiex_alloc_dma_align_buf(pkt_len,
+							 GFP_KERNEL | GFP_DMA);
 		if (!skb_deaggr)
 			break;
 		skb_put(skb_deaggr, pkt_len);
@@ -1355,9 +1351,6 @@ static int mwifiex_sdio_card_to_host_mp_aggr(struct mwifiex_adapter *adapter,
 				 card->mpa_rx.start_port;
 		}
 
-		if (card->mpa_rx.pkt_cnt == 1)
-			mport = adapter->ioport + port;
-
 		if (mwifiex_read_data_sync(adapter, card->mpa_rx.buf,
 					   card->mpa_rx.buf_len, mport, 1))
 			goto error;
@@ -1373,7 +1366,8 @@ static int mwifiex_sdio_card_to_host_mp_aggr(struct mwifiex_adapter *adapter,
 
 			/* copy pkt to deaggr buf */
 			skb_deaggr = mwifiex_alloc_dma_align_buf(len_arr[pind],
-								 GFP_KERNEL);
+								 GFP_KERNEL |
+								 GFP_DMA);
 			if (!skb_deaggr) {
 				mwifiex_dbg(adapter, ERROR, "skb allocation failure\t"
 					    "drop pkt len=%d type=%d\n",
@@ -1686,7 +1680,6 @@ static int mwifiex_host_to_card_mp_aggr(struct mwifiex_adapter *adapter,
 	s32 f_precopy_cur_buf = 0;
 	s32 f_postcopy_cur_buf = 0;
 	u32 mport;
-	int index;
 
 	if (!card->mpa_tx.enabled ||
 	    (card->has_control_mask && (port == CTRL_PORT)) ||
@@ -1788,20 +1781,8 @@ static int mwifiex_host_to_card_mp_aggr(struct mwifiex_adapter *adapter,
 				 card->mpa_tx.start_port;
 		}
 
-		if (card->mpa_tx.pkt_cnt == 1)
-			mport = adapter->ioport + port;
-
 		ret = mwifiex_write_data_to_card(adapter, card->mpa_tx.buf,
 						 card->mpa_tx.buf_len, mport);
-
-		/* Save the last multi port tx aggreagation info to debug log */
-		index = adapter->dbg.last_sdio_mp_index;
-		index = (index + 1) % MWIFIEX_DBG_SDIO_MP_NUM;
-		adapter->dbg.last_sdio_mp_index = index;
-		adapter->dbg.last_mp_wr_ports[index] = mport;
-		adapter->dbg.last_mp_wr_bitmap[index] = card->mp_wr_bitmap;
-		adapter->dbg.last_mp_wr_len[index] = card->mpa_tx.buf_len;
-		adapter->dbg.last_mp_curr_wr_port[index] = card->curr_wr_port;
 
 		MP_TX_AGGR_BUF_RESET(card);
 	}
@@ -2072,19 +2053,8 @@ static int mwifiex_init_sdio(struct mwifiex_adapter *adapter)
 	/* Allocate skb pointer buffers */
 	card->mpa_rx.skb_arr = kzalloc((sizeof(void *)) *
 				       card->mp_agg_pkt_limit, GFP_KERNEL);
-	if (!card->mpa_rx.skb_arr) {
-		kfree(card->mp_regs);
-		return -ENOMEM;
-	}
-
 	card->mpa_rx.len_arr = kzalloc(sizeof(*card->mpa_rx.len_arr) *
 				       card->mp_agg_pkt_limit, GFP_KERNEL);
-	if (!card->mpa_rx.len_arr) {
-		kfree(card->mp_regs);
-		kfree(card->mpa_rx.skb_arr);
-		return -ENOMEM;
-	}
-
 	ret = mwifiex_alloc_sdio_mpa_buffers(adapter,
 					     card->mp_tx_agg_buf_size,
 					     card->mp_rx_agg_buf_size);
@@ -2639,7 +2609,6 @@ static struct mwifiex_if_ops sdio_ops = {
 	.init_if = mwifiex_init_sdio,
 	.cleanup_if = mwifiex_cleanup_sdio,
 	.check_fw_status = mwifiex_check_fw_status,
-	.check_winner_status = mwifiex_check_winner_status,
 	.prog_fw = mwifiex_prog_fw_w_helper,
 	.register_dev = mwifiex_register_dev,
 	.unregister_dev = mwifiex_unregister_dev,

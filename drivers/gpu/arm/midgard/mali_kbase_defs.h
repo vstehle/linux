@@ -470,9 +470,6 @@ struct kbase_jd_context {
 	unsigned fence_context;
 	atomic_t fence_seqno;
 #endif				/* CONFIG_KDS */
-#if (defined(CONFIG_KDS) || defined(CONFIG_DRM_DMA_SYNC)) && defined(CONFIG_SYNC)
-	bool implicit_sync;
-#endif				/* (CONFIG_KDS or CONFIG_DRM_DMA_SYNC) && CONFIG_SYNC */
 #ifdef CONFIG_GPU_TRACEPOINTS
 	atomic_t work_id;
 #endif
@@ -962,7 +959,7 @@ struct kbase_device {
 	unsigned long current_freq;
 	unsigned long current_voltage;
 #ifdef CONFIG_DEVFREQ_THERMAL
-	struct thermal_cooling_device *devfreq_cooling;
+	struct devfreq_cooling_device *devfreq_cooling;
 #endif
 #endif
 

@@ -95,7 +95,7 @@ int mwifiex_init_priv(struct mwifiex_private *priv)
 	priv->curr_pkt_filter = HostCmd_ACT_MAC_RX_ON | HostCmd_ACT_MAC_TX_ON |
 				HostCmd_ACT_MAC_ETHERNETII_ENABLE;
 
-	priv->beacon_period = 100; /* beacon interval */
+	priv->beacon_period = 100; /* beacon interval */ ;
 	priv->attempted_bss_desc = NULL;
 	memset(&priv->curr_bss_params, 0, sizeof(priv->curr_bss_params));
 	priv->listen_interval = MWIFIEX_DEFAULT_LISTEN_INTERVAL;
@@ -741,6 +741,8 @@ int mwifiex_dnld_fw(struct mwifiex_adapter *adapter,
 	u32 poll_num = 1;
 
 	if (adapter->if_ops.check_fw_status) {
+		adapter->winner = 0;
+
 		/* check if firmware is already running */
 		ret = adapter->if_ops.check_fw_status(adapter, poll_num);
 		if (!ret) {
@@ -748,23 +750,13 @@ int mwifiex_dnld_fw(struct mwifiex_adapter *adapter,
 				    "WLAN FW already running! Skip FW dnld\n");
 			return 0;
 		}
-	}
-
-	/* check if we are the winner for downloading FW */
-	if (adapter->if_ops.check_winner_status) {
-		adapter->winner = 0;
-		ret = adapter->if_ops.check_winner_status(adapter);
 
 		poll_num = MAX_FIRMWARE_POLL_TRIES;
-		if (ret) {
-			mwifiex_dbg(adapter, MSG,
-				    "WLAN read winner status failed!\n");
-			return ret;
-		}
 
+		/* check if we are the winner for downloading FW */
 		if (!adapter->winner) {
 			mwifiex_dbg(adapter, MSG,
-				    "WLAN is not the winner! Skip FW dnld\n");
+				    "FW already running! Skip FW dnld\n");
 			goto poll_fw;
 		}
 	}
