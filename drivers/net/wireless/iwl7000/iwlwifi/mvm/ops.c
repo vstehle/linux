@@ -503,7 +503,6 @@ static const struct iwl_hcmd_names iwl_mvm_phy_names[] = {
 static const struct iwl_hcmd_names iwl_mvm_data_path_names[] = {
 	HCMD_NAME(DQA_ENABLE_CMD),
 	HCMD_NAME(UPDATE_MU_GROUPS_CMD),
-	HCMD_NAME(DQA_ENABLE_CMD),
 	HCMD_NAME(TRIGGER_RX_QUEUES_NOTIF_CMD),
 	HCMD_NAME(STA_PM_NOTIF),
 	HCMD_NAME(MU_GROUP_MGMT_NOTIF),
@@ -1225,7 +1224,7 @@ static void iwl_mvm_stop_sw_queue(struct iwl_op_mode *op_mode, int hw_queue)
 	unsigned long mq;
 
 	spin_lock_bh(&mvm->queue_info_lock);
-	mq = mvm->queue_info[hw_queue].hw_queue_to_mac80211;
+	mq = mvm->hw_queue_to_mac80211[hw_queue];
 	spin_unlock_bh(&mvm->queue_info_lock);
 
 	iwl_mvm_stop_mac_queues(mvm, mq);
@@ -1255,7 +1254,7 @@ static void iwl_mvm_wake_sw_queue(struct iwl_op_mode *op_mode, int hw_queue)
 	unsigned long mq;
 
 	spin_lock_bh(&mvm->queue_info_lock);
-	mq = mvm->queue_info[hw_queue].hw_queue_to_mac80211;
+	mq = mvm->hw_queue_to_mac80211[hw_queue];
 	spin_unlock_bh(&mvm->queue_info_lock);
 
 	iwl_mvm_start_mac_queues(mvm, mq);
@@ -1334,44 +1333,43 @@ static void iwl_mvm_fw_error_dump_wk(struct work_struct *work)
 {
 	struct iwl_mvm *mvm =
 		container_of(work, struct iwl_mvm, fw_dump_wk.work);
-	u32 in_sample, out_ctrl;
 
 	if (iwl_mvm_ref_sync(mvm, IWL_MVM_REF_FW_DBG_COLLECT))
 		return;
 
 	mutex_lock(&mvm->mutex);
 
-	/* stop recording */
 	if (mvm->cfg->device_family == IWL_DEVICE_FAMILY_7000) {
+		/* stop recording */
 		iwl_set_bits_prph(mvm->trans, MON_BUFF_SAMPLE_CTL, 0x100);
-	} else {
-		in_sample = iwl_read_prph(mvm->trans, DBGC_IN_SAMPLE);
-		out_ctrl = iwl_read_prph(mvm->trans, DBGC_OUT_CTRL);
 
+		iwl_mvm_fw_error_dump(mvm);
+
+		/* start recording again if the firmware is not crashed */
+		if (!test_bit(STATUS_FW_ERROR, &mvm->trans->status) &&
+		    mvm->fw->dbg_dest_tlv) {
+			iwl_clear_bits_prph(mvm->trans,
+					    MON_BUFF_SAMPLE_CTL, 0x100);
+			iwl_clear_bits_prph(mvm->trans,
+					    MON_BUFF_SAMPLE_CTL, 0x1);
+			iwl_set_bits_prph(mvm->trans, MON_BUFF_SAMPLE_CTL, 0x1);
+		}
+	} else {
+		u32 in_sample = iwl_read_prph(mvm->trans, DBGC_IN_SAMPLE);
+		u32 out_ctrl = iwl_read_prph(mvm->trans, DBGC_OUT_CTRL);
+
+		/* stop recording */
 		iwl_write_prph(mvm->trans, DBGC_IN_SAMPLE, 0);
 		udelay(100);
 		iwl_write_prph(mvm->trans, DBGC_OUT_CTRL, 0);
 		/* wait before we collect the data till the DBGC stop */
 		udelay(500);
-	}
 
-	iwl_mvm_fw_error_dump(mvm);
+		iwl_mvm_fw_error_dump(mvm);
 
-	if (mvm->cfg->device_family == IWL_DEVICE_FAMILY_7000 &&
-	    !test_bit(STATUS_FW_ERROR, &mvm->trans->status) &&
-		      mvm->fw->dbg_dest_tlv) {
-		iwl_clear_bits_prph(mvm->trans, MON_BUFF_SAMPLE_CTL, 0x100);
-		iwl_clear_bits_prph(mvm->trans, MON_BUFF_SAMPLE_CTL, 0x1);
-		iwl_set_bits_prph(mvm->trans, MON_BUFF_SAMPLE_CTL, 0x1);
-	}
-
-	/* start recording again if the firmware is not crashed */
-	if (!test_bit(STATUS_FW_ERROR, &mvm->trans->status) &&
-	    mvm->fw->dbg_dest_tlv) {
-		if (mvm->cfg->device_family == IWL_DEVICE_FAMILY_7000) {
-			iwl_clear_bits_prph(mvm->trans,
-					    MON_BUFF_SAMPLE_CTL, 0x100);
-		} else {
+		/* start recording again if the firmware is not crashed */
+		if (!test_bit(STATUS_FW_ERROR, &mvm->trans->status) &&
+		    mvm->fw->dbg_dest_tlv) {
 			iwl_write_prph(mvm->trans, DBGC_IN_SAMPLE, in_sample);
 			iwl_write_prph(mvm->trans, DBGC_OUT_CTRL, out_ctrl);
 		}
@@ -1479,7 +1477,7 @@ static bool iwl_mvm_disallow_offloading(struct iwl_mvm *mvm,
 	u8 tid;
 
 	if (WARN_ON(vif->type != NL80211_IFTYPE_STATION ||
-		    mvmvif->ap_sta_id == IWL_MVM_STATION_COUNT))
+		    mvmvif->ap_sta_id == IWL_MVM_INVALID_STA))
 		return false;
 
 	mvmsta = iwl_mvm_sta_from_staid_rcu(mvm, mvmvif->ap_sta_id);
@@ -1567,7 +1565,7 @@ static void iwl_mvm_set_wowlan_data(struct iwl_mvm *mvm,
 	struct ieee80211_sta *ap_sta;
 	struct iwl_mvm_sta *mvm_ap_sta;
 
-	if (iter_data->ap_sta_id == IWL_MVM_STATION_COUNT)
+	if (iter_data->ap_sta_id == IWL_MVM_INVALID_STA)
 		return;
 
 	rcu_read_lock();
@@ -1637,7 +1635,7 @@ int iwl_mvm_enter_d0i3(struct iwl_op_mode *op_mode)
 		mvm->d0i3_offloading = !d0i3_iter_data.disable_offloading;
 	} else {
 		WARN_ON_ONCE(d0i3_iter_data.vif_count > 1);
-		mvm->d0i3_ap_sta_id = IWL_MVM_STATION_COUNT;
+		mvm->d0i3_ap_sta_id = IWL_MVM_INVALID_STA;
 		mvm->d0i3_offloading = false;
 	}
 
@@ -1653,7 +1651,7 @@ int iwl_mvm_enter_d0i3(struct iwl_op_mode *op_mode)
 		return ret;
 
 	/* configure wowlan configuration only if needed */
-	if (mvm->d0i3_ap_sta_id != IWL_MVM_STATION_COUNT) {
+	if (mvm->d0i3_ap_sta_id != IWL_MVM_INVALID_STA) {
 		/* wake on beacons only if beacon storing isn't supported */
 		if (!fw_has_capa(&mvm->fw->ucode_capa,
 				 IWL_UCODE_TLV_CAPA_BEACON_STORING))
@@ -1730,7 +1728,7 @@ void iwl_mvm_d0i3_enable_tx(struct iwl_mvm *mvm, __le16 *qos_seq)
 
 	spin_lock_bh(&mvm->d0i3_tx_lock);
 
-	if (mvm->d0i3_ap_sta_id == IWL_MVM_STATION_COUNT)
+	if (mvm->d0i3_ap_sta_id == IWL_MVM_INVALID_STA)
 		goto out;
 
 	IWL_DEBUG_RPM(mvm, "re-enqueue packets\n");
@@ -1768,7 +1766,7 @@ out:
 	}
 	clear_bit(IWL_MVM_STATUS_IN_D0I3, &mvm->status);
 	wake_up(&mvm->d0i3_exit_waitq);
-	mvm->d0i3_ap_sta_id = IWL_MVM_STATION_COUNT;
+	mvm->d0i3_ap_sta_id = IWL_MVM_INVALID_STA;
 	if (wake_queues)
 		ieee80211_wake_queues(mvm->hw);
 

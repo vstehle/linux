@@ -2737,7 +2737,8 @@ static int ieee80211_set_bitrate_mask(struct wiphy *wiphy,
 			return ret;
 	}
 
-	/* If active validate the setting and reject it if it doesn't leave
+	/*
+	 * If active validate the setting and reject it if it doesn't leave
 	 * at least one basic rate usable, since we really have to be able
 	 * to send something, and if we're an AP we have to be able to do
 	 * so at a basic rate so that all clients can receive it.

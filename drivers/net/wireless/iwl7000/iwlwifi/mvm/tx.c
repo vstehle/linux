@@ -549,6 +549,7 @@ static int iwl_mvm_get_ctrl_vif_queue(struct iwl_mvm *mvm,
 
 	switch (info->control.vif->type) {
 	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_ADHOC:
 		/*
 		 * Handle legacy hostapd as well, where station may be added
 		 * only after assoc. Take care of the case where we send a
@@ -560,7 +561,8 @@ static int iwl_mvm_get_ctrl_vif_queue(struct iwl_mvm *mvm,
 		if (info->hw_queue == info->control.vif->cab_queue)
 			return info->hw_queue;
 
-		WARN_ONCE(1, "fc=0x%02x", le16_to_cpu(fc));
+		WARN_ONCE(info->control.vif->type != NL80211_IFTYPE_ADHOC,
+			  "fc=0x%02x", le16_to_cpu(fc));
 		return mvm->probe_queue;
 	case NL80211_IFTYPE_P2P_DEVICE:
 		if (ieee80211_is_mgmt(fc))
@@ -626,18 +628,21 @@ int iwl_mvm_tx_skb_non_sta(struct iwl_mvm *mvm, struct sk_buff *skb)
 			iwl_mvm_vif_from_mac80211(info.control.vif);
 
 		if (info.control.vif->type == NL80211_IFTYPE_P2P_DEVICE ||
-		    info.control.vif->type == NL80211_IFTYPE_AP) {
+		    info.control.vif->type == NL80211_IFTYPE_AP ||
+		    info.control.vif->type == NL80211_IFTYPE_ADHOC) {
 			sta_id = mvmvif->bcast_sta.sta_id;
 			queue = iwl_mvm_get_ctrl_vif_queue(mvm, &info,
 							   hdr->frame_control);
 			if (queue < 0)
 				return -1;
 
+			if (queue == info.control.vif->cab_queue)
+				queue = mvmvif->cab_queue;
 		} else if (info.control.vif->type == NL80211_IFTYPE_STATION &&
 			   is_multicast_ether_addr(hdr->addr1)) {
 			u8 ap_sta_id = ACCESS_ONCE(mvmvif->ap_sta_id);
 
-			if (ap_sta_id != IWL_MVM_STATION_COUNT)
+			if (ap_sta_id != IWL_MVM_INVALID_STA)
 				sta_id = ap_sta_id;
 		} else if (iwl_mvm_is_dqa_supported(mvm) &&
 			   info.control.vif->type == NL80211_IFTYPE_STATION &&
@@ -896,6 +901,9 @@ static bool iwl_mvm_txq_should_update(struct iwl_mvm *mvm, int txq_id)
 	unsigned long now = jiffies;
 	int tid;
 
+	if (WARN_ON(iwl_mvm_has_new_tx_api(mvm)))
+		return false;
+
 	for_each_set_bit(tid, &queue_tid_bitmap, IWL_MAX_TID_COUNT + 1) {
 		if (time_before(mvm->queue_info[txq_id].last_frame_time[tid] +
 				IWL_MVM_DQA_QUEUE_TIMEOUT, now))
@@ -957,7 +965,7 @@ static int iwl_mvm_tx_mpdu(struct iwl_mvm *mvm, struct sk_buff *skb,
 	if (WARN_ON_ONCE(!mvmsta))
 		return -1;
 
-	if (WARN_ON_ONCE(mvmsta->sta_id == IWL_MVM_STATION_COUNT))
+	if (WARN_ON_ONCE(mvmsta->sta_id == IWL_MVM_INVALID_STA))
 		return -1;
 
 	dev_cmd = iwl_mvm_set_tx_params(mvm, skb, info, hdrlen,
@@ -1032,6 +1040,9 @@ static int iwl_mvm_tx_mpdu(struct iwl_mvm *mvm, struct sk_buff *skb,
 			return 0;
 		}
 
+		/* queue should always be active in new TX path */
+		WARN_ON(iwl_mvm_has_new_tx_api(mvm));
+
 		/* If we are here - TXQ exists and needs to be re-activated */
 		spin_lock(&mvm->queue_info_lock);
 		mvm->queue_info[txq_id].status = IWL_MVM_QUEUE_READY;
@@ -1042,7 +1053,7 @@ static int iwl_mvm_tx_mpdu(struct iwl_mvm *mvm, struct sk_buff *skb,
 				    txq_id);
 	}
 
-	if (iwl_mvm_is_dqa_supported(mvm)) {
+	if (iwl_mvm_is_dqa_supported(mvm) && !iwl_mvm_has_new_tx_api(mvm)) {
 		/* Keep track of the time of the last frame for this RA/TID */
 		mvm->queue_info[txq_id].last_frame_time[tid] = jiffies;
 
@@ -1106,7 +1117,7 @@ int iwl_mvm_tx_skb(struct iwl_mvm *mvm, struct sk_buff *skb,
 	if (WARN_ON_ONCE(!mvmsta))
 		return -1;
 
-	if (WARN_ON_ONCE(mvmsta->sta_id == IWL_MVM_STATION_COUNT))
+	if (WARN_ON_ONCE(mvmsta->sta_id == IWL_MVM_INVALID_STA))
 		return -1;
 
 	memcpy(&info, skb->cb, sizeof(info));
@@ -1315,6 +1326,26 @@ static void iwl_mvm_tx_status_check_trigger(struct iwl_mvm *mvm,
 	}
 }
 
+/**
+ * iwl_mvm_get_scd_ssn - returns the SSN of the SCD
+ * @tx_resp: the Tx response from the fw (agg or non-agg)
+ *
+ * When the fw sends an AMPDU, it fetches the MPDUs one after the other. Since
+ * it can't know that everything will go well until the end of the AMPDU, it
+ * can't know in advance the number of MPDUs that will be sent in the current
+ * batch. This is why it writes the agg Tx response while it fetches the MPDUs.
+ * Hence, it can't know in advance what the SSN of the SCD will be at the end
+ * of the batch. This is why the SSN of the SCD is written at the end of the
+ * whole struct at a variable offset. This function knows how to cope with the
+ * variable offset and returns the SSN of the SCD.
+ */
+static inline u32 iwl_mvm_get_scd_ssn(struct iwl_mvm *mvm,
+				      struct iwl_mvm_tx_resp *tx_resp)
+{
+	return le32_to_cpup((__le32 *)iwl_mvm_get_agg_status(mvm, tx_resp) +
+			    tx_resp->frame_count) & 0xfff;
+}
+
 static void iwl_mvm_rx_tx_cmd_single(struct iwl_mvm *mvm,
 				     struct iwl_rx_packet *pkt)
 {
@@ -1324,8 +1355,10 @@ static void iwl_mvm_rx_tx_cmd_single(struct iwl_mvm *mvm,
 	struct iwl_mvm_tx_resp *tx_resp = (void *)pkt->data;
 	int sta_id = IWL_MVM_TX_RES_GET_RA(tx_resp->ra_tid);
 	int tid = IWL_MVM_TX_RES_GET_TID(tx_resp->ra_tid);
-	u32 status = le16_to_cpu(tx_resp->status.status);
-	u16 ssn = iwl_mvm_get_scd_ssn(tx_resp);
+	struct agg_tx_status *agg_status =
+		iwl_mvm_get_agg_status(mvm, tx_resp);
+	u32 status = le16_to_cpu(agg_status->status);
+	u16 ssn = iwl_mvm_get_scd_ssn(mvm, tx_resp);
 	struct iwl_mvm_sta *mvmsta;
 	struct sk_buff_head skbs;
 	u8 skb_freed = 0;
@@ -1334,6 +1367,9 @@ static void iwl_mvm_rx_tx_cmd_single(struct iwl_mvm *mvm,
 	bool is_ndp = false;
 
 	__skb_queue_head_init(&skbs);
+
+	if (iwl_mvm_has_new_tx_api(mvm))
+		txq_id = le16_to_cpu(tx_resp->v6.tx_queue);
 
 	seq_ctl = le16_to_cpu(tx_resp->seq_ctl);
 
@@ -1471,7 +1507,7 @@ static void iwl_mvm_rx_tx_cmd_single(struct iwl_mvm *mvm,
 				   le16_to_cpu(tx_resp->wireless_media_time));
 #endif
 
-		if (tid != IWL_TID_NON_QOS) {
+		if (tid != IWL_TID_NON_QOS && tid != IWL_MGMT_TID) {
 			struct iwl_mvm_tid_data *tid_data =
 				&mvmsta->tid_data[tid];
 			bool send_eosp_ndp = false;
@@ -1603,7 +1639,8 @@ static void iwl_mvm_rx_tx_cmd_agg_dbg(struct iwl_mvm *mvm,
 				      struct iwl_rx_packet *pkt)
 {
 	struct iwl_mvm_tx_resp *tx_resp = (void *)pkt->data;
-	struct agg_tx_status *frame_status = &tx_resp->status;
+	struct agg_tx_status *frame_status =
+		iwl_mvm_get_agg_status(mvm, tx_resp);
 	int i;
 
 	for (i = 0; i < tx_resp->frame_count; i++) {
@@ -1832,9 +1869,12 @@ void iwl_mvm_rx_ba_notif(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
 		 * This will go together with SN and AddBA offload and cannot
 		 * be handled properly for now.
 		 */
-		WARN_ON(le16_to_cpu(ba_res->tfd_cnt) != 1);
-		iwl_mvm_tx_reclaim(mvm, sta_id, ba_res->ra_tid[0].tid,
-				   (int)ba_res->tfd[0].q_num,
+		WARN_ON(le16_to_cpu(ba_res->ra_tid_cnt) != 1);
+		tid = ba_res->ra_tid[0].tid;
+		if (tid == IWL_MGMT_TID)
+			tid = IWL_MAX_TID_COUNT;
+		iwl_mvm_tx_reclaim(mvm, sta_id, tid,
+				   (int)(le16_to_cpu(ba_res->tfd[0].q_num)),
 				   le16_to_cpu(ba_res->tfd[0].tfd_index),
 				   &ba_info, le32_to_cpu(ba_res->tx_rate));
 
@@ -1920,4 +1960,21 @@ int iwl_mvm_flush_tx_path(struct iwl_mvm *mvm, u32 tfd_msk, u32 flags)
 	if (ret)
 		IWL_ERR(mvm, "Failed to send flush command (%d)\n", ret);
 	return ret;
+}
+
+int iwl_mvm_flush_sta(struct iwl_mvm *mvm, void *sta, bool int_sta, u32 flags)
+{
+	u32 mask;
+
+	if (int_sta) {
+		struct iwl_mvm_int_sta *int_sta = sta;
+
+		mask = int_sta->tfd_queue_msk;
+	} else {
+		struct iwl_mvm_sta *mvm_sta = sta;
+
+		mask = mvm_sta->tfd_queue_msk;
+	}
+
+	return iwl_mvm_flush_tx_path(mvm, mask, flags);
 }

@@ -74,6 +74,7 @@
  *	Otherwise, use rate_n_flags from the TX command
  * @TX_CMD_FLG_BAR: this frame is a BA request, immediate BAR is expected
  *	Must set TX_CMD_FLG_ACK with this flag.
+ * @TX_CMD_FLG_TXOP_PROT: TXOP protection requested
  * @TX_CMD_FLG_VHT_NDPA: mark frame is NDPA for VHT beamformer sequence
  * @TX_CMD_FLG_HT_NDPA: mark frame is NDPA for HT beamformer sequence
  * @TX_CMD_FLG_CSI_FDBK2HOST: mark to send feedback to host (only if good CRC)
@@ -201,7 +202,7 @@ enum iwl_tx_cmd_sec_ctrl {
 
 /**
  * enum iwl_tx_offload_assist_flags_pos -  set %iwl_tx_cmd offload_assist values
- * @TX_CMD_OFFLD_IP_HDR_OFFSET: offset to start of IP header (in words)
+ * @TX_CMD_OFFLD_IP_HDR: offset to start of IP header (in words)
  *	from mac header end. For normal case it is 4 words for SNAP.
  *	note: tx_cmd, mac header and pad are not counted in the offset.
  *	This is used to help the offload in case there is tunneling such as
@@ -235,12 +236,14 @@ enum iwl_tx_offload_assist_flags_pos {
  * @len: in bytes of the payload, see below for details
  * @offload_assist: TX offload configuration
  * @tx_flags: combination of TX_CMD_FLG_*
+ * @scratch: scratch buffer used by the device
  * @rate_n_flags: rate for *all* Tx attempts, if TX_CMD_FLG_STA_RATE_MSK is
  *	cleared. Combination of RATE_MCS_*
  * @sta_id: index of destination station in FW station table
  * @sec_ctl: security control, TX_CMD_SEC_*
  * @initial_rate_index: index into the the rate table for initial TX attempt.
  *	Applied if TX_CMD_FLG_STA_RATE_MSK is set, normally 0 for data frames.
+ * @reserved2: reserved
  * @key: security key
  * @reserved3: reserved
  * @life_time: frame life time (usecs??)
@@ -249,8 +252,11 @@ enum iwl_tx_offload_assist_flags_pos {
  * @dram_msb_ptr: upper bits of the scratch physical address
  * @rts_retry_limit: max attempts for RTS
  * @data_retry_limit: max attempts to send the data packet
- * @tid_spec: TID/tspec
+ * @tid_tspec: TID/tspec
  * @pm_frame_timeout: PM TX frame timeout
+ * @reserved4: reserved
+ * @payload: payload (same as @hdr)
+ * @hdr: 802.11 header (same as @payload)
  *
  * The byte count (both len and next_frame_len) includes MAC header
  * (24/26/30/32 bytes)
@@ -304,10 +310,11 @@ struct iwl_dram_sec_info {
  * ( TX_CMD = 0x1c )
  * @len: in bytes of the payload, see below for details
  * @offload_assist: TX offload configuration
- * @tx_flags: combination of &iwl_tx_cmd_flags
+ * @flags: combination of &enum iwl_tx_cmd_flags
  * @dram_info: FW internal DRAM storage
  * @rate_n_flags: rate for *all* Tx attempts, if TX_CMD_FLG_STA_RATE_MSK is
  *	cleared. Combination of RATE_MCS_*
+ * @hdr: 802.11 header
  */
 struct iwl_tx_cmd_gen2 {
 	__le16 len;
@@ -522,15 +529,19 @@ struct agg_tx_status {
  * @pa_integ_res_b: tx power info
  * @pa_integ_res_c: tx power info
  * @measurement_req_id: tx power info
+ * @reduced_tpc: transmit power reduction used
+ * @reserved: reserved
  * @tfd_info: TFD information set by the FH
  * @seq_ctl: sequence control from the Tx cmd
  * @byte_cnt: byte count from the Tx cmd
  * @tlc_info: TLC rate info
  * @ra_tid: bits [3:0] = ra, bits [7:4] = tid
  * @frame_ctrl: frame control
+ * @tx_queue: TX queue for this response
  * @status: for non-agg:  frame status TX_STATUS_*
  *	for agg: status of 1st frame, AGG_TX_STATE_*; other frame status fields
  *	follow this one, up to frame_count.
+ *	For version 6 TX response isn't received for aggregation at all.
  *
  * After the array of statuses comes the SSN of the SCD. Look at
  * %iwl_mvm_get_scd_ssn for more details.
@@ -557,17 +568,26 @@ struct iwl_mvm_tx_resp {
 	u8 tlc_info;
 	u8 ra_tid;
 	__le16 frame_ctrl;
-
-	struct agg_tx_status status;
-} __packed; /* TX_RSP_API_S_VER_3 */
+	union {
+		struct {
+			struct agg_tx_status status;
+		} v3;/* TX_RSP_API_S_VER_3 */
+		struct {
+			__le16 tx_queue;
+			__le16 reserved2;
+			struct agg_tx_status status;
+		} v6;
+	};
+} __packed; /* TX_RSP_API_S_VER_6 */
 
 /**
  * struct iwl_mvm_ba_notif - notifies about reception of BA
  * ( BA_NOTIF = 0xc5 )
  * @sta_addr: MAC address
+ * @reserved: reserved
  * @sta_id: Index of recipient (BA-sending) station in fw's station table
  * @tid: tid of the session
- * @seq_ctl:
+ * @seq_ctl: sequence control field
  * @bitmap: the bitmap of the BA notification as seen in the air
  * @scd_flow: the tx queue this BA relates to
  * @scd_ssn: the index of the last contiguously sent packet
@@ -576,6 +596,7 @@ struct iwl_mvm_tx_resp {
  * @reduced_txp: power reduced according to TPC. This is the actual value and
  *	not a copy from the LQ command. Thus, if not the first rate was used
  *	for Tx-ing then this value will be set to 0 by FW.
+ * @reserved1: reserved
  */
 struct iwl_mvm_ba_notif {
 	u8 sta_addr[ETH_ALEN];
@@ -597,11 +618,14 @@ struct iwl_mvm_ba_notif {
  * struct iwl_mvm_compressed_ba_tfd - progress of a TFD queue
  * @q_num: TFD queue number
  * @tfd_index: Index of first un-acked frame in the  TFD queue
+ * @scd_queue: For debug only - the physical queue the TFD queue is bound to
+ * @reserved: reserved for alignment
  */
 struct iwl_mvm_compressed_ba_tfd {
-	u8 q_num;
-	u8 reserved;
+	__le16 q_num;
 	__le16 tfd_index;
+	u8 scd_queue;
+	u8 reserved[3];
 } __packed; /* COMPRESSED_BA_TFD_API_S_VER_1 */
 
 /**
@@ -649,11 +673,12 @@ enum iwl_mvm_ba_resp_flags {
  * @query_frame_cnt: SCD query frame count
  * @txed: number of frames sent in the aggregation (all-TIDs)
  * @done: number of frames that were Acked by the BA (all-TIDs)
+ * @reserved: reserved (for alignment)
  * @wireless_time: Wireless-media time
  * @tx_rate: the rate the aggregation was sent at
  * @tfd_cnt: number of TFD-Q elements
  * @ra_tid_cnt: number of RATID-Q elements
- * @ba_tfd: array of TFD queue status updates. See &iwl_mvm_compressed_ba_tfd
+ * @tfd: array of TFD queue status updates. See &iwl_mvm_compressed_ba_tfd
  *	for details.
  * @ra_tid: array of RA-TID queue status updates. For debug purposes only. See
  *	&iwl_mvm_compressed_ba_ratid for more details.
@@ -727,6 +752,7 @@ struct iwl_mac_beacon_cmd_v7 {
  * struct iwl_mac_beacon_cmd - beacon template command with offloaded CSA
  * @byte_cnt: byte count of the beacon frame
  * @flags: for future use
+ * @reserved: reserved
  * @data: see &iwl_mac_beacon_cmd_data
  */
 struct iwl_mac_beacon_cmd {
@@ -777,25 +803,6 @@ struct iwl_tx_path_flush_cmd {
 	__le16 reserved;
 } __packed; /* TX_PATH_FLUSH_CMD_API_S_VER_1 */
 
-/**
- * iwl_mvm_get_scd_ssn - returns the SSN of the SCD
- * @tx_resp: the Tx response from the fw (agg or non-agg)
- *
- * When the fw sends an AMPDU, it fetches the MPDUs one after the other. Since
- * it can't know that everything will go well until the end of the AMPDU, it
- * can't know in advance the number of MPDUs that will be sent in the current
- * batch. This is why it writes the agg Tx response while it fetches the MPDUs.
- * Hence, it can't know in advance what the SSN of the SCD will be at the end
- * of the batch. This is why the SSN of the SCD is written at the end of the
- * whole struct at a variable offset. This function knows how to cope with the
- * variable offset and returns the SSN of the SCD.
- */
-static inline u32 iwl_mvm_get_scd_ssn(struct iwl_mvm_tx_resp *tx_resp)
-{
-	return le32_to_cpup((__le32 *)&tx_resp->status +
-			    tx_resp->frame_count) & 0xfff;
-}
-
 /* Available options for the SCD_QUEUE_CFG HCMD */
 enum iwl_scd_cfg_actions {
 	SCD_CFG_DISABLE_QUEUE		= 0x0,
@@ -805,16 +812,17 @@ enum iwl_scd_cfg_actions {
 
 /**
  * struct iwl_scd_txq_cfg_cmd - New txq hw scheduler config command
- * @token:
+ * @token: unused
  * @sta_id: station id
- * @tid:
+ * @tid: TID
  * @scd_queue: scheduler queue to confiug
  * @action: 1 queue enable, 0 queue disable, 2 change txq's tid owner
- *	Value is one of %iwl_scd_cfg_actions options
+ *	Value is one of &enum iwl_scd_cfg_actions options
  * @aggregate: 1 aggregated queue, 0 otherwise
- * @tx_fifo: %enum iwl_mvm_tx_fifo
+ * @tx_fifo: &enum iwl_mvm_tx_fifo
  * @window: BA window size
  * @ssn: SSN for the BA agreement
+ * @reserved: reserved
  */
 struct iwl_scd_txq_cfg_cmd {
 	u8 token;

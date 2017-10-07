@@ -627,13 +627,13 @@ struct iwl_tx_ant_cfg_cmd {
 	__le32 valid;
 } __packed;
 
-/*
- * Calibration control struct.
+/**
+ * struct iwl_calib_ctrl - Calibration control struct.
  * Sent as part of the phy configuration command.
  * @flow_trigger: bitmap for which calibrations to perform according to
- *		flow triggers.
+ *		flow triggers, using &enum iwl_calib_cfg
  * @event_trigger: bitmap for which calibrations to perform according to
- *		event triggers.
+ *		event triggers, using &enum iwl_calib_cfg
  */
 struct iwl_calib_ctrl {
 	__le32 flow_trigger;
@@ -665,8 +665,10 @@ enum iwl_calib_cfg {
 	IWL_CALIB_CFG_AGC_IDX			= BIT(18),
 };
 
-/*
- * Phy configuration command.
+/**
+ * struct iwl_phy_cfg_cmd - Phy configuration command
+ * @phy_cfg: PHY configuration value, uses &enum iwl_fw_phy_cfg
+ * @calib_control: calibration control data
  */
 struct iwl_phy_cfg_cmd {
 	__le32	phy_cfg;
@@ -685,15 +687,39 @@ struct iwl_phy_cfg_cmd {
 #define PHY_CFG_RX_CHAIN_C	BIT(14)
 
 
-/* Target of the NVM_ACCESS_CMD */
-enum {
+/**
+ * enum iwl_nvm_access_op - NVM access opcode
+ * @IWL_NVM_READ: read NVM
+ * @IWL_NVM_WRITE: write NVM
+ */
+enum iwl_nvm_access_op {
+	IWL_NVM_READ	= 0,
+	IWL_NVM_WRITE	= 1,
+};
+
+/**
+ * enum iwl_nvm_access_target - target of the NVM_ACCESS_CMD
+ * @NVM_ACCESS_TARGET_CACHE: access the cache
+ * @NVM_ACCESS_TARGET_OTP: access the OTP
+ * @NVM_ACCESS_TARGET_EEPROM: access the EEPROM
+ */
+enum iwl_nvm_access_target {
 	NVM_ACCESS_TARGET_CACHE = 0,
 	NVM_ACCESS_TARGET_OTP = 1,
 	NVM_ACCESS_TARGET_EEPROM = 2,
 };
 
-/* Section types for NVM_ACCESS_CMD */
-enum {
+/**
+ * enum iwl_nvm_section_type - section types for NVM_ACCESS_CMD
+ * @NVM_SECTION_TYPE_SW: software section
+ * @NVM_SECTION_TYPE_REGULATORY: regulatory section
+ * @NVM_SECTION_TYPE_CALIBRATION: calibration section
+ * @NVM_SECTION_TYPE_PRODUCTION: production section
+ * @NVM_SECTION_TYPE_MAC_OVERRIDE: MAC override section
+ * @NVM_SECTION_TYPE_PHY_SKU: PHY SKU section
+ * @NVM_MAX_NUM_SECTIONS: number of sections
+ */
+enum iwl_nvm_section_type {
 	NVM_SECTION_TYPE_SW = 1,
 	NVM_SECTION_TYPE_REGULATORY = 3,
 	NVM_SECTION_TYPE_CALIBRATION = 4,
@@ -704,10 +730,10 @@ enum {
 };
 
 /**
- * struct iwl_nvm_access_cmd_ver2 - Request the device to send an NVM section
- * @op_code: 0 - read, 1 - write
- * @target: NVM_ACCESS_TARGET_*
- * @type: NVM_SECTION_TYPE_*
+ * struct iwl_nvm_access_cmd - Request the device to send an NVM section
+ * @op_code: &enum iwl_nvm_access_op
+ * @target: &enum iwl_nvm_access_target
+ * @type: &enum iwl_nvm_section_type
  * @offset: offset in bytes into the section
  * @length: in bytes, to read/write
  * @data: if write operation, the data to write. On read its empty
@@ -761,12 +787,12 @@ struct iwl_fw_paging_cmd {
 	__le64 device_phy_addr[NUM_OF_FW_PAGING_BLOCKS];
 } __packed; /* FW_PAGING_BLOCK_CMD_API_S_VER_2 */
 
-/*
+/**
  * struct iwl_soc_configuration_cmd - Set device stabilization latency
  *
  * @device_type: the device type as defined in &enum iwl_soc_device_types
  * @soc_latency: time for SOC to ensure stable power & XTAL
-*/
+ */
 struct iwl_soc_configuration_cmd {
 	__le32 device_type;
 	__le32 soc_latency;
@@ -864,60 +890,7 @@ enum {
 
 #define IWL_ALIVE_FLG_RFKILL	BIT(0)
 
-struct mvm_alive_resp_ver1 {
-	__le16 status;
-	__le16 flags;
-	u8 ucode_minor;
-	u8 ucode_major;
-	__le16 id;
-	u8 api_minor;
-	u8 api_major;
-	u8 ver_subtype;
-	u8 ver_type;
-	u8 mac;
-	u8 opt;
-	__le16 reserved2;
-	__le32 timestamp;
-	__le32 error_event_table_ptr;	/* SRAM address for error log */
-	__le32 log_event_table_ptr;	/* SRAM address for event log */
-	__le32 cpu_register_ptr;
-	__le32 dbgm_config_ptr;
-	__le32 alive_counter_ptr;
-	__le32 scd_base_ptr;		/* SRAM address for SCD */
-} __packed; /* ALIVE_RES_API_S_VER_1 */
-
-struct mvm_alive_resp_ver2 {
-	__le16 status;
-	__le16 flags;
-	u8 ucode_minor;
-	u8 ucode_major;
-	__le16 id;
-	u8 api_minor;
-	u8 api_major;
-	u8 ver_subtype;
-	u8 ver_type;
-	u8 mac;
-	u8 opt;
-	__le16 reserved2;
-	__le32 timestamp;
-	__le32 error_event_table_ptr;	/* SRAM address for error log */
-	__le32 log_event_table_ptr;	/* SRAM address for LMAC event log */
-	__le32 cpu_register_ptr;
-	__le32 dbgm_config_ptr;
-	__le32 alive_counter_ptr;
-	__le32 scd_base_ptr;		/* SRAM address for SCD */
-	__le32 st_fwrd_addr;		/* pointer to Store and forward */
-	__le32 st_fwrd_size;
-	u8 umac_minor;			/* UMAC version: minor */
-	u8 umac_major;			/* UMAC version: major */
-	__le16 umac_id;			/* UMAC version: id */
-	__le32 error_info_addr;		/* SRAM address for UMAC error log */
-	__le32 dbg_print_buff_addr;
-} __packed; /* ALIVE_RES_API_S_VER_2 */
-
-struct mvm_alive_resp {
-	__le16 status;
-	__le16 flags;
+struct iwl_lmac_alive {
 	__le32 ucode_minor;
 	__le32 ucode_major;
 	u8 ver_subtype;
@@ -933,11 +906,28 @@ struct mvm_alive_resp {
 	__le32 scd_base_ptr;		/* SRAM address for SCD */
 	__le32 st_fwrd_addr;		/* pointer to Store and forward */
 	__le32 st_fwrd_size;
+} __packed; /* UCODE_ALIVE_NTFY_API_S_VER_3 */
+
+struct iwl_umac_alive {
 	__le32 umac_minor;		/* UMAC version: minor */
 	__le32 umac_major;		/* UMAC version: major */
 	__le32 error_info_addr;		/* SRAM address for UMAC error log */
 	__le32 dbg_print_buff_addr;
+} __packed; /* UMAC_ALIVE_DATA_API_S_VER_2 */
+
+struct mvm_alive_resp_v3 {
+	__le16 status;
+	__le16 flags;
+	struct iwl_lmac_alive lmac_data;
+	struct iwl_umac_alive umac_data;
 } __packed; /* ALIVE_RES_API_S_VER_3 */
+
+struct mvm_alive_resp {
+	__le16 status;
+	__le16 flags;
+	struct iwl_lmac_alive lmac_data[2];
+	struct iwl_umac_alive umac_data;
+} __packed; /* ALIVE_RES_API_S_VER_4 */
 
 /* Error response/notification */
 enum {
@@ -975,17 +965,24 @@ struct iwl_error_resp {
 
 
 /* Common PHY, MAC and Bindings definitions */
-
 #define MAX_MACS_IN_BINDING	(3)
 #define MAX_BINDINGS		(4)
-#define AUX_BINDING_INDEX	(3)
 
-/* Used to extract ID and color from the context dword */
-#define FW_CTXT_ID_POS	  (0)
-#define FW_CTXT_ID_MSK	  (0xff << FW_CTXT_ID_POS)
-#define FW_CTXT_COLOR_POS (8)
-#define FW_CTXT_COLOR_MSK (0xff << FW_CTXT_COLOR_POS)
-#define FW_CTXT_INVALID	  (0xffffffff)
+/**
+ * enum iwl_mvm_id_and_color - ID and color fields in context dword
+ * @FW_CTXT_ID_POS: position of the ID
+ * @FW_CTXT_ID_MSK: mask of the ID
+ * @FW_CTXT_COLOR_POS: position of the color
+ * @FW_CTXT_COLOR_MSK: mask of the color
+ * @FW_CTXT_INVALID: value used to indicate unused/invalid
+ */
+enum iwl_mvm_id_and_color {
+	FW_CTXT_ID_POS		= 0,
+	FW_CTXT_ID_MSK		= 0xff << FW_CTXT_ID_POS,
+	FW_CTXT_COLOR_POS	= 8,
+	FW_CTXT_COLOR_MSK	= 0xff << FW_CTXT_COLOR_POS,
+	FW_CTXT_INVALID		= 0xffffffff,
+};
 
 #define FW_CMD_ID_AND_COLOR(_id, _color) ((_id << FW_CTXT_ID_POS) |\
 					  (_color << FW_CTXT_COLOR_POS))
@@ -1133,7 +1130,8 @@ enum {
 #define TE_V2_PLACEMENT_POS	12
 #define TE_V2_ABSENCE_POS	15
 
-/* Time event policy values
+/**
+ * enum iwl_time_event_policy - Time event policy values
  * A notification (both event and fragment) includes a status indicating weather
  * the FW was able to schedule the event or not. For fragment start/end
  * notification the status is always success. There is no start/end fragment
@@ -1148,12 +1146,13 @@ enum {
  * @TE_V2_NOTIF_HOST_FRAG_END:request/receive notification on frag end
  * @TE_V2_NOTIF_INTERNAL_FRAG_START: internal FW use.
  * @TE_V2_NOTIF_INTERNAL_FRAG_END: internal FW use.
+ * @T2_V2_START_IMMEDIATELY: start time event immediately
  * @TE_V2_DEP_OTHER: depends on another time event
  * @TE_V2_DEP_TSF: depends on a specific time
  * @TE_V2_EVENT_SOCIOPATHIC: can't co-exist with other events of tha same MAC
  * @TE_V2_ABSENCE: are we present or absent during the Time Event.
  */
-enum {
+enum iwl_time_event_policy {
 	TE_V2_DEFAULT_POLICY = 0x0,
 
 	/* notifications (event start/stop, fragment start/stop) */
@@ -1168,8 +1167,6 @@ enum {
 	TE_V2_NOTIF_INTERNAL_FRAG_END = BIT(7),
 	T2_V2_START_IMMEDIATELY = BIT(11),
 
-	TE_V2_NOTIF_MSK = 0xff,
-
 	/* placement characteristics */
 	TE_V2_DEP_OTHER = BIT(TE_V2_PLACEMENT_POS),
 	TE_V2_DEP_TSF = BIT(TE_V2_PLACEMENT_POS + 1),
@@ -1180,12 +1177,13 @@ enum {
 };
 
 /**
- * struct iwl_time_event_cmd_api - configuring Time Events
+ * struct iwl_time_event_cmd - configuring Time Events
  * with struct MAC_TIME_EVENT_DATA_API_S_VER_2 (see also
  * with version 1. determined by IWL_UCODE_TLV_FLAGS)
  * ( TIME_EVENT_CMD = 0x29 )
- * @id_and_color: ID and color of the relevant MAC
- * @action: action to perform, one of FW_CTXT_ACTION_*
+ * @id_and_color: ID and color of the relevant MAC,
+ *	&enum iwl_mvm_id_and_color
+ * @action: action to perform, one of &enum iwl_phy_ctxt_action
  * @id: this field has two meanings, depending on the action:
  *	If the action is ADD, then it means the type of event to add.
  *	For all other actions it is the unique event ID assigned when the
@@ -1201,7 +1199,8 @@ enum {
  *	on event and/or fragment start and/or end
  *	using one of TE_INDEPENDENT, TE_DEP_OTHER, TE_DEP_TSF
  *	TE_EVENT_SOCIOPATHIC
- *	using TE_ABSENCE and using TE_NOTIF_*
+ *	using TE_ABSENCE and using TE_NOTIF_*,
+ *	&enum iwl_time_event_policy
  */
 struct iwl_time_event_cmd {
 	/* COMMON_INDEX_HDR_API_S_VER_1 */
@@ -1224,7 +1223,8 @@ struct iwl_time_event_cmd {
  * @status: bit 0 indicates success, all others specify errors
  * @id: the Time Event type
  * @unique_id: the unique ID assigned (in ADD) or given (others) to the TE
- * @id_and_color: ID and color of the relevant MAC
+ * @id_and_color: ID and color of the relevant MAC,
+ *	&enum iwl_mvm_id_and_color
  */
 struct iwl_time_event_resp {
 	__le32 status;
@@ -1240,7 +1240,7 @@ struct iwl_time_event_resp {
  * @session_id: session's unique id
  * @unique_id: unique id of the Time Event itself
  * @id_and_color: ID and color of the relevant MAC
- * @action: one of TE_NOTIF_START or TE_NOTIF_END
+ * @action: &enum iwl_time_event_policy
  * @status: true if scheduled, false otherwise (not executed)
  */
 struct iwl_time_event_notif {
@@ -1256,14 +1256,17 @@ struct iwl_time_event_notif {
 /* Bindings and Time Quota */
 
 /**
- * struct iwl_binding_cmd - configuring bindings
+ * struct iwl_binding_cmd_v1 - configuring bindings
  * ( BINDING_CONTEXT_CMD = 0x2b )
- * @id_and_color: ID and color of the relevant Binding
+ * @id_and_color: ID and color of the relevant Binding,
+ *	&enum iwl_mvm_id_and_color
  * @action: action to perform, one of FW_CTXT_ACTION_*
- * @macs: array of MAC id and colors which belong to the binding
- * @phy: PHY id and color which belongs to the binding
+ * @macs: array of MAC id and colors which belong to the binding,
+ *	&enum iwl_mvm_id_and_color
+ * @phy: PHY id and color which belongs to the binding,
+ *	&enum iwl_mvm_id_and_color
  */
-struct iwl_binding_cmd {
+struct iwl_binding_cmd_v1 {
 	/* COMMON_INDEX_HDR_API_S_VER_1 */
 	__le32 id_and_color;
 	__le32 action;
@@ -1272,12 +1275,39 @@ struct iwl_binding_cmd {
 	__le32 phy;
 } __packed; /* BINDING_CMD_API_S_VER_1 */
 
+/**
+ * struct iwl_binding_cmd - configuring bindings
+ * ( BINDING_CONTEXT_CMD = 0x2b )
+ * @id_and_color: ID and color of the relevant Binding,
+ *	&enum iwl_mvm_id_and_color
+ * @action: action to perform, one of FW_CTXT_ACTION_*
+ * @macs: array of MAC id and colors which belong to the binding
+ *	&enum iwl_mvm_id_and_color
+ * @phy: PHY id and color which belongs to the binding
+ *	&enum iwl_mvm_id_and_color
+ * @lmac_id: the lmac id the binding belongs to
+ */
+struct iwl_binding_cmd {
+	/* COMMON_INDEX_HDR_API_S_VER_1 */
+	__le32 id_and_color;
+	__le32 action;
+	/* BINDING_DATA_API_S_VER_1 */
+	__le32 macs[MAX_MACS_IN_BINDING];
+	__le32 phy;
+	__le32 lmac_id;
+} __packed; /* BINDING_CMD_API_S_VER_2 */
+
+#define IWL_BINDING_CMD_SIZE_V1	sizeof(struct iwl_binding_cmd_v1)
+#define IWL_LMAC_24G_INDEX		0
+#define IWL_LMAC_5G_INDEX		1
+
 /* The maximal number of fragments in the FW's schedule session */
 #define IWL_MVM_MAX_QUOTA 128
 
 /**
  * struct iwl_time_quota_data - configuration of time quota per binding
- * @id_and_color: ID and color of the relevant Binding
+ * @id_and_color: ID and color of the relevant Binding,
+ *	&enum iwl_mvm_id_and_color
  * @quota: absolute time quota in TU. The scheduler will try to divide the
  *	remainig quota (after Time Events) according to this quota.
  * @max_duration: max uninterrupted context duration in TU
@@ -1292,6 +1322,9 @@ struct iwl_time_quota_data {
  * struct iwl_time_quota_cmd - configuration of time quota between bindings
  * ( TIME_QUOTA_CMD = 0x2c )
  * @quotas: allocations per binding
+ * Note: on non-CDB the fourth one is the auxilary mac and is
+ *	essentially zero.
+ *	On CDB the fourth one is a regular binding.
  */
 struct iwl_time_quota_cmd {
 	struct iwl_time_quota_data quotas[MAX_BINDINGS];
@@ -1830,8 +1863,8 @@ enum iwl_sf_scenario {
 #define SF_CFG_DUMMY_NOTIF_OFF	BIT(16)
 
 /**
- * Smart Fifo configuration command.
- * @state: smart fifo state, types listed in enum %iwl_sf_sate.
+ * struct iwl_sf_cfg_cmd - Smart Fifo configuration command.
+ * @state: smart fifo state, types listed in &enum iwl_sf_state.
  * @watermark: Minimum allowed availabe free space in RXF for transient state.
  * @long_delay_timeouts: aging and idle timer values for each scenario
  * in long delay state.
@@ -1885,7 +1918,7 @@ struct iwl_mcc_update_cmd {
 } __packed; /* LAR_UPDATE_MCC_CMD_API_S_VER_2 */
 
 /**
- * iwl_mcc_update_resp_v1  - response to MCC_UPDATE_CMD.
+ * struct iwl_mcc_update_resp_v1  - response to MCC_UPDATE_CMD.
  * Contains the new channel control profile map, if changed, and the new MCC
  * (mobile country code).
  * The new MCC may be different than what was requested in MCC_UPDATE_CMD.
@@ -1908,7 +1941,7 @@ struct iwl_mcc_update_resp_v1  {
 } __packed; /* LAR_UPDATE_MCC_CMD_RESP_S_VER_1 */
 
 /**
- * iwl_mcc_update_resp - response to MCC_UPDATE_CMD.
+ * struct iwl_mcc_update_resp - response to MCC_UPDATE_CMD.
  * Contains the new channel control profile map, if changed, and the new MCC
  * (mobile country code).
  * The new MCC may be different than what was requested in MCC_UPDATE_CMD.
@@ -1990,10 +2023,10 @@ enum iwl_dts_measurement_flags {
 };
 
 /**
- * iwl_dts_measurement_cmd - request DTS temperature and/or voltage measurements
+ * struct iwl_dts_measurement_cmd - request DTS temp and/or voltage measurements
  *
- * @flags: indicates which measurements we want as specified in &enum
- *	   iwl_dts_measurement_flags
+ * @flags: indicates which measurements we want as specified in
+ *	&enum iwl_dts_measurement_flags
  */
 struct iwl_dts_measurement_cmd {
 	__le32 flags;
@@ -2045,7 +2078,7 @@ enum iwl_dts_bit_mode {
 };
 
 /**
- * iwl_ext_dts_measurement_cmd - request extended DTS temperature measurements
+ * struct iwl_ext_dts_measurement_cmd - request extended DTS temp measurements
  * @control_mode: see &enum iwl_dts_control_measurement_mode
  * @temperature: used when over write DTS mode is selected
  * @sensor: set temperature sensor to use. See &enum iwl_dts_used
@@ -2125,7 +2158,7 @@ struct iwl_mvm_ctdp_cmd {
 #define IWL_MAX_DTS_TRIPS	8
 
 /**
- * struct iwl_temp_report_ths_cmd - set temperature thresholds
+ * struct temp_report_ths_cmd - set temperature thresholds
  *
  * @num_temps: number of temperature thresholds passed
  * @thresholds: array with the thresholds to be configured
@@ -2147,7 +2180,7 @@ enum iwl_tdls_channel_switch_type {
 }; /* TDLS_STA_CHANNEL_SWITCH_CMD_TYPE_API_E_VER_1 */
 
 /**
- * Switch timing sub-element in a TDLS channel-switch command
+ * struct iwl_tdls_channel_switch_timing - Switch timing in TDLS channel-switch
  * @frame_timestamp: GP2 timestamp of channel-switch request/response packet
  *	received from peer
  * @max_offchan_duration: What amount of microseconds out of a DTIM is given
@@ -2167,7 +2200,7 @@ struct iwl_tdls_channel_switch_timing {
 #define IWL_TDLS_CH_SW_FRAME_MAX_SIZE 200
 
 /**
- * TDLS channel switch frame template
+ * struct iwl_tdls_channel_switch_frame - TDLS channel switch frame template
  *
  * A template representing a TDLS channel-switch request or response frame
  *
@@ -2182,7 +2215,7 @@ struct iwl_tdls_channel_switch_frame {
 } __packed; /* TDLS_STA_CHANNEL_SWITCH_FRAME_API_S_VER_1 */
 
 /**
- * TDLS channel switch command
+ * struct iwl_tdls_channel_switch_cmd - TDLS channel switch command
  *
  * The command is sent to initiate a channel switch and also in response to
  * incoming TDLS channel-switch request/response packets from remote peers.
@@ -2202,7 +2235,7 @@ struct iwl_tdls_channel_switch_cmd {
 } __packed; /* TDLS_STA_CHANNEL_SWITCH_CMD_API_S_VER_1 */
 
 /**
- * TDLS channel switch start notification
+ * struct iwl_tdls_channel_switch_notif - TDLS channel switch start notification
  *
  * @status: non-zero on success
  * @offchannel_duration: duration given in microseconds
@@ -2215,7 +2248,7 @@ struct iwl_tdls_channel_switch_notif {
 } __packed; /* TDLS_STA_CHANNEL_SWITCH_NTFY_API_S_VER_1 */
 
 /**
- * TDLS station info
+ * struct iwl_tdls_sta_info - TDLS station info
  *
  * @sta_id: station id of the TDLS peer
  * @tx_to_peer_tid: TID reserved vs. the peer for FW based Tx
@@ -2230,7 +2263,7 @@ struct iwl_tdls_sta_info {
 } __packed; /* TDLS_STA_INFO_VER_1 */
 
 /**
- * TDLS basic config command
+ * struct iwl_tdls_config_cmd - TDLS basic config command
  *
  * @id_and_color: MAC id and color being configured
  * @tdls_peer_count: amount of currently connected TDLS peers
@@ -2254,7 +2287,7 @@ struct iwl_tdls_config_cmd {
 } __packed; /* TDLS_CONFIG_CMD_API_S_VER_1 */
 
 /**
- * TDLS per-station config information from FW
+ * struct iwl_tdls_config_sta_info_res - TDLS per-station config information
  *
  * @sta_id: station id of the TDLS peer
  * @tx_to_peer_last_seq: last sequence number used by FW during FW-based Tx to
@@ -2266,7 +2299,7 @@ struct iwl_tdls_config_sta_info_res {
 } __packed; /* TDLS_STA_INFO_RSP_VER_1 */
 
 /**
- * TDLS config information from FW
+ * struct iwl_tdls_config_res - TDLS config information from FW
  *
  * @tx_to_ap_last_seq: last sequence number used by FW during FW-based Tx to AP
  * @sta_info: per-station TDLS config information
@@ -2282,7 +2315,7 @@ struct iwl_tdls_config_res {
 #define TX_FIFO_INTERNAL_MAX_NUM	6
 
 /**
- * Shared memory configuration information from the FW
+ * struct iwl_shared_mem_cfg_v1 - Shared memory configuration information
  *
  * @shared_mem_addr: shared memory addr (pre 8000 HW set to 0x0 as MARBH is not
  *	accessible)
@@ -2336,7 +2369,7 @@ struct iwl_shared_mem_lmac_cfg {
 } __packed; /* SHARED_MEM_ALLOC_LMAC_API_S_VER_1 */
 
 /**
- * Shared memory configuration information from the FW
+ * struct iwl_shared_mem_cfg - Shared memory configuration information
  *
  * @shared_mem_addr: shared memory address
  * @shared_mem_size: shared memory size
@@ -2364,7 +2397,7 @@ struct iwl_shared_mem_cfg {
 } __packed; /* SHARED_MEM_ALLOC_API_S_VER_3 */
 
 /**
- * VHT MU-MIMO group configuration
+ * struct iwl_mu_group_mgmt_cmd - VHT MU-MIMO group configuration
  *
  * @membership_status: a bitmap of MU groups
  * @user_position:the position of station in a group. If the station is in the
@@ -2391,7 +2424,7 @@ struct iwl_mu_group_mgmt_notif {
 #define MAX_STORED_BEACON_SIZE 600
 
 /**
- * Stored beacon notification
+ * struct iwl_stored_beacon_notif - Stored beacon notification
  *
  * @system_time: system time on air rise
  * @tsf: TSF on air rise
@@ -2426,7 +2459,7 @@ enum iwl_lqm_status {
 };
 
 /**
- * Link Quality Measurement command
+ * struct iwl_link_qual_msrmnt_cmd - Link Quality Measurement command
  * @cmd_operatrion: command operation to be performed (start or stop)
  *	as defined above.
  * @mac_id: MAC ID the measurement applies to.
@@ -2441,7 +2474,7 @@ struct iwl_link_qual_msrmnt_cmd {
 } __packed /* LQM_CMD_API_S_VER_1 */;
 
 /**
- * Link Quality Measurement notification
+ * struct iwl_link_qual_msrmnt_notif - Link Quality Measurement notification
  *
  * @frequent_stations_air_time: an array containing the total air time
  *	(in uSec) used by the most frequently transmitting stations.
@@ -2469,7 +2502,7 @@ struct iwl_link_qual_msrmnt_notif {
 } __packed; /* LQM_MEASUREMENT_COMPLETE_NTF_API_S_VER1 */
 
 /**
- * Channel switch NOA notification
+ * struct iwl_channel_switch_noa_notif - Channel switch NOA notification
  *
  * @id_and_color: ID and color of the MAC
  */

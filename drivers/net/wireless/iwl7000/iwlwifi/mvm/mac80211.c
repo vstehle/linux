@@ -765,7 +765,7 @@ int iwl_mvm_mac_setup_register(struct iwl_mvm *mvm)
 #endif
 	}
 
-	if (mvm->fw->img[IWL_UCODE_WOWLAN].sec[0].len &&
+	if (mvm->fw->img[IWL_UCODE_WOWLAN].num_sec &&
 	    mvm->trans->ops->d3_suspend &&
 	    mvm->trans->ops->d3_resume &&
 	    device_can_wakeup(mvm->trans->dev)) {
@@ -865,7 +865,7 @@ static bool iwl_mvm_defer_tx(struct iwl_mvm *mvm,
 		goto out;
 
 	mvmsta = iwl_mvm_sta_from_mac80211(sta);
-	if (mvmsta->sta_id == IWL_MVM_STATION_COUNT ||
+	if (mvmsta->sta_id == IWL_MVM_INVALID_STA ||
 	    mvmsta->sta_id != mvm->d0i3_ap_sta_id)
 		goto out;
 
@@ -1121,7 +1121,7 @@ static void iwl_mvm_cleanup_iterator(void *data, u8 *mac,
 	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 
 	mvmvif->uploaded = false;
-	mvmvif->ap_sta_id = IWL_MVM_STATION_COUNT;
+	mvmvif->ap_sta_id = IWL_MVM_INVALID_STA;
 
 	spin_lock_bh(&mvm->time_event_lock);
 	iwl_mvm_te_clear_data(mvm, &mvmvif->time_event_data);
@@ -1168,7 +1168,7 @@ static void iwl_mvm_restart_cleanup(struct iwl_mvm *mvm)
 	ieee80211_iterate_interfaces(mvm->hw, 0, iwl_mvm_cleanup_iterator, mvm);
 
 	mvm->p2p_device_vif = NULL;
-	mvm->d0i3_ap_sta_id = IWL_MVM_STATION_COUNT;
+	mvm->d0i3_ap_sta_id = IWL_MVM_INVALID_STA;
 
 	iwl_mvm_reset_phy_ctxts(mvm);
 	memset(mvm->fw_key_table, 0, sizeof(mvm->fw_key_table));
@@ -1488,7 +1488,8 @@ static int iwl_mvm_mac_add_interface(struct ieee80211_hw *hw,
 			 * which shouldn't be in TFD mask anyway
 			 */
 			ret = iwl_mvm_allocate_int_sta(mvm, &mvmvif->mcast_sta,
-						       0, vif->type);
+						       0, vif->type,
+						       IWL_STA_MULTICAST);
 			if (ret)
 				goto out_release;
 		}
@@ -1598,7 +1599,7 @@ static void iwl_mvm_prepare_mac_removal(struct iwl_mvm *mvm,
 {
 	u32 tfd_msk = iwl_mvm_mac_get_queues_mask(vif);
 
-	if (tfd_msk) {
+	if (tfd_msk && !iwl_mvm_is_dqa_supported(mvm)) {
 		/*
 		 * mac80211 first removes all the stations of the vif and
 		 * then removes the vif. When it removes a station it also
@@ -1607,6 +1608,8 @@ static void iwl_mvm_prepare_mac_removal(struct iwl_mvm *mvm,
 		 * of these AMPDU sessions are properly closed.
 		 * We still need to take care of the shared queues of the vif.
 		 * Flush them here.
+		 * For DQA mode there is no need - broacast and multicast queue
+		 * are flushed separately.
 		 */
 		mutex_lock(&mvm->mutex);
 		iwl_mvm_flush_tx_path(mvm, tfd_msk, 0);
@@ -2157,7 +2160,7 @@ static void iwl_mvm_bss_info_changed_station(struct iwl_mvm *mvm,
 						    IWL_MVM_SMPS_REQ_PROT,
 						    IEEE80211_SMPS_DYNAMIC);
 			}
-		} else if (mvmvif->ap_sta_id != IWL_MVM_STATION_COUNT) {
+		} else if (mvmvif->ap_sta_id != IWL_MVM_INVALID_STA) {
 			/*
 			 * If update fails - SF might be running in associated
 			 * mode while disassociated - which is forbidden.
@@ -2187,8 +2190,8 @@ static void iwl_mvm_bss_info_changed_station(struct iwl_mvm *mvm,
 
 				if (mvm->d0i3_ap_sta_id == mvmvif->ap_sta_id)
 					mvm->d0i3_ap_sta_id =
-						IWL_MVM_STATION_COUNT;
-				mvmvif->ap_sta_id = IWL_MVM_STATION_COUNT;
+						IWL_MVM_INVALID_STA;
+				mvmvif->ap_sta_id = IWL_MVM_INVALID_STA;
 			}
 
 			/* remove quota for this interface */
@@ -2321,15 +2324,15 @@ static int iwl_mvm_start_ap_ibss(struct ieee80211_hw *hw,
 	if (ret)
 		goto out_remove;
 
+	ret = iwl_mvm_add_mcast_sta(mvm, vif);
+	if (ret)
+		goto out_unbind;
+
 	/* Send the bcast station. At this stage the TBTT and DTIM time events
 	 * are added and applied to the scheduler */
 	ret = iwl_mvm_send_add_bcast_sta(mvm, vif);
 	if (ret)
-		goto out_unbind;
-
-	ret = iwl_mvm_add_mcast_sta(mvm, vif);
-	if (ret)
-		goto out_rm_bcast;
+		goto out_rm_mcast;
 
 	/* must be set before quota calculations */
 	mvmvif->ap_ibss_active = true;
@@ -2361,9 +2364,9 @@ static int iwl_mvm_start_ap_ibss(struct ieee80211_hw *hw,
 out_quota_failed:
 	iwl_mvm_power_update_mac(mvm);
 	mvmvif->ap_ibss_active = false;
-	iwl_mvm_rm_mcast_sta(mvm, vif);
-out_rm_bcast:
 	iwl_mvm_send_rm_bcast_sta(mvm, vif);
+out_rm_mcast:
+	iwl_mvm_rm_mcast_sta(mvm, vif);
 out_unbind:
 	iwl_mvm_binding_remove_vif(mvm, vif);
 out_remove:
@@ -2409,8 +2412,20 @@ static void iwl_mvm_stop_ap_ibss(struct ieee80211_hw *hw,
 		iwl_mvm_mac_ctxt_changed(mvm, mvm->p2p_device_vif, false, NULL);
 
 	iwl_mvm_update_quotas(mvm, false, NULL);
-	iwl_mvm_rm_mcast_sta(mvm, vif);
+
+	/*
+	 * This is not very nice, but the simplest:
+	 * For older FWs removing the mcast sta before the bcast station may
+	 * cause assert 0x2b00.
+	 * This is fixed in later FW (which will stop beaconing when removing
+	 * bcast station).
+	 * So make the order of removal depend on the TLV
+	 */
+	if (!fw_has_api(&mvm->fw->ucode_capa, IWL_UCODE_TLV_API_STA_TYPE))
+		iwl_mvm_rm_mcast_sta(mvm, vif);
 	iwl_mvm_send_rm_bcast_sta(mvm, vif);
+	if (fw_has_api(&mvm->fw->ucode_capa, IWL_UCODE_TLV_API_STA_TYPE))
+		iwl_mvm_rm_mcast_sta(mvm, vif);
 	iwl_mvm_binding_remove_vif(mvm, vif);
 
 	iwl_mvm_power_update_mac(mvm);
@@ -2604,7 +2619,7 @@ static void __iwl_mvm_mac_sta_notify(struct ieee80211_hw *hw,
 		 */
 		break;
 	case STA_NOTIFY_AWAKE:
-		if (WARN_ON(mvmsta->sta_id == IWL_MVM_STATION_COUNT))
+		if (WARN_ON(mvmsta->sta_id == IWL_MVM_INVALID_STA))
 			break;
 
 		if (txqs)
@@ -4238,7 +4253,7 @@ static void iwl_mvm_mac_flush(struct ieee80211_hw *hw,
 	mvmvif = iwl_mvm_vif_from_mac80211(vif);
 
 	/* flush the AP-station and all TDLS peers */
-	for (i = 0; i < IWL_MVM_STATION_COUNT; i++) {
+	for (i = 0; i < ARRAY_SIZE(mvm->fw_id_to_mac_id); i++) {
 		sta = rcu_dereference_protected(mvm->fw_id_to_mac_id[i],
 						lockdep_is_held(&mvm->mutex));
 		if (IS_ERR_OR_NULL(sta))
@@ -4251,21 +4266,23 @@ static void iwl_mvm_mac_flush(struct ieee80211_hw *hw,
 		/* make sure only TDLS peers or the AP are flushed */
 		WARN_ON(i != mvmvif->ap_sta_id && !sta->tdls);
 
-		msk |= mvmsta->tfd_queue_msk;
+		if (drop) {
+			if (iwl_mvm_flush_sta(mvm, mvmsta, false, 0))
+				IWL_ERR(mvm, "flush request fail\n");
+		} else {
+			msk |= mvmsta->tfd_queue_msk;
+			if (iwl_mvm_has_new_tx_api(mvm))
+				iwl_mvm_wait_sta_queues_empty(mvm, mvmsta);
+		}
 	}
 
-	if (drop) {
-		if (iwl_mvm_flush_tx_path(mvm, msk, 0))
-			IWL_ERR(mvm, "flush request fail\n");
-		mutex_unlock(&mvm->mutex);
-	} else {
-		mutex_unlock(&mvm->mutex);
+	mutex_unlock(&mvm->mutex);
 
-		/* this can take a while, and we may need/want other operations
-		 * to succeed while doing this, so do it without the mutex held
-		 */
+	/* this can take a while, and we may need/want other operations
+	 * to succeed while doing this, so do it without the mutex held
+	 */
+	if (!drop && !iwl_mvm_has_new_tx_api(mvm))
 		iwl_trans_wait_tx_queues_empty(mvm->trans, msk);
-	}
 }
 
 static int iwl_mvm_mac_get_survey(struct ieee80211_hw *hw, int idx,

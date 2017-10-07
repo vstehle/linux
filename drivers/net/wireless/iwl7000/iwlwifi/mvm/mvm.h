@@ -389,6 +389,8 @@ struct iwl_mvm_vif {
 	bool associated;
 	u8 ap_assoc_sta_count;
 
+	u16 cab_queue;
+
 	bool uploaded;
 	bool ap_ibss_active;
 	bool pm_enabled;
@@ -842,7 +844,7 @@ struct iwl_mvm {
 	enum iwl_ucode_type cur_ucode;
 	bool hw_registered;
 	bool calibrating;
-	u32 error_event_table;
+	u32 error_event_table[2];
 	u32 log_event_table;
 	u32 umac_error_event_table;
 	bool support_umac_log;
@@ -862,9 +864,9 @@ struct iwl_mvm {
 		u64 on_time_scan;
 	} radio_stats, accu_radio_stats;
 
+	u8 hw_queue_to_mac80211[IWL_MAX_TVQM_QUEUES];
+
 	struct {
-		/* Map to HW queue */
-		u32 hw_queue_to_mac80211;
 		u8 hw_queue_refcount;
 		u8 ra_sta_id; /* The RA this queue is mapped to, if exists */
 		bool reserved; /* Is this the TXQ reserved for a STA */
@@ -1387,6 +1389,31 @@ static inline bool iwl_mvm_has_new_tx_api(struct iwl_mvm *mvm)
 	return mvm->trans->cfg->use_tfh;
 }
 
+static inline bool iwl_mvm_is_cdb_supported(struct iwl_mvm *mvm)
+{
+	/*
+	 * TODO:
+	 * The issue of how to determine CDB APIs and usage is still not fully
+	 * defined.
+	 * There is a compilation for CDB and non-CDB FW, but there may
+	 * be also runtime check.
+	 * For now there is a TLV for checking compilation mode, but a
+	 * runtime check will also have to be here - once defined.
+	 */
+	return fw_has_capa(&mvm->fw->ucode_capa,
+			   IWL_UCODE_TLV_CAPA_CDB_SUPPORT);
+}
+
+static inline struct agg_tx_status*
+iwl_mvm_get_agg_status(struct iwl_mvm *mvm,
+		       struct iwl_mvm_tx_resp *tx_resp)
+{
+	if (iwl_mvm_has_new_tx_api(mvm))
+		return &tx_resp->v6.status;
+	else
+		return &tx_resp->v3.status;
+}
+
 static inline bool iwl_mvm_is_tt_in_fw(struct iwl_mvm *mvm)
 {
 #ifdef CONFIG_THERMAL
@@ -1466,6 +1493,8 @@ const char *iwl_mvm_get_tx_fail_reason(u32 status);
 static inline const char *iwl_mvm_get_tx_fail_reason(u32 status) { return ""; }
 #endif
 int iwl_mvm_flush_tx_path(struct iwl_mvm *mvm, u32 tfd_msk, u32 flags);
+int iwl_mvm_flush_sta(struct iwl_mvm *mvm, void *sta, bool int_sta, u32 flags);
+
 void iwl_mvm_async_handlers_purge(struct iwl_mvm *mvm);
 
 static inline void iwl_mvm_set_tx_cmd_ccmp(struct ieee80211_tx_info *info,
@@ -1848,12 +1877,15 @@ static inline bool iwl_mvm_vif_low_latency(struct iwl_mvm_vif *mvmvif)
 bool iwl_mvm_enable_txq(struct iwl_mvm *mvm, int queue, int mac80211_queue,
 			u16 ssn, const struct iwl_trans_txq_scd_cfg *cfg,
 			unsigned int wdg_timeout);
+int iwl_mvm_tvqm_enable_txq(struct iwl_mvm *mvm, int mac80211_queue,
+			    u8 sta_id, u8 tid, unsigned int timeout);
+
 /*
  * Disable a TXQ.
  * Note that in non-DQA mode the %mac80211_queue and %tid params are ignored.
  */
-void iwl_mvm_disable_txq(struct iwl_mvm *mvm, int queue, int mac80211_queue,
-			 u8 tid, u8 flags);
+int iwl_mvm_disable_txq(struct iwl_mvm *mvm, int queue, int mac80211_queue,
+			u8 tid, u8 flags);
 int iwl_mvm_find_free_queue(struct iwl_mvm *mvm, u8 sta_id, u8 minq, u8 maxq);
 
 /* Return a bitmask with all the hw supported queues, except for the

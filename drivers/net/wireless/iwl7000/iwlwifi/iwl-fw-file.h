@@ -244,6 +244,8 @@ typedef unsigned int __bitwise iwl_ucode_tlv_api_t;
  *	scan request.
  * @IWL_UCODE_TLV_API_TKIP_MIC_KEYS: This ucode supports version 2 of
  *	ADD_MODIFY_STA_KEY_API_S_VER_2.
+ * @IWL_UCODE_TLV_API_STA_TYPE: This ucode supports station type assignement.
+ * @IWL_UCODE_TLV_API_NAN2_VER2: This ucode supports NAN API version 2
  *
  * @NUM_IWL_UCODE_TLV_API: number of bits used
  */
@@ -254,6 +256,8 @@ enum iwl_ucode_tlv_api {
 	IWL_UCODE_TLV_API_NEW_VERSION		= (__force iwl_ucode_tlv_api_t)20,
 	IWL_UCODE_TLV_API_SCAN_TSF_REPORT	= (__force iwl_ucode_tlv_api_t)28,
 	IWL_UCODE_TLV_API_TKIP_MIC_KEYS		= (__force iwl_ucode_tlv_api_t)29,
+	IWL_UCODE_TLV_API_STA_TYPE		= (__force iwl_ucode_tlv_api_t)30,
+	IWL_UCODE_TLV_API_NAN2_VER2		= (__force iwl_ucode_tlv_api_t)31,
 
 	NUM_IWL_UCODE_TLV_API
 #ifdef __CHECKER__
@@ -360,6 +364,8 @@ enum iwl_ucode_tlv_capa {
 	IWL_UCODE_TLV_CAPA_UMAC_UPLOAD			= (__force iwl_ucode_tlv_capa_t)35,
 	IWL_UCODE_TLV_CAPA_SOC_LATENCY_SUPPORT		= (__force iwl_ucode_tlv_capa_t)37,
 	IWL_UCODE_TLV_CAPA_STA_PM_NOTIF			= (__force iwl_ucode_tlv_capa_t)38,
+	IWL_UCODE_TLV_CAPA_BINDING_CDB_SUPPORT		= (__force iwl_ucode_tlv_capa_t)39,
+	IWL_UCODE_TLV_CAPA_CDB_SUPPORT			= (__force iwl_ucode_tlv_capa_t)40,
 	IWL_UCODE_TLV_CAPA_EXTENDED_DTS_MEASURE		= (__force iwl_ucode_tlv_capa_t)64,
 	IWL_UCODE_TLV_CAPA_SHORT_PM_TIMEOUTS		= (__force iwl_ucode_tlv_capa_t)65,
 	IWL_UCODE_TLV_CAPA_BT_MPLUT_SUPPORT		= (__force iwl_ucode_tlv_capa_t)67,
@@ -396,7 +402,6 @@ enum iwl_ucode_tlv_capa {
  * For 16.0 uCode and above, there is no differentiation between sections,
  * just an offset to the HW address.
  */
-#define IWL_UCODE_SECTION_MAX 32
 #define CPU1_CPU2_SEPARATOR_SECTION	0xFFFFCCCC
 #define PAGING_SEPARATOR_SECTION	0xAAAABBBB
 
@@ -406,8 +411,8 @@ enum iwl_ucode_tlv_capa {
 #define IWL_UCODE_API(ver)	(((ver) & 0x0000FF00) >> 8)
 #define IWL_UCODE_SERIAL(ver)	((ver) & 0x000000FF)
 
-/*
- * Calibration control struct.
+/**
+ * struct iwl_tlv_calib_ctrl - Calibration control struct.
  * Sent as part of the phy configuration command.
  * @flow_trigger: bitmap for which calibrations to perform according to
  *		flow triggers.
@@ -506,25 +511,22 @@ enum iwl_fw_dbg_monitor_mode {
 };
 
 /**
- * enum iwl_fw_mem_seg_type - data types for dumping on error
- *
- * @FW_DBG_MEM_SMEM: the data type is SMEM
- * @FW_DBG_MEM_DCCM_LMAC: the data type is DCCM_LMAC
- * @FW_DBG_MEM_DCCM_UMAC: the data type is DCCM_UMAC
+ * enum iwl_fw_mem_seg_type - memory segment type
+ * @FW_DBG_MEM_TYPE_MASK: mask for the type indication
+ * @FW_DBG_MEM_TYPE_REGULAR: regular memory
+ * @FW_DBG_MEM_TYPE_PRPH: periphery memory (requires special reading)
  */
-enum iwl_fw_dbg_mem_seg_type {
-	FW_DBG_MEM_DCCM_LMAC = 0,
-	FW_DBG_MEM_DCCM_UMAC,
-	FW_DBG_MEM_SMEM,
-
-	/* Must be last */
-	FW_DBG_MEM_MAX,
+enum iwl_fw_mem_seg_type {
+	FW_DBG_MEM_TYPE_MASK	= 0xff000000,
+	FW_DBG_MEM_TYPE_REGULAR	= 0x00000000,
+	FW_DBG_MEM_TYPE_PRPH	= 0x01000000,
 };
 
 /**
  * struct iwl_fw_dbg_mem_seg_tlv - configures the debug data memory segments
  *
- * @data_type: enum %iwl_fw_mem_seg_type
+ * @data_type: the memory segment type to record, see &enum iwl_fw_mem_seg_type
+ *	for what we care about
  * @ofs: the memory segment offset
  * @len: the memory segment length, in bytes
  *

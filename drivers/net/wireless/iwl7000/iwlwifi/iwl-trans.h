@@ -7,7 +7,7 @@
  *
  * Copyright(c) 2007 - 2014 Intel Corporation. All rights reserved.
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
- * Copyright(c) 2016        Intel Deutschland GmbH
+ * Copyright(c) 2016 - 2017 Intel Deutschland GmbH
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU General Public License as
@@ -34,7 +34,7 @@
  *
  * Copyright(c) 2005 - 2014 Intel Corporation. All rights reserved.
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
- * Copyright(c) 2016        Intel Deutschland GmbH
+ * Copyright(c) 2016 - 2017 Intel Deutschland GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -304,7 +304,10 @@ static inline void iwl_free_rxb(struct iwl_rx_cmd_buffer *r)
  * currently supports
  */
 #define IWL_MAX_HW_QUEUES		32
+#define IWL_MAX_TVQM_QUEUES		512
+
 #define IWL_MAX_TID_COUNT	8
+#define IWL_MGMT_TID		15
 #define IWL_FRAME_LIMIT	64
 #define IWL_MAX_RX_HW_QUEUES	16
 
@@ -324,7 +327,8 @@ enum iwl_d3_status {
  * @STATUS_DEVICE_ENABLED: APM is enabled
  * @STATUS_TPOWER_PMI: the device might be asleep (need to wake it up)
  * @STATUS_INT_ENABLED: interrupts are enabled
- * @STATUS_RFKILL: the HW RFkill switch is in KILL position
+ * @STATUS_RFKILL_HW: the actual HW state of the RF-kill switch
+ * @STATUS_RFKILL_OPMODE: RF-kill state reported to opmode
  * @STATUS_FW_ERROR: the fw is in error state
  * @STATUS_TRANS_GOING_IDLE: shutting down the trans, only special commands
  *	are sent
@@ -337,7 +341,8 @@ enum iwl_trans_status {
 	STATUS_DEVICE_ENABLED,
 	STATUS_TPOWER_PMI,
 	STATUS_INT_ENABLED,
-	STATUS_RFKILL,
+	STATUS_RFKILL_HW,
+	STATUS_RFKILL_OPMODE,
 	STATUS_FW_ERROR,
 	STATUS_TRANS_GOING_IDLE,
 	STATUS_TRANS_IDLE,
@@ -490,7 +495,8 @@ struct iwl_trans_txq_scd_cfg {
  * @txq_disable: de-configure a Tx queue to send AMPDUs
  *	Must be atomic
  * @txq_set_shared_mode: change Tx queue shared/unshared marking
- * @wait_tx_queue_empty: wait until tx queues are empty. May sleep.
+ * @wait_tx_queues_empty: wait until tx queues are empty. May sleep.
+ * @wait_txq_empty: wait until specific tx queue is empty. May sleep.
  * @freeze_txq_timer: prevents the timer of the queue from firing until the
  *	queue is set to awake. Must be atomic.
  * @block_txq_ptrs: stop updating the write pointers of the Tx queues. Note
@@ -557,11 +563,18 @@ struct iwl_trans_ops {
 			   unsigned int queue_wdg_timeout);
 	void (*txq_disable)(struct iwl_trans *trans, int queue,
 			    bool configure_scd);
+	/* a000 functions */
+	int (*txq_alloc)(struct iwl_trans *trans,
+			 struct iwl_tx_queue_cfg_cmd *cmd,
+			 int cmd_id,
+			 unsigned int queue_wdg_timeout);
+	void (*txq_free)(struct iwl_trans *trans, int queue);
 
 	void (*txq_set_shared_mode)(struct iwl_trans *trans, u32 txq_id,
 				    bool shared);
 
 	int (*wait_tx_queues_empty)(struct iwl_trans *trans, u32 txq_bm);
+	int (*wait_txq_empty)(struct iwl_trans *trans, int queue);
 	void (*freeze_txq_timer)(struct iwl_trans *trans, unsigned long txqs,
 				 bool freeze);
 	void (*block_txq_ptrs)(struct iwl_trans *trans, bool block);
@@ -1005,6 +1018,34 @@ iwl_trans_txq_enable_cfg(struct iwl_trans *trans, int queue, u16 ssn,
 				      cfg, queue_wdg_timeout);
 }
 
+static inline void
+iwl_trans_txq_free(struct iwl_trans *trans, int queue)
+{
+	if (WARN_ON_ONCE(!trans->ops->txq_free))
+		return;
+
+	trans->ops->txq_free(trans, queue);
+}
+
+static inline int
+iwl_trans_txq_alloc(struct iwl_trans *trans,
+		    struct iwl_tx_queue_cfg_cmd *cmd,
+		    int cmd_id,
+		    unsigned int queue_wdg_timeout)
+{
+	might_sleep();
+
+	if (WARN_ON_ONCE(!trans->ops->txq_alloc))
+		return -ENOTSUPP;
+
+	if (WARN_ON_ONCE(trans->state != IWL_TRANS_FW_ALIVE)) {
+		IWL_ERR(trans, "%s bad state = %d\n", __func__, trans->state);
+		return -EIO;
+	}
+
+	return trans->ops->txq_alloc(trans, cmd, cmd_id, queue_wdg_timeout);
+}
+
 static inline void iwl_trans_txq_set_shared_mode(struct iwl_trans *trans,
 						 int queue, bool shared_mode)
 {
@@ -1071,12 +1112,28 @@ static inline void iwl_trans_block_txq_ptrs(struct iwl_trans *trans,
 static inline int iwl_trans_wait_tx_queues_empty(struct iwl_trans *trans,
 						 u32 txqs)
 {
+	if (WARN_ON_ONCE(!trans->ops->wait_tx_queues_empty))
+		return -ENOTSUPP;
+
 	if (WARN_ON_ONCE(trans->state != IWL_TRANS_FW_ALIVE)) {
 		IWL_ERR(trans, "%s bad state = %d\n", __func__, trans->state);
 		return -EIO;
 	}
 
 	return trans->ops->wait_tx_queues_empty(trans, txqs);
+}
+
+static inline int iwl_trans_wait_txq_empty(struct iwl_trans *trans, int queue)
+{
+	if (WARN_ON_ONCE(!trans->ops->wait_txq_empty))
+		return -ENOTSUPP;
+
+	if (WARN_ON_ONCE(trans->state != IWL_TRANS_FW_ALIVE)) {
+		IWL_ERR(trans, "%s bad state = %d\n", __func__, trans->state);
+		return -EIO;
+	}
+
+	return trans->ops->wait_txq_empty(trans, queue);
 }
 
 #if IS_ENABLED(CPTCFG_IWLXVT)

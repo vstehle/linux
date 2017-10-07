@@ -424,7 +424,7 @@ void iwl_mvm_rx_rx_mpdu(struct iwl_mvm *mvm, struct napi_struct *napi,
 
 		id >>= RX_MDPU_RES_STATUS_STA_ID_SHIFT;
 
-		if (!WARN_ON_ONCE(id >= IWL_MVM_STATION_COUNT)) {
+		if (!WARN_ON_ONCE(id >= ARRAY_SIZE(mvm->fw_id_to_mac_id))) {
 			sta = rcu_dereference(mvm->fw_id_to_mac_id[id]);
 			if (IS_ERR(sta))
 				sta = NULL;
@@ -611,8 +611,7 @@ struct iwl_mvm_stat_data {
 	struct iwl_mvm *mvm;
 	__le32 mac_id;
 	u8 beacon_filter_average_energy;
-	struct mvm_statistics_general_v8 *general;
-	struct mvm_statistics_load *load;
+	void *general;
 };
 
 static void iwl_mvm_stat_iterator(void *_data, u8 *mac,
@@ -632,10 +631,26 @@ static void iwl_mvm_stat_iterator(void *_data, u8 *mac,
 	 * the notification directly.
 	 */
 	if (data->general) {
-		mvmvif->beacon_stats.num_beacons =
-			le32_to_cpu(data->general->beacon_counter[mvmvif->id]);
-		mvmvif->beacon_stats.avg_signal =
-			-data->general->beacon_average_energy[mvmvif->id];
+		u16 vif_id = mvmvif->id;
+
+		if (iwl_mvm_is_cdb_supported(mvm)) {
+			struct mvm_statistics_general_cdb *general =
+				data->general;
+
+			mvmvif->beacon_stats.num_beacons =
+				le32_to_cpu(general->beacon_counter[vif_id]);
+			mvmvif->beacon_stats.avg_signal =
+				-general->beacon_average_energy[vif_id];
+		} else {
+			struct mvm_statistics_general_v8 *general =
+				data->general;
+
+			mvmvif->beacon_stats.num_beacons =
+				le32_to_cpu(general->beacon_counter[vif_id]);
+			mvmvif->beacon_stats.avg_signal =
+				-general->beacon_average_energy[vif_id];
+		}
+
 	}
 
 	if (mvmvif->id != id)
@@ -731,14 +746,21 @@ iwl_mvm_rx_stats_check_trigger(struct iwl_mvm *mvm, struct iwl_rx_packet *pkt)
 void iwl_mvm_handle_rx_statistics(struct iwl_mvm *mvm,
 				  struct iwl_rx_packet *pkt)
 {
-	struct iwl_notif_statistics_v11 *stats = (void *)&pkt->data;
+	struct iwl_notif_statistics_cdb *stats = (void *)&pkt->data;
 	struct iwl_mvm_stat_data data = {
 		.mvm = mvm,
 	};
-	int expected_size = iwl_mvm_has_new_rx_api(mvm) ? sizeof(*stats) :
-			    sizeof(struct iwl_notif_statistics_v10);
-	u32 temperature;
+	int expected_size;
 	int i;
+	u8 *energy;
+	__le32 *bytes, *air_time;
+
+	if (iwl_mvm_is_cdb_supported(mvm))
+		expected_size = sizeof(*stats);
+	else if (iwl_mvm_has_new_rx_api(mvm))
+		expected_size = sizeof(struct iwl_notif_statistics_v11);
+	else
+		expected_size = sizeof(struct iwl_notif_statistics_v10);
 
 	if (iwl_rx_packet_payload_len(pkt) != expected_size) {
 		IWL_ERR(mvm, "received invalid statistics size (%d)!\n",
@@ -746,19 +768,18 @@ void iwl_mvm_handle_rx_statistics(struct iwl_mvm *mvm,
 		return;
 	}
 
-	temperature = le32_to_cpu(stats->general.radio_temperature);
 	data.mac_id = stats->rx.general.mac_id;
 	data.beacon_filter_average_energy =
-		stats->general.beacon_filter_average_energy;
+		stats->general.common.beacon_filter_average_energy;
 
 	iwl_mvm_update_rx_statistics(mvm, &stats->rx);
 
-	mvm->radio_stats.rx_time = le64_to_cpu(stats->general.rx_time);
-	mvm->radio_stats.tx_time = le64_to_cpu(stats->general.tx_time);
+	mvm->radio_stats.rx_time = le64_to_cpu(stats->general.common.rx_time);
+	mvm->radio_stats.tx_time = le64_to_cpu(stats->general.common.tx_time);
 	mvm->radio_stats.on_time_rf =
-		le64_to_cpu(stats->general.on_time_rf);
+		le64_to_cpu(stats->general.common.on_time_rf);
 	mvm->radio_stats.on_time_scan =
-		le64_to_cpu(stats->general.on_time_scan);
+		le64_to_cpu(stats->general.common.on_time_scan);
 
 	data.general = &stats->general;
 
@@ -772,19 +793,30 @@ void iwl_mvm_handle_rx_statistics(struct iwl_mvm *mvm,
 	if (!iwl_mvm_has_new_rx_api(mvm))
 		return;
 
-	data.load = &stats->load_stats;
+	if (!iwl_mvm_is_cdb_supported(mvm)) {
+		struct iwl_notif_statistics_v11 *v11 =
+			(void *)&pkt->data;
+
+		energy = (void *)&v11->load_stats.avg_energy;
+		bytes = (void *)&v11->load_stats.byte_count;
+		air_time = (void *)&v11->load_stats.air_time;
+	} else {
+		energy = (void *)&stats->load_stats.avg_energy;
+		bytes = (void *)&stats->load_stats.byte_count;
+		air_time = (void *)&stats->load_stats.air_time;
+	}
 
 	rcu_read_lock();
-	for (i = 0; i < IWL_MVM_STATION_COUNT; i++) {
+	for (i = 0; i < ARRAY_SIZE(mvm->fw_id_to_mac_id); i++) {
 		struct iwl_mvm_sta *sta;
 
-		if (!data.load->avg_energy[i])
+		if (!energy[i])
 			continue;
 
 		sta = iwl_mvm_sta_from_staid_rcu(mvm, i);
 		if (!sta)
 			continue;
-		sta->avg_energy = data.load->avg_energy[i];
+		sta->avg_energy = energy[i];
 	}
 	rcu_read_unlock();
 
@@ -800,15 +832,14 @@ void iwl_mvm_handle_rx_statistics(struct iwl_mvm *mvm,
 	spin_lock(&mvm->tcm.lock);
 	for (i = 0; i < NUM_MAC_INDEX_DRIVER; i++) {
 		struct iwl_mvm_tcm_mac *mdata = &mvm->tcm.data[i];
-		u32 rx_bytes = le32_to_cpu(data.load->byte_count[i]);
-		u32 airtime = le32_to_cpu(data.load->air_time[i]);
+		u32 rx_bytes = le32_to_cpu(bytes[i]);
+		u32 airtime = le32_to_cpu(air_time[i]);
 
 		mdata->rx.airtime += airtime;
 		mdata->uapsd_nonagg_detect.rx_bytes += rx_bytes;
-		if (airtime) {
+		if (airtime)
 			ewma_rate_add(&mdata->uapsd_nonagg_detect.rate,
 				      rx_bytes * 8 / airtime);
-		}
 	}
 	spin_unlock(&mvm->tcm.lock);
 #endif
