@@ -27,8 +27,6 @@
 
 #include "cros_ec_dev.h"
 
-#define DRV_NAME "cros-ec-ctl"
-
 /* Device variables */
 #define CROS_MAX_DEV 128
 static int ec_major;
@@ -36,10 +34,11 @@ static int ec_major;
 static const struct attribute_group *cros_ec_groups[] = {
 	&cros_ec_attr_group,
 	&cros_ec_lightbar_attr_group,
-#if IS_ENABLED(CONFIG_MFD_CROS_EC_PD_UPDATE)
+	&cros_ec_vbc_attr_group,
+#ifdef CONFIG_MFD_CROS_EC_PD_UPDATE
 	&cros_ec_pd_attr_group,
 #endif
-#if IS_ENABLED(CONFIG_CHARGER_CROS_USB_PD)
+#ifdef CONFIG_CHARGER_CROS_USB_PD
 	&cros_usb_pd_charger_attr_group,
 #endif
 	NULL,
@@ -538,7 +537,7 @@ static const struct dev_pm_ops cros_ec_dev_pm_ops = {
 
 static struct platform_driver cros_ec_dev_driver = {
 	.driver = {
-		.name = DRV_NAME,
+		.name = "cros-ec-ctl",
 		.pm = &cros_ec_dev_pm_ops,
 	},
 	.probe = ec_device_probe,
@@ -589,7 +588,6 @@ static void __exit cros_ec_dev_exit(void)
 module_init(cros_ec_dev_init);
 module_exit(cros_ec_dev_exit);
 
-MODULE_ALIAS("platform:" DRV_NAME);
 MODULE_AUTHOR("Bill Richardson <wfrichar@chromium.org>");
 MODULE_DESCRIPTION("Userspace interface to the Chrome OS Embedded Controller");
 MODULE_VERSION("1.0");

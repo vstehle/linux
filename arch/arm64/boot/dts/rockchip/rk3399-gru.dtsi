@@ -45,7 +45,6 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/pwm/pwm.h>
 #include "rk3399.dtsi"
-#include "rk3399-early-opp.dtsi"
 
 / {
 	/*
@@ -177,6 +176,9 @@
 
 		pwms = <&pwm1 0 3333 0>;
 
+		// TODO: where's the mapping of duty cycle to voltage???
+		// TODO: we probably need in-flight PWM regulator series?
+
 		/* EC turns on w/ ap_core_en; always on for AP */
 		regulator-always-on;
 		regulator-boot-on;
@@ -184,12 +186,7 @@
 		regulator-min-microvolt = <800000>;
 		regulator-max-microvolt = <1500000>;
 
-		// TODO: scope; change driver to ramp slower too?
-		regulator-ramp-delay = <6000>;
-
 		pwm-supply = <&ppvar_sys>;
-		pwm-dutycycle-range = <100 0>;
-		pwm-dutycycle-unit = <100>;
 	};
 
 	ppvar_litcpu: ppvar-litcpu {
@@ -206,12 +203,7 @@
 		regulator-min-microvolt = <800000>;
 		regulator-max-microvolt = <1500000>;
 
-		// TODO: scope; change driver to ramp slower too?
-		regulator-ramp-delay = <6000>;
-
 		pwm-supply = <&ppvar_sys>;
-		pwm-dutycycle-range = <100 0>;
-		pwm-dutycycle-unit = <100>;
 	};
 
 	ppvar_gpu: ppvar-gpu {
@@ -228,12 +220,7 @@
 		regulator-min-microvolt = <800000>;
 		regulator-max-microvolt = <1500000>;
 
-		// TODO: scope; change driver to ramp slower too?
-		regulator-ramp-delay = <6000>;
-
 		pwm-supply = <&ppvar_sys>;
-		pwm-dutycycle-range = <100 0>;
-		pwm-dutycycle-unit = <100>;
 	};
 
 	ppvar_centerlogic: ppvar-centerlogic {
@@ -250,12 +237,7 @@
 		regulator-min-microvolt = <800000>;
 		regulator-max-microvolt = <1500000>;
 
-		// TODO: scope; change driver to ramp slower too?
-		regulator-ramp-delay = <6000>;
-
 		pwm-supply = <&ppvar_sys>;
-		pwm-dutycycle-range = <100 0>;
-		pwm-dutycycle-unit = <100>;
 	};
 
 	/* Schematics call this PPVAR even though it's fixed */
@@ -276,23 +258,23 @@
 	/* pp900_ap aliases; these are always on for AP so just use alias */
 
 	/* EC turns on w/ pp900_ddrpll_en */
-	pp900_ddrpll: pp900-ap {
+	pp900_ddrpll: pp900_ap {
 	};
 
 	/* EC turns on w/ pp900_pcie_en */
-	pp900_pcie: pp900-ap {
+	pp900_pcie: pp900_ap {
 	};
 
 	/* EC turns on w/ pp900_pll_en */
-	pp900_pll: pp900-ap {
+	pp900_pll: pp900_ap {
 	};
 
 	/* EC turns on w/ pp900_pmu_en */
-	pp900_pmu: pp900-ap {
+	pp900_pmu: pp900_ap {
 	};
 
 	/* EC turns on w/ pp900_usb_en */
-	pp900_usb: pp900-ap {
+	pp900_usb: pp900_ap {
 	};
 
 	/* pp1800 aliases; these are always on for AP so just use alias */
@@ -330,7 +312,7 @@
 		pinctrl-0 = <&pp1500_en>;
 
 		enable-active-high;
-		gpio = <&gpio0 10 GPIO_ACTIVE_HIGH>;
+		gpio = <&gpio1 11 GPIO_ACTIVE_HIGH>;
 
 		regulator-always-on;
 		regulator-boot-on;
@@ -418,6 +400,8 @@
 
 	/* pp3300 children */
 
+	// TODO: this regulator should get referenced by the
+	// EC<-->AP backlight driver. See http://crosbug.com/p/52005
 	pp3300_disp: pp3300-disp {
 		compatible = "regulator-fixed";
 		regulator-name = "pp3300_disp";
@@ -428,7 +412,6 @@
 
 		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
 
-		startup-delay-us = <2000>;
 		vin-supply = <&pp3300>;
 	};
 
@@ -461,28 +444,11 @@
 		gpio1830-supply = <&pp3000_ap>;		/* APIO4_VDD;  4c 4d */
 	};
 
-	max98357a: max98357a {
-		#sound-dai-cells = <0>;
-		status = "okay";
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&sdmode_en>;
-
-		compatible = "maxim,max98357a";
-		sdmode-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-	};
-
 	pmu-io-domains {
 		compatible = "rockchip,rk3399-pmu-io-voltage-domain";
 		rockchip,grf = <&pmugrf>;
 
 		pmu1830-supply = <&pp1800_pmu>;		/* PMUIO2_VDD */
-	};
-
-	sound {
-		compatible = "rockchip,rk3399-gru-sound";
-		rockchip,cpu = <&i2s0>;
-		rockchip,codec = <&max98357a &headsetcodec &codec>;
 	};
 };
 
@@ -510,130 +476,6 @@
 	cpu-supply = <&ppvar_bigcpu>;
 };
 
-&display_subsystem {
-	status = "okay";
-};
-
-&edp {
-	status = "okay";
-};
-
-&emmc_phy {
-	status = "okay";
-};
-
-&gpu {
-	mali-supply = <&ppvar_gpu>;
-	status = "okay";
-};
-
-ap_i2c_mic: &i2c1 {
-	status = "okay";
-
-	// TODO: device can handle 1MHz, can the bus?
-	// http://crosbug.com/p/53683
-	clock-frequency = <400000>;
-
-	/* These are relatively safe rise/fall times; TODO: measure */
-	i2c-scl-falling-time-ns = <50>;
-	i2c-scl-rising-time-ns = <300>;
-	// TODO: Put realtek,rt5514 here
-	headsetcodec: rt5514@57 {
-		compatible = "realtek,rt5514";
-		reg = <0x57>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&mic_int>;
-
-		/*
-		 * NOTE: Interrupts aren't part of the binding and driver
-		 * doesn't support it, but throw it in anyway.
-		 */
-		interrupt-parent = <&gpio1>;
-		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
-	};
-};
-
-ap_i2c_ts: &i2c3 {
-	status = "okay";
-
-	clock-frequency = <400000>;
-
-	/* These are relatively safe rise/fall times; TODO: measure */
-	i2c-scl-falling-time-ns = <50>;
-	i2c-scl-rising-time-ns = <300>;
-};
-
-ap_i2c_tp: &i2c5 {
-	status = "okay";
-
-	/*
-	 * Note strange pullup enable.  Apparently this avoids leakage but
-	 * still allows us to get nice 4.7K pullups for high speed i2c
-	 * transfers.  Basically we want the pullup on whenever the ap is
-	 * alive, so the "en" pin just gets set to output high.
-	 */
-	pinctrl-0 = <&i2c5_xfer &ap_i2c_tp_pu_en>;
-
-	clock-frequency = <400000>;
-
-	/* These are relatively safe rise/fall times; TODO: measure */
-	i2c-scl-falling-time-ns = <50>;
-	i2c-scl-rising-time-ns = <300>;
-};
-
-ap_i2c_audio: &i2c8 {
-	status = "okay";
-
-	// TODO: device can handle 1MHz, can the bus?  Probably...
-	// http://crosbug.com/p/53683
-	clock-frequency = <400000>;
-
-	/* These are relatively safe rise/fall times; TODO: measure */
-	i2c-scl-falling-time-ns = <50>;
-	i2c-scl-rising-time-ns = <300>;
-
-	// TODO: Put dlg,da7219 here
-	codec: da7219@1a {
-		compatible = "dlg,da7219";
-		reg = <0x1a>;
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&headset_int_l>;
-
-		interrupt-parent = <&gpio1>;
-		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
-
-		VDD-supply = <&pp1800>;
-		VDDMIC-supply = <&pp3300>;
-		VDDIO-supply = <&pp1800>;
-
-		// TODO: I THINK this is right, but it's a bit of a guess.
-		clocks = <&cru SCLK_I2S_8CH_OUT>;
-		clock-names = "mclk";
-
-// Below is from bindings; we need to adjust for our SoC / board.
-		dlg,ldo-lvl = <1200>;
-		dlg,micbias-lvl = <2600>;
-		dlg,mic-amp-in-sel = "diff";
-
-		da7219_aad {
-			dlg,btn-cfg = <50>;
-			dlg,mic-det-thr = <500>;
-			dlg,jack-ins-deb = <20>;
-			dlg,jack-det-rate = "32ms_64ms";
-			dlg,jack-rem-deb = <1>;
-
-			dlg,a-d-btn-thr = <0xa>;
-			dlg,d-b-btn-thr = <0x16>;
-			dlg,b-c-btn-thr = <0x21>;
-			dlg,c-mic-btn-thr = <0x3E>;
-
-			dlg,btn-avg = <4>;
-			dlg,adc-1bit-rpt = <1>;
-		};
-	};
-};
-
 &i2s0 {
 	status = "okay";
 };
@@ -654,21 +496,6 @@ ap_i2c_audio: &i2c8 {
 	status = "okay";
 };
 
-&sdhci {
-	/*
-	 * Signal integrity isn't great at 200 MHz and 150 MHz (DDR) gives the
-	 * same (or nearly the same) performance for all eMMC that are intended
-	 * to be used.
-	 */
-	assigned-clock-rates = <150000000>;
-
-	bus-width = <8>;
-	mmc-hs400-1_8v;
-	mmc-hs400-enhanced-strobe;
-	non-removable;
-	status = "okay";
-};
-
 &sdmmc {
 	status = "okay";
 
@@ -684,30 +511,27 @@ ap_i2c_audio: &i2c8 {
 	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_cd_gpio
 		     &sdmmc_bus4>;
 
+	// HACK: Limit freq for now
+	// ...as of 160330 confirmed that things break if you remove this.
+	clock-frequency = <37500000>;
+	clock-freq-min-max = <400000 37500000>;
+
 	bus-width = <4>;
 	cd-gpios = <&gpio4 24 GPIO_ACTIVE_LOW>;
 	disable-wp;
 
 	cap-mmc-highspeed;
 	cap-sd-highspeed;
-	sd-uhs-sdr12;
-	sd-uhs-sdr25;
-	sd-uhs-sdr50;
-	sd-uhs-sdr104;
+
+	// TODO: enable once tested...
+	//sd-uhs-sdr12;
+	//sd-uhs-sdr25;
+	//sd-uhs-sdr50;
+	//sd-uhs-sdr104;
 
 	// Comment out until we turn on gpio-regulator config
 	vmmc-supply = <&pp3000_sd_slot>;
 	vqmmc-supply = <&ppvar_sd_card_io>;
-};
-
-&spi0 {
-	status = "okay";
-
-	cr50@0 {
-		compatible = "google,cr50", "tcg,tpm_tis-spi";
-		reg = <0>;
-		spi-max-frequency = <800000>; // TODO: review later
-	};
 };
 
 &spi1 {
@@ -720,19 +544,6 @@ ap_i2c_audio: &i2c8 {
 		// TODO: add rx-sample-delay-ns.
 		spi-max-frequency = <10000000>;
 		reg = <0>;
-	};
-};
-
-&spi2 {
-	status = "okay";
-
-	wacky_spi_audio: spi2@0 {
-		compatible = "realtek,rt5514";
-		reg = <0>;
-
-		// TODO: can run faster once verified.
-		// TODO: add rx-sample-delay-ns.
-		spi-max-frequency = <10000000>;
 	};
 };
 
@@ -752,23 +563,11 @@ ap_i2c_audio: &i2c8 {
 
 		i2c_tunnel: i2c-tunnel {
 			compatible = "google,cros-ec-i2c-tunnel";
-			google,remote-bus = <4>;
+			google,remote-bus = <0>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 		};
-
-		cros_ec_pwm: ec-pwm {
-			compatible = "google,cros-ec-pwm";
-			#pwm-cells = <1>;
-		};
 	};
-};
-
-&tsadc {
-	status = "okay";
-
-	rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
-	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
 };
 
 &uart2 {
@@ -809,50 +608,11 @@ ap_i2c_audio: &i2c8 {
 	dr_mode = "host";
 };
 
-&vopb {
-	status = "okay";
-	assigned-clocks = <&cru ACLK_VOP0>, <&cru HCLK_VOP0>;
-	assigned-clock-rates = <400000000>, <200000000>;
-};
-
-&vopb_mmu {
-	status = "okay";
-};
-
-&vopl {
-	status = "okay";
-	assigned-clocks = <&cru ACLK_VOP1>, <&cru HCLK_VOP1>;
-	assigned-clock-rates = <400000000>, <200000000>;
-};
-
-&vopl_mmu {
-	status = "okay";
-};
-
-#include "common/cros-ec-keyboard.dtsi"
-#include "common/cros-ec-sbs.dtsi"
-
 /* PINCTRL: always below everything else */
 
 &pinctrl {
-	/*
-	 * pinctrl settings for pins that have no real owners.
-	 *
-	 * At the moment settings are identical for S0 and S3, but if we later
-	 * need to configure things differently for S3 we'll adjust here.
-	 */
-	pinctrl-names = "default";
-	pinctrl-0 = <
-		&ap_pwroff	/* AP will auto-assert this when in S3 */
-	>;
-
 	pcfg_output_high: pcfg-output-high {
 		output-high;
-	};
-
-	pcfg_pull_none_8ma: pcfg-pull-none-8ma {
-		bias-disable;
-		drive-strength = <8>;
 	};
 
 	cros-ec {
@@ -915,33 +675,30 @@ ap_i2c_audio: &i2c8 {
 		};
 	};
 
-	max98357a {
-		sdmode_en: sdmode-en {
-			rockchip,pins = <1 2 RK_FUNC_GPIO &pcfg_pull_down>;
-		};
-	};
-
 	sdmmc {
 		/*
-		 * We run sdmmc at max speed; bump up drive strength.
-		 * We also have external pulls, so disable the internal ones.
+		 * We have external pulls on SDMMC, so disable internals
+		 *
+		 * TODO:
+		 * - On veyron we found that we needed to drive at 8mA.  Do we
+		 *   need to that here?  If so, 8mA or 12mA?
 		 */
 		sdmmc_bus4: sdmmc-bus4 {
 			rockchip,pins =
-				<4 8 RK_FUNC_1 &pcfg_pull_none_8ma>,
-				<4 9 RK_FUNC_1 &pcfg_pull_none_8ma>,
-				<4 10 RK_FUNC_1 &pcfg_pull_none_8ma>,
-				<4 11 RK_FUNC_1 &pcfg_pull_none_8ma>;
+				<4 8 RK_FUNC_1 &pcfg_pull_none>,
+				<4 9 RK_FUNC_1 &pcfg_pull_none>,
+				<4 10 RK_FUNC_1 &pcfg_pull_none>,
+				<4 11 RK_FUNC_1 &pcfg_pull_none>;
 		};
 
 		sdmmc_clk: sdmmc-clk {
 			rockchip,pins =
-				<4 12 RK_FUNC_1 &pcfg_pull_none_8ma>;
+				<4 12 RK_FUNC_1 &pcfg_pull_none>;
 		};
 
 		sdmmc_cmd: sdmmc-cmd {
 			rockchip,pins =
-				<4 13 RK_FUNC_1 &pcfg_pull_none_8ma>;
+				<4 13 RK_FUNC_1 &pcfg_pull_none>;
 		};
 
 		/*
@@ -977,10 +734,6 @@ ap_i2c_audio: &i2c8 {
 	touchscreen {
 		touch_int_l: touch-int-l {
 			rockchip,pins = <3 13 RK_FUNC_GPIO &pcfg_pull_up>;
-		};
-
-		touch_reset_l: touch-reset-l {
-			rockchip,pins = <4 26 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 

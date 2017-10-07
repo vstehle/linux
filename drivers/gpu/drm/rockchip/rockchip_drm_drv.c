@@ -14,18 +14,16 @@
  * GNU General Public License for more details.
  */
 
+#include <asm/dma-iommu.h>
+
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fb_helper.h>
 #include <linux/dma-mapping.h>
-#include <linux/dma-iommu.h>
 #include <linux/pm_runtime.h>
 #include <linux/module.h>
 #include <linux/of_graph.h>
 #include <linux/component.h>
-#include <linux/iommu.h>
-
-#include <drm/rockchip_drm.h>
 
 #include "rockchip_drm_drv.h"
 #include "rockchip_drm_fb.h"
@@ -38,8 +36,6 @@
 #define DRIVER_MAJOR	1
 #define DRIVER_MINOR	0
 
-static bool is_support_iommu = true;
-
 /*
  * Attach a (component) device to the shared drm dma mapping from master drm
  * device.  This is used by the VOPs to map GEM buffers to a common DMA
@@ -48,31 +44,22 @@ static bool is_support_iommu = true;
 int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
 				   struct device *dev)
 {
-	struct rockchip_drm_private *private = drm_dev->dev_private;
+	struct dma_iommu_mapping *mapping = drm_dev->dev->archdata.mapping;
 	int ret;
 
-	if (!is_support_iommu)
-		return 0;
-
-	ret = iommu_attach_device(private->domain, dev);
-	if (ret) {
-		dev_err(dev, "Failed to attach iommu device\n");
+	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+	if (ret)
 		return ret;
-	}
 
-	return 0;
+	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+
+	return arm_iommu_attach_device(dev, mapping);
 }
 
 void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
 				    struct device *dev)
 {
-	struct rockchip_drm_private *private = drm_dev->dev_private;
-	struct iommu_domain *domain = private->domain;
-
-	if (!is_support_iommu)
-		return;
-
-	iommu_detach_device(domain, dev);
+	arm_iommu_detach_device(dev);
 }
 
 int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
@@ -137,44 +124,10 @@ static void rockchip_drm_crtc_disable_vblank(struct drm_device *dev,
 		priv->crtc_funcs[pipe]->disable_vblank(crtc);
 }
 
-static int rockchip_drm_init_iommu(struct drm_device *drm_dev)
-{
-	struct rockchip_drm_private *private = drm_dev->dev_private;
-	struct iommu_domain_geometry *geometry;
-	u64 start, end;
-
-	if (!is_support_iommu)
-		return 0;
-
-	private->domain = iommu_domain_alloc(&platform_bus_type);
-	if (!private->domain)
-		return -ENOMEM;
-
-	geometry = &private->domain->geometry;
-	start = geometry->aperture_start;
-	end = geometry->aperture_end;
-
-	DRM_DEBUG("IOMMU context initialized (aperture: %#llx-%#llx)\n",
-		  start, end);
-	drm_mm_init(&private->mm, start, end - start + 1);
-
-	return 0;
-}
-
-static void rockchip_iommu_cleanup(struct drm_device *drm_dev)
-{
-	struct rockchip_drm_private *private = drm_dev->dev_private;
-
-	if (!is_support_iommu)
-		return;
-
-	drm_mm_takedown(&private->mm);
-	iommu_domain_free(private->domain);
-}
-
 static int rockchip_drm_load(struct drm_device *drm_dev, unsigned long flags)
 {
 	struct rockchip_drm_private *private;
+	struct dma_iommu_mapping *mapping;
 	struct device *dev = drm_dev->dev;
 	struct drm_connector *connector;
 	int ret;
@@ -192,14 +145,35 @@ static int rockchip_drm_load(struct drm_device *drm_dev, unsigned long flags)
 
 	rockchip_drm_mode_config_init(drm_dev);
 
-	ret = rockchip_drm_init_iommu(drm_dev);
-	if (ret)
+	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms),
+				      GFP_KERNEL);
+	if (!dev->dma_parms) {
+		ret = -ENOMEM;
 		goto err_config_cleanup;
+	}
+
+	/* TODO(djkurtz): fetch the mapping start/size from somewhere */
+	mapping = arm_iommu_create_mapping(&platform_bus_type, 0x00000000,
+					   SZ_2G);
+	if (IS_ERR(mapping)) {
+		ret = PTR_ERR(mapping);
+		goto err_config_cleanup;
+	}
+
+	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+	if (ret)
+		goto err_release_mapping;
+
+	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+
+	ret = arm_iommu_attach_device(dev, mapping);
+	if (ret)
+		goto err_release_mapping;
 
 	/* Try to bind all sub drivers. */
 	ret = component_bind_all(dev, drm_dev);
 	if (ret)
-		goto err_iommu_cleanup;
+		goto err_detach_device;
 
 	/*
 	 * All components are now added, we can publish the connector sysfs
@@ -251,8 +225,10 @@ err_kms_helper_poll_fini:
 	drm_kms_helper_poll_fini(drm_dev);
 err_unbind:
 	component_unbind_all(dev, drm_dev);
-err_iommu_cleanup:
-	rockchip_iommu_cleanup(drm_dev);
+err_detach_device:
+	arm_iommu_detach_device(dev);
+err_release_mapping:
+	arm_iommu_release_mapping(dev->archdata.mapping);
 err_config_cleanup:
 	drm_mode_config_cleanup(drm_dev);
 	drm_dev->dev_private = NULL;
@@ -267,7 +243,8 @@ static int rockchip_drm_unload(struct drm_device *drm_dev)
 	drm_vblank_cleanup(drm_dev);
 	drm_kms_helper_poll_fini(drm_dev);
 	component_unbind_all(dev, drm_dev);
-	rockchip_iommu_cleanup(drm_dev);
+	arm_iommu_detach_device(dev);
+	arm_iommu_release_mapping(dev->archdata.mapping);
 	drm_mode_config_cleanup(drm_dev);
 	drm_dev->dev_private = NULL;
 
@@ -302,14 +279,6 @@ void rockchip_drm_lastclose(struct drm_device *dev)
 	drm_fb_helper_restore_fbdev_mode_unlocked(&priv->fbdev_helper);
 }
 
-static const struct drm_ioctl_desc rockchip_ioctls[] = {
-	DRM_IOCTL_DEF_DRV(ROCKCHIP_GEM_CREATE, rockchip_gem_create_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ROCKCHIP_GEM_MAP_OFFSET,
-			  rockchip_gem_map_offset_ioctl,
-			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
-};
-
 static const struct file_operations rockchip_drm_driver_fops = {
 	.owner = THIS_MODULE,
 	.open = drm_open,
@@ -330,7 +299,7 @@ const struct vm_operations_struct rockchip_drm_vm_ops = {
 
 static struct drm_driver rockchip_drm_driver = {
 	.driver_features	= DRIVER_MODESET | DRIVER_GEM |
-				  DRIVER_PRIME | DRIVER_ATOMIC | DRIVER_RENDER,
+				  DRIVER_PRIME | DRIVER_ATOMIC,
 	.load			= rockchip_drm_load,
 	.unload			= rockchip_drm_unload,
 	.preclose		= rockchip_drm_preclose,
@@ -351,8 +320,6 @@ static struct drm_driver rockchip_drm_driver = {
 	.gem_prime_vmap		= rockchip_gem_prime_vmap,
 	.gem_prime_vunmap	= rockchip_gem_prime_vunmap,
 	.gem_prime_mmap		= rockchip_gem_mmap_buf,
-	.ioctls			= rockchip_ioctls,
-	.num_ioctls		= ARRAY_SIZE(rockchip_ioctls),
 	.fops			= &rockchip_drm_driver_fops,
 	.name	= DRIVER_NAME,
 	.desc	= DRIVER_DESC,
@@ -521,8 +488,6 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
 	 * works as expected.
 	 */
 	for (i = 0;; i++) {
-		struct device_node *iommu;
-
 		port = of_parse_phandle(np, "ports", i);
 		if (!port)
 			break;
@@ -530,17 +495,6 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
 		if (!of_device_is_available(port->parent)) {
 			of_node_put(port);
 			continue;
-		}
-
-		iommu = of_parse_phandle(port->parent, "iommus", 0);
-		if (!iommu || !of_device_is_available(iommu->parent)) {
-			dev_dbg(dev, "no iommu attached for %s, using non-iommu buffers\n",
-				port->parent->full_name);
-			/*
-			 * if there is a crtc not support iommu, force set all
-			 * crtc use non-iommu buffer.
-			 */
-			is_support_iommu = false;
 		}
 
 		component_match_add(dev, &match, compare_of, port->parent);

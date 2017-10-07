@@ -764,8 +764,10 @@ static int cros_ec_pd_add(struct device *dev)
 
 	drv_data =
 		devm_kzalloc(dev, sizeof(*drv_data), GFP_KERNEL);
-	if (!drv_data)
-		return -ENOMEM;
+	if (!drv_data) {
+		ret = -ENOMEM;
+		goto fail;
+	}
 
 	drv_data->dev = dev;
 	INIT_DELAYED_WORK(&drv_data->work, cros_ec_pd_update_check);
@@ -775,7 +777,8 @@ static int cros_ec_pd_add(struct device *dev)
 				     pd_ec,
 				     &drv_data->num_ports) < 0) {
 		dev_err(drv_data->dev, "Can't get num_ports\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto fail;
 	}
 	drv_data->force_update = 1;
 	drv_data->is_suspending = 0;
@@ -783,7 +786,7 @@ static int cros_ec_pd_add(struct device *dev)
 	ret = sysfs_create_groups(&dev->kobj, pd_groups);
 	if (ret) {
 		dev_err(dev, "failed to create sysfs attributes: %d\n", ret);
-		return ret;
+		goto fail;
 	}
 
 	/*
@@ -799,6 +802,13 @@ static int cros_ec_pd_add(struct device *dev)
 	queue_delayed_work(drv_data->workqueue, &drv_data->work,
 		PD_UPDATE_CHECK_DELAY);
 	return 0;
+
+fail:
+	if (drv_data) {
+		dev_set_drvdata(dev, NULL);
+		devm_kfree(dev, drv_data);
+	}
+	return ret;
 }
 
 static int cros_ec_pd_resume(struct device *dev)
@@ -903,7 +913,6 @@ struct attribute_group cros_ec_pd_attr_group = {
 	.attrs = __pd_attrs,
 	.is_visible = cros_ec_pd_attrs_are_visible,
 };
-EXPORT_SYMBOL(cros_ec_pd_attr_group);
 
 static SIMPLE_DEV_PM_OPS(cros_ec_pd_pm,
 	cros_ec_pd_suspend, cros_ec_pd_resume);

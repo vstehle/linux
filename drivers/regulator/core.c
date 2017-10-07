@@ -906,8 +906,7 @@ static int machine_constraints_voltage(struct regulator_dev *rdev,
 
 	/* do we need to apply the constraint voltage */
 	if (rdev->constraints->apply_uV &&
-	    rdev->constraints->min_uV && rdev->constraints->max_uV) {
-		int target_min, target_max;
+	    rdev->constraints->min_uV == rdev->constraints->max_uV) {
 		int current_uV = _regulator_get_voltage(rdev);
 		if (current_uV < 0) {
 			rdev_err(rdev,
@@ -915,34 +914,15 @@ static int machine_constraints_voltage(struct regulator_dev *rdev,
 				 current_uV);
 			return current_uV;
 		}
-
-		/*
-		 * If we're below the minimum voltage move up to the
-		 * minimum voltage, if we're above the maximum voltage
-		 * then move down to the maximum.
-		 */
-		target_min = current_uV;
-		target_max = current_uV;
-
-		if (current_uV < rdev->constraints->min_uV) {
-			target_min = rdev->constraints->min_uV;
-			target_max = rdev->constraints->min_uV;
-		}
-
-		if (current_uV > rdev->constraints->max_uV) {
-			target_min = rdev->constraints->max_uV;
-			target_max = rdev->constraints->max_uV;
-		}
-
-		if (target_min != current_uV || target_max != current_uV) {
-			rdev_info(rdev, "Bringing %duV into %d-%duV\n",
-				  current_uV, target_min, target_max);
+		if (current_uV < rdev->constraints->min_uV ||
+		    current_uV > rdev->constraints->max_uV) {
 			ret = _regulator_do_set_voltage(
-				rdev, target_min, target_max);
+				rdev, rdev->constraints->min_uV,
+				rdev->constraints->max_uV);
 			if (ret < 0) {
 				rdev_err(rdev,
-					"failed to apply %d-%duV constraint(%d)\n",
-					target_min, target_max, ret);
+					"failed to apply %duV constraint(%d)\n",
+					rdev->constraints->min_uV, ret);
 				return ret;
 			}
 		}
@@ -1541,7 +1521,7 @@ static int regulator_resolve_supply(struct regulator_dev *rdev)
 	}
 
 	/* Cascade always-on state to supply */
-	if (_regulator_is_enabled(rdev)) {
+	if (_regulator_is_enabled(rdev) && rdev->supply) {
 		ret = regulator_enable(rdev->supply);
 		if (ret < 0) {
 			_regulator_put(rdev->supply);
@@ -3119,20 +3099,6 @@ EXPORT_SYMBOL_GPL(regulator_sync_voltage);
 static int _regulator_get_voltage(struct regulator_dev *rdev)
 {
 	int sel, ret;
-	bool bypassed;
-
-	if (rdev->desc->ops->get_bypass) {
-		ret = rdev->desc->ops->get_bypass(rdev, &bypassed);
-		if (ret < 0)
-			return ret;
-		if (bypassed) {
-			/* if bypassed the regulator must have a supply */
-			if (!rdev->supply)
-				return -EINVAL;
-
-			return _regulator_get_voltage(rdev->supply->rdev);
-		}
-	}
 
 	if (rdev->desc->ops->get_voltage_sel) {
 		sel = rdev->desc->ops->get_voltage_sel(rdev);
@@ -3862,11 +3828,6 @@ static void rdev_init_debugfs(struct regulator_dev *rdev)
 			   &rdev->bypass_count);
 }
 
-static int regulator_register_resolve_supply(struct device *dev, void *data)
-{
-	return regulator_resolve_supply(dev_to_rdev(dev));
-}
-
 /**
  * regulator_register - register regulator
  * @regulator_desc: regulator to register
@@ -3977,15 +3938,6 @@ regulator_register(const struct regulator_desc *regulator_desc,
 	rdev->dev.parent = dev;
 	dev_set_name(&rdev->dev, "regulator.%lu",
 		    (unsigned long) atomic_inc_return(&regulator_no));
-
-	/* set regulator constraints */
-	if (init_data)
-		constraints = &init_data->constraints;
-
-	ret = set_machine_constraints(rdev, constraints);
-	if (ret < 0)
-		goto wash;
-
 	ret = device_register(&rdev->dev);
 	if (ret != 0) {
 		put_device(&rdev->dev);
@@ -3993,6 +3945,14 @@ regulator_register(const struct regulator_desc *regulator_desc,
 	}
 
 	dev_set_drvdata(&rdev->dev, rdev);
+
+	/* set regulator constraints */
+	if (init_data)
+		constraints = &init_data->constraints;
+
+	ret = set_machine_constraints(rdev, constraints);
+	if (ret < 0)
+		goto scrub;
 
 	if (init_data && init_data->supply_regulator)
 		rdev->supply_name = init_data->supply_regulator;
@@ -4014,10 +3974,6 @@ regulator_register(const struct regulator_desc *regulator_desc,
 	}
 
 	rdev_init_debugfs(rdev);
-
-	/* try to resolve regulators supply since a new one was registered */
-	class_for_each_device(&regulator_class, NULL, NULL,
-			      regulator_register_resolve_supply);
 out:
 	mutex_unlock(&regulator_list_mutex);
 	kfree(config);
@@ -4025,6 +3981,8 @@ out:
 
 unset_supplies:
 	unset_regulator_supplies(rdev);
+
+scrub:
 	regulator_ena_gpio_free(rdev);
 	device_unregister(&rdev->dev);
 	/* device core frees rdev */
@@ -4032,7 +3990,6 @@ unset_supplies:
 	goto out;
 
 wash:
-	kfree(rdev->constraints);
 	regulator_ena_gpio_free(rdev);
 clean:
 	kfree(rdev);
@@ -4063,8 +4020,8 @@ void regulator_unregister(struct regulator_dev *rdev)
 	WARN_ON(rdev->open_count);
 	unset_regulator_supplies(rdev);
 	list_del(&rdev->list);
-	regulator_ena_gpio_free(rdev);
 	mutex_unlock(&regulator_list_mutex);
+	regulator_ena_gpio_free(rdev);
 	device_unregister(&rdev->dev);
 }
 EXPORT_SYMBOL_GPL(regulator_unregister);

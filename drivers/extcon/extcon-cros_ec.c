@@ -50,8 +50,6 @@ struct cros_ec_extcon_info {
 	struct device *dev;
 	struct extcon_dev *edev;
 
-	int port_id;
-
 	struct cros_ec_device *ec;
 
 	struct notifier_block notifier;
@@ -83,7 +81,8 @@ static const unsigned int usb_type_c_cable[] = {
 
 /**
  * cros_ec_pd_command() - Send a command to the EC.
- * @info: pointer to struct cros_ec_extcon_info
+ * @dev: PD device
+ * @ec_dev: pointer to cros_ec_device structure to talk to the physical device
  * @command: EC command
  * @version: EC command version
  * @outdata: EC command output data
@@ -93,12 +92,13 @@ static const unsigned int usb_type_c_cable[] = {
  *
  * Return: 0 on success, <0 on failure.
  */
-static int cros_ec_pd_command(struct cros_ec_extcon_info *info,
+static int cros_ec_pd_command(struct device *dev,
+			      struct cros_ec_device *ec_dev,
 			      unsigned int command,
 			      unsigned int version,
-			      void *outdata,
+			      uint8_t *outdata,
 			      unsigned int outsize,
-			      void *indata,
+			      uint8_t *indata,
 			      unsigned int insize)
 {
 	struct cros_ec_command *msg;
@@ -114,7 +114,7 @@ static int cros_ec_pd_command(struct cros_ec_extcon_info *info,
 	if (outsize)
 		memcpy(msg->data, outdata, outsize);
 
-	ret = cros_ec_cmd_xfer_status(info->ec, msg);
+	ret = cros_ec_cmd_xfer_status(ec_dev, msg);
 	if (ret >= 0 && insize)
 		memcpy(indata, msg->data, insize);
 
@@ -125,23 +125,32 @@ static int cros_ec_pd_command(struct cros_ec_extcon_info *info,
 /**
  * cros_ec_usb_get_power_type() - Get power type info about PD device attached to
  * given port.
- * @info: pointer to struct cros_ec_extcon_info
+ * @dev: PD device
+ * @ec_dev: pointer to cros_ec_device structure to talk to the physical device
+ * @port: Port # on device
+ * @power_type: Holds a value of usb_chg_type on command success
  *
- * Return: power type on success, <0 on failure.
+ * Return: 0 on success, <0 on failure.
  */
-static int cros_ec_usb_get_power_type(struct cros_ec_extcon_info *info)
+static int cros_ec_usb_get_power_type(struct device *dev,
+				      struct cros_ec_device *ec_dev,
+				      unsigned int port,
+				      unsigned int *power_type)
 {
 	struct ec_params_usb_pd_power_info req;
 	struct ec_response_usb_pd_power_info resp;
 	int ret;
 
-	req.port = info->port_id;
-	ret = cros_ec_pd_command(info, EC_CMD_USB_PD_POWER_INFO, 0,
-				 &req, sizeof(req), &resp, sizeof(resp));
+	req.port = port;
+	ret = cros_ec_pd_command(dev, ec_dev, EC_CMD_USB_PD_POWER_INFO, 0,
+				 (uint8_t *)&req, sizeof(req),
+				 (uint8_t *)&resp, sizeof(resp));
 	if (ret < 0)
 		return ret;
 
-	return resp.type;
+	*power_type = resp.type;
+
+	return ret;
 }
 
 
@@ -149,50 +158,58 @@ static int cros_ec_usb_get_power_type(struct cros_ec_extcon_info *info)
 /**
  * cros_ec_usb_get_role() - Get role info about possible PD device attached to a
  * given port.
- * @info: pointer to struct cros_ec_extcon_info
+ * @dev: PD device
+ * @ec_dev: pointer to cros_ec_device structure to talk to the physical device
+ * @port: Port # on device
+ * @role: data/power/vconn roles
  *
  *
- * Return: role info on success, -ENOTCONN if no cable is connected, <0 on failure.
+ * Return: >0 on success, 0 if no cable is connected, <0 on failure.
  */
-static int cros_ec_usb_get_role(struct cros_ec_extcon_info *info)
+static int cros_ec_usb_get_role(struct device *dev,
+				struct cros_ec_device *ec_dev,
+				unsigned int port,
+				unsigned int *role)
 {
 	struct ec_params_usb_pd_control pd_control;
 	struct ec_response_usb_pd_control_v1 resp;
 	int ret;
 
-	pd_control.port = info->port_id;
+	pd_control.port = port;
 	pd_control.role = USB_PD_CTRL_ROLE_NO_CHANGE;
 	pd_control.mux = USB_PD_CTRL_MUX_NO_CHANGE;
 	pd_control.swap = USB_PD_CTRL_SWAP_NONE;
-	ret = cros_ec_pd_command(info, EC_CMD_USB_PD_CONTROL, 1,
-				 &pd_control, sizeof(pd_control),
-				 &resp, sizeof(resp));
+	ret = cros_ec_pd_command(dev, ec_dev, EC_CMD_USB_PD_CONTROL, 1,
+				 (uint8_t *)&pd_control, sizeof(pd_control),
+				 (uint8_t *)&resp, sizeof(resp));
 	if (ret < 0)
 		return ret;
 
-	if (!(resp.enabled & PD_CTRL_RESP_ENABLED_CONNECTED))
-		return -ENOTCONN;
-
-	return resp.role;
+	*role = resp.role;
+	return resp.enabled & (1 << 1);
 }
 
 /**
  * cros_ec_pd_get_num_ports() - Get number of EC charge ports.
- * @info: pointer to struct cros_ec_extcon_info
+ * @dev: PD device
+ * @ec_dev: pointer to cros_ec_device structure to talk to the physical device
+ * @num_ports: Holds number of ports, on command success
  *
- * Return: number of ports on success, <0 on failure.
+ * Return: 0 on success, <0 on failure.
  */
-static int cros_ec_pd_get_num_ports(struct cros_ec_extcon_info *info)
+static int cros_ec_pd_get_num_ports(struct device *dev,
+				    struct cros_ec_device *ec_dev,
+				    unsigned int *num_ports)
 {
 	struct ec_response_usb_pd_ports resp;
 	int ret;
 
-	ret = cros_ec_pd_command(info, EC_CMD_USB_PD_PORTS,
-				 0, NULL, 0, &resp, sizeof(resp));
-	if (ret < 0)
-		return ret;
-
-	return resp.num_ports;
+	ret = cros_ec_pd_command(dev, ec_dev, EC_CMD_USB_PD_PORTS,
+				 0, NULL, 0,
+				 (uint8_t *)&resp, sizeof(resp));
+	if (ret == EC_RES_SUCCESS)
+		*num_ports = resp.num_ports;
+	return ret;
 }
 
 static const char *cros_ec_usb_role_string(unsigned int role)
@@ -206,24 +223,34 @@ static const char *cros_ec_usb_power_type_string(unsigned int type)
 	switch (type) {
 	case USB_CHG_TYPE_NONE:
 		return "USB_CHG_TYPE_NONE";
+		break;
 	case USB_CHG_TYPE_PD:
 		return "USB_CHG_TYPE_PD";
+		break;
 	case USB_CHG_TYPE_PROPRIETARY:
 		return "USB_CHG_TYPE_PROPRIETARY";
+		break;
 	case USB_CHG_TYPE_C:
 		return "USB_CHG_TYPE_C";
+		break;
 	case USB_CHG_TYPE_BC12_DCP:
 		return "USB_CHG_TYPE_BC12_DCP";
+		break;
 	case USB_CHG_TYPE_BC12_CDP:
 		return "USB_CHG_TYPE_BC12_CDP";
+		break;
 	case USB_CHG_TYPE_BC12_SDP:
 		return "USB_CHG_TYPE_BC12_SDP";
+		break;
 	case USB_CHG_TYPE_OTHER:
 		return "USB_CHG_TYPE_OTHER";
+		break;
 	case USB_CHG_TYPE_VBUS:
 		return "USB_CHG_TYPE_VBUS";
+		break;
 	case USB_CHG_TYPE_UNKNOWN:
 		return "USB_CHG_TYPE_UNKNOWN";
+		break;
 	default:
 		return "USB_CHG_TYPE_UNKNOWN";
 	}
@@ -241,12 +268,14 @@ static bool cros_ec_usb_power_type_is_wall_wart(unsigned int type,
 	case USB_CHG_TYPE_PROPRIETARY:
 	case USB_CHG_TYPE_BC12_DCP:
 		return true;
+		break;
 	case USB_CHG_TYPE_PD:
 #if 0		/* TODO(crosbug.com/p/45871) use USB comm bit when available */
 		return !(role & PD_CTRL_RESP_ROLE_USB_COMM);
 #else
 		return false;
 #endif
+		break;
 	case USB_CHG_TYPE_C:
 	case USB_CHG_TYPE_BC12_CDP:
 	case USB_CHG_TYPE_BC12_SDP:
@@ -272,34 +301,33 @@ static unsigned int cros_ec_usb_role_is_writeable(unsigned int role)
 	return write_mask;
 }
 
-static int extcon_cros_ec_detect_cable(struct cros_ec_extcon_info *info)
+static void extcon_cros_ec_detect_cable(struct cros_ec_extcon_info *info)
 {
 	struct device *dev = info->dev;
-	int role, power_type;
-	unsigned int dr, pr;
+	struct cros_ec_device *ec = info->ec;
+	int err, res;
+	unsigned int role, dr, pr, power_type;
 
-	power_type = cros_ec_usb_get_power_type(info);
-	if (power_type < 0) {
-		dev_err(dev, "failed getting power type err = %d\n",
-			power_type);
-		return power_type;
+	err = cros_ec_usb_get_power_type(dev, ec, 0, &power_type);
+	if (err) {
+		dev_err(dev, "failed getting power type err = %d\n", err);
+		return;
 	}
 
-	role = cros_ec_usb_get_role(info);
-	if (role < 0) {
-		if (role != -ENOTCONN) {
-			dev_err(dev, "failed getting role err = %d\n", role);
-			return role;
-		}
-		dr = DUAL_ROLE_PROP_DR_NONE;
-		pr = DUAL_ROLE_PROP_PR_NONE;
-	} else {
+	res = cros_ec_usb_get_role(dev, ec, 0, &role);
+	if (res < 0) {
+		dev_err(dev, "failed getting role err = %d\n", res);
+		return;
+	}
+	if (res) {
 		dr = (role & PD_CTRL_RESP_ROLE_DATA) ?
 			DUAL_ROLE_PROP_DR_HOST : DUAL_ROLE_PROP_DR_DEVICE;
 		pr = (role & PD_CTRL_RESP_ROLE_POWER) ?
 			DUAL_ROLE_PROP_PR_SRC : DUAL_ROLE_PROP_PR_SNK;
+	} else {
+		dr = DUAL_ROLE_PROP_DR_NONE;
+		pr = DUAL_ROLE_PROP_PR_NONE;
 	}
-
 	/*
 	 * When there is no USB host (e.g. USB PD charger),
 	 * we are not really a UFP for the AP.
@@ -341,40 +369,46 @@ static int extcon_cros_ec_detect_cable(struct cros_ec_extcon_info *info)
 		wake_up_all(&info->role_wait);
 		dual_role_instance_changed(info->drp_inst);
 	}
-	return 0;
 }
 
 static int extcon_cros_ec_event(struct notifier_block *nb,
 	unsigned long queued_during_suspend, void *_notify)
 {
 	struct cros_ec_extcon_info *info;
+	struct device *dev;
 	struct cros_ec_device *ec;
 	u32 host_event;
 
 	info = container_of(nb, struct cros_ec_extcon_info, notifier);
+	dev = info->dev;
 	ec = info->ec;
 
 	host_event = cros_ec_get_host_event(ec);
 	if (host_event & EC_HOST_EVENT_MASK(EC_HOST_EVENT_PD_MCU)) {
 		extcon_cros_ec_detect_cable(info);
 		return NOTIFY_OK;
+	} else {
+		return NOTIFY_DONE;
 	}
-	return NOTIFY_DONE;
 }
 
 static bool extcon_cros_ec_has_vconn(struct cros_ec_extcon_info *info)
 {
-	int role;
+	struct device *dev = info->dev;
+	struct cros_ec_device *ec = info->ec;
+	unsigned int role;
+	int res;
 
-	role = cros_ec_usb_get_role(info);
+	res = cros_ec_usb_get_role(dev, ec, 0, &role);
 
-	return (role >= 0) && (role & PD_CTRL_RESP_ROLE_VCONN);
+	return (res > 0) && (role & PD_CTRL_RESP_ROLE_VCONN);
 }
 
 static int extcon_cros_ec_force_data_role(struct cros_ec_extcon_info *info,
 					   unsigned int new_dr)
 {
 	struct device *dev = info->dev;
+	struct cros_ec_device *ec = info->ec;
 	struct ec_params_usb_pd_control pd_control;
 	struct ec_response_usb_pd_control_v1 resp;
 	int ret;
@@ -388,13 +422,13 @@ static int extcon_cros_ec_force_data_role(struct cros_ec_extcon_info *info,
 	if (new_dr == info->dr)
 		return 0;
 
-	pd_control.port = info->port_id;
+	pd_control.port = 0;
 	pd_control.role = USB_PD_CTRL_ROLE_NO_CHANGE;
 	pd_control.mux = USB_PD_CTRL_MUX_NO_CHANGE;
 	pd_control.swap = USB_PD_CTRL_SWAP_DATA;
-	ret = cros_ec_pd_command(info, EC_CMD_USB_PD_CONTROL, 1,
-				 &pd_control, sizeof(pd_control),
-				 &resp, sizeof(resp));
+	ret = cros_ec_pd_command(dev, ec, EC_CMD_USB_PD_CONTROL, 1,
+				 (uint8_t *)&pd_control, sizeof(pd_control),
+				 (uint8_t *)&resp, sizeof(resp));
 	dev_dbg(dev, "EC data swap to %s = %d\n",
 		new_dr == DUAL_ROLE_PROP_DR_HOST ? "dfp" : "ufp", ret);
 	if (ret < 0)
@@ -413,6 +447,7 @@ static int extcon_cros_ec_force_power_role(struct cros_ec_extcon_info *info,
 					   unsigned int new_pr)
 {
 	struct device *dev = info->dev;
+	struct cros_ec_device *ec = info->ec;
 	struct ec_params_charge_port_override p;
 	int ret;
 
@@ -433,8 +468,8 @@ static int extcon_cros_ec_force_power_role(struct cros_ec_extcon_info *info,
 		return -EINVAL;
 	}
 
-	ret = cros_ec_pd_command(info, EC_CMD_PD_CHARGE_PORT_OVERRIDE, 0,
-				 &p, sizeof(p), NULL, 0);
+	ret = cros_ec_pd_command(dev, ec, EC_CMD_PD_CHARGE_PORT_OVERRIDE, 0,
+				 (uint8_t *)&p, sizeof(p), NULL, 0);
 	dev_dbg(dev, "EC charge port override to %d = %d\n",
 		p.override_port, ret);
 	if (ret < 0)
@@ -543,8 +578,20 @@ static int extcon_cros_ec_probe(struct platform_device *pdev)
 	struct cros_ec_extcon_info *info;
 	struct cros_ec_device *ec = dev_get_drvdata(pdev->dev.parent);
 	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
-	int numports, ret;
+	unsigned int numports = 0;
+	int ret = 0;
+
+	ret = cros_ec_pd_get_num_ports(dev, ec, &numports);
+	if (ret) {
+		dev_err(dev, "failed getting number of ports! ret = %d\n", ret);
+		return -ENODEV;
+	}
+
+	if (numports != 1) {
+		/* If we don't have exactly one port, fail */
+		dev_err(dev, "This driver only supports exactly one port\n");
+		return -ENODEV;
+	}
 
 	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
 	if (!info)
@@ -552,31 +599,6 @@ static int extcon_cros_ec_probe(struct platform_device *pdev)
 
 	info->dev = dev;
 	info->ec = ec;
-
-	if (np) {
-		u32 port;
-
-		ret = of_property_read_u32(np, "google,usb-port-id", &port);
-		if (ret < 0) {
-			dev_err(dev, "Missing google,usb-port-id property\n");
-			return ret;
-		}
-		info->port_id = port;
-	} else {
-		info->port_id = pdev->id;
-	}
-
-	numports = cros_ec_pd_get_num_ports(info);
-	if (numports < 0) {
-		dev_err(dev, "failed getting number of ports! ret = %d\n",
-			numports);
-		return numports;
-	}
-
-	if (info->port_id >= numports) {
-		dev_err(dev, "This system only supports %d ports\n", numports);
-		return -ENODEV;
-	}
 
 	info->edev = devm_extcon_dev_allocate(dev, usb_type_c_cable);
 	if (IS_ERR(info->edev)) {
@@ -604,36 +626,24 @@ static int extcon_cros_ec_probe(struct platform_device *pdev)
 		info->drp_inst = inst;
 	}
 
+	/* Get PD events from the EC */
+	info->notifier.notifier_call = extcon_cros_ec_event;
+	ret = blocking_notifier_chain_register(&info->ec->event_notifier,
+					       &info->notifier);
+	if (ret < 0)
+		dev_warn(dev, "failed to register notifier\n");
+
 	/* Initialize wakelock to hold off suspend when USB is attached */
 	wake_lock_init(&info->wakelock, WAKE_LOCK_SUSPEND,
 		       dev_name(&pdev->dev));
 	info->wakelock_held = false;
 
-	/* Get PD events from the EC */
-	info->notifier.notifier_call = extcon_cros_ec_event;
-	ret = blocking_notifier_chain_register(&info->ec->event_notifier,
-					       &info->notifier);
-	if (ret < 0) {
-		dev_err(dev, "failed to register notifier\n");
-		return ret;
-	}
-
 	/* Perform initial detection */
-	ret = extcon_cros_ec_detect_cable(info);
-	if (ret < 0) {
-		dev_err(dev, "failed to detect initial cable state\n");
-		goto unregister_notifier;
-	}
+	extcon_cros_ec_detect_cable(info);
 
 	return 0;
-
-unregister_notifier:
-	blocking_notifier_chain_unregister(&info->ec->event_notifier,
-					   &info->notifier);
-	if (info->wakelock_held)
-		wake_unlock(&info->wakelock);
-	return ret;
 }
+
 
 static int extcon_cros_ec_remove(struct platform_device *pdev)
 {

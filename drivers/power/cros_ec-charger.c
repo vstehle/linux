@@ -52,8 +52,6 @@
 		       TSU6721_TYPE_APPLE_CHG | TSU6721_TYPE_U200_CHG | \
 		       TSU6721_TYPE_NON_STD_CHG | TSU6721_TYPE_JIG_UART_ON)
 
-#define DRV_NAME "cros-ec-charger"
-
 struct charger_data {
 	struct device *dev;
 	struct power_supply *charger;
@@ -269,7 +267,7 @@ static SIMPLE_DEV_PM_OPS(cros_ec_charger_pm_ops, NULL,
 
 static struct platform_driver cros_ec_charger_driver = {
 	.driver = {
-		.name = DRV_NAME,
+		.name = "cros-ec-charger",
 		.owner = THIS_MODULE,
 		.pm = &cros_ec_charger_pm_ops,
 	},
@@ -281,4 +279,4 @@ module_platform_driver(cros_ec_charger_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Chrome EC charger");
-MODULE_ALIAS("platform:" DRV_NAME);
+MODULE_ALIAS("power_supply:cros-ec-charger");

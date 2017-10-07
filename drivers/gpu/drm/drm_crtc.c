@@ -649,18 +649,6 @@ EXPORT_SYMBOL(drm_framebuffer_remove);
 
 DEFINE_WW_CLASS(crtc_ww_class);
 
-static unsigned int drm_num_crtcs(struct drm_device *dev)
-{
-	unsigned int num = 0;
-	struct drm_crtc *tmp;
-
-	drm_for_each_crtc(tmp, dev) {
-		num++;
-	}
-
-	return num;
-}
-
 /**
  * drm_crtc_init_with_planes - Initialise a new CRTC object with
  *    specified primary and cursor planes.
@@ -695,21 +683,6 @@ int drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc,
 	ret = drm_mode_object_get(dev, &crtc->base, DRM_MODE_OBJECT_CRTC);
 	if (ret)
 		return ret;
-
-	if (name) {
-		va_list ap;
-
-		va_start(ap, name);
-		crtc->name = kvasprintf(GFP_KERNEL, name, ap);
-		va_end(ap);
-	} else {
-		crtc->name = kasprintf(GFP_KERNEL, "crtc-%d",
-				       drm_num_crtcs(dev));
-	}
-	if (!crtc->name) {
-		drm_mode_object_put(dev, &crtc->base);
-		return -ENOMEM;
-	}
 
 	crtc->base.properties = &crtc->properties;
 
@@ -756,8 +729,6 @@ void drm_crtc_cleanup(struct drm_crtc *crtc)
 	WARN_ON(crtc->state && !crtc->funcs->atomic_destroy_state);
 	if (crtc->state && crtc->funcs->atomic_destroy_state)
 		crtc->funcs->atomic_destroy_state(crtc, crtc->state);
-
-	kfree(crtc->name);
 
 	memset(crtc, 0, sizeof(*crtc));
 }
@@ -1153,29 +1124,6 @@ out_unlock:
 EXPORT_SYMBOL(drm_encoder_init);
 
 /**
- * drm_encoder_index - find the index of a registered encoder
- * @encoder: encoder to find index for
- *
- * Given a registered encoder, return the index of that encoder within a DRM
- * device's list of encoders.
- */
-unsigned int drm_encoder_index(struct drm_encoder *encoder)
-{
-	unsigned int index = 0;
-	struct drm_encoder *tmp;
-
-	drm_for_each_encoder(tmp, encoder->dev) {
-		if (tmp == encoder)
-			return index;
-
-		index++;
-	}
-
-	BUG();
-}
-EXPORT_SYMBOL(drm_encoder_index);
-
-/**
  * drm_encoder_cleanup - cleans up an initialised encoder
  * @encoder: encoder to cleanup
  *
@@ -1527,41 +1475,6 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 		return -ENOMEM;
 	dev->mode_config.prop_mode_id = prop;
 
-	prop = drm_property_create(dev,
-			DRM_MODE_PROP_BLOB,
-			"DEGAMMA_LUT", 0);
-	if (!prop)
-		return -ENOMEM;
-	dev->mode_config.degamma_lut_property = prop;
-
-	prop = drm_property_create_range(dev,
-			DRM_MODE_PROP_IMMUTABLE,
-			"DEGAMMA_LUT_SIZE", 0, UINT_MAX);
-	if (!prop)
-		return -ENOMEM;
-	dev->mode_config.degamma_lut_size_property = prop;
-
-	prop = drm_property_create(dev,
-			DRM_MODE_PROP_BLOB,
-			"CTM", 0);
-	if (!prop)
-		return -ENOMEM;
-	dev->mode_config.ctm_property = prop;
-
-	prop = drm_property_create(dev,
-			DRM_MODE_PROP_BLOB,
-			"GAMMA_LUT", 0);
-	if (!prop)
-		return -ENOMEM;
-	dev->mode_config.gamma_lut_property = prop;
-
-	prop = drm_property_create_range(dev,
-			DRM_MODE_PROP_IMMUTABLE,
-			"GAMMA_LUT_SIZE", 0, UINT_MAX);
-	if (!prop)
-		return -ENOMEM;
-	dev->mode_config.gamma_lut_size_property = prop;
-
 	return 0;
 }
 
@@ -1893,8 +1806,7 @@ int drm_mode_getresources(struct drm_device *dev, void *data,
 		copied = 0;
 		crtc_id = (uint32_t __user *)(unsigned long)card_res->crtc_id_ptr;
 		drm_for_each_crtc(crtc, dev) {
-			DRM_DEBUG_KMS("[CRTC:%d:%s]\n",
-				      crtc->base.id, crtc->name);
+			DRM_DEBUG_KMS("[CRTC:%d]\n", crtc->base.id);
 			if (put_user(crtc->base.id, crtc_id + copied)) {
 				ret = -EFAULT;
 				goto out;
@@ -2739,7 +2651,7 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 		ret = -ENOENT;
 		goto out;
 	}
-	DRM_DEBUG_KMS("[CRTC:%d:%s]\n", crtc->base.id, crtc->name);
+	DRM_DEBUG_KMS("[CRTC:%d]\n", crtc->base.id);
 
 	if (crtc_req->mode_valid) {
 		/* If we have a mode we need a framebuffer. */
@@ -3407,24 +3319,6 @@ int drm_mode_addfb2(struct drm_device *dev,
 	return 0;
 }
 
-struct drm_mode_rmfb_work {
-	struct work_struct work;
-	struct list_head fbs;
-};
-
-static void drm_mode_rmfb_work_fn(struct work_struct *w)
-{
-	struct drm_mode_rmfb_work *arg = container_of(w, typeof(*arg), work);
-
-	while (!list_empty(&arg->fbs)) {
-		struct drm_framebuffer *fb =
-			list_first_entry(&arg->fbs, typeof(*fb), filp_head);
-
-		list_del_init(&fb->filp_head);
-		drm_framebuffer_remove(fb);
-	}
-}
-
 /**
  * drm_mode_rmfb - remove an FB from the configuration
  * @dev: drm device for the ioctl
@@ -3465,25 +3359,7 @@ int drm_mode_rmfb(struct drm_device *dev,
 	mutex_unlock(&dev->mode_config.fb_lock);
 	mutex_unlock(&file_priv->fbs_lock);
 
-	/*
-	 * we now own the reference that was stored in the fbs list
-	 *
-	 * drm_framebuffer_remove may fail with -EINTR on pending signals,
-	 * so run this in a separate stack as there's no way to correctly
-	 * handle this after the fb is already removed from the lookup table.
-	 */
-	if (atomic_read(&fb->refcount.refcount) > 1) {
-		struct drm_mode_rmfb_work arg;
-
-		INIT_WORK_ONSTACK(&arg.work, drm_mode_rmfb_work_fn);
-		INIT_LIST_HEAD(&arg.fbs);
-		list_add_tail(&fb->filp_head, &arg.fbs);
-
-		schedule_work(&arg.work);
-		flush_work(&arg.work);
-		destroy_work_on_stack(&arg.work);
-	} else
-		drm_framebuffer_unreference(fb);
+	drm_framebuffer_unreference(fb);
 
 	return 0;
 
@@ -3636,6 +3512,7 @@ out_err1:
 	return ret;
 }
 
+
 /**
  * drm_fb_release - remove and free the FBs on this file
  * @priv: drm file for the ioctl
@@ -3650,9 +3527,6 @@ out_err1:
 void drm_fb_release(struct drm_file *priv)
 {
 	struct drm_framebuffer *fb, *tfb;
-	struct drm_mode_rmfb_work arg;
-
-	INIT_LIST_HEAD(&arg.fbs);
 
 	/*
 	 * When the file gets released that means no one else can access the fb
@@ -3665,22 +3539,10 @@ void drm_fb_release(struct drm_file *priv)
 	 * at it any more.
 	 */
 	list_for_each_entry_safe(fb, tfb, &priv->fbs, filp_head) {
-		if (atomic_read(&fb->refcount.refcount) > 1) {
-			list_move_tail(&fb->filp_head, &arg.fbs);
-		} else {
-			list_del_init(&fb->filp_head);
+		list_del_init(&fb->filp_head);
 
-			/* This drops the fpriv->fbs reference. */
-			drm_framebuffer_unreference(fb);
-		}
-	}
-
-	if (!list_empty(&arg.fbs)) {
-		INIT_WORK_ONSTACK(&arg.work, drm_mode_rmfb_work_fn);
-
-		schedule_work(&arg.work);
-		flush_work(&arg.work);
-		destroy_work_on_stack(&arg.work);
+		/* This drops the fpriv->fbs reference. */
+		drm_framebuffer_unreference(fb);
 	}
 }
 
