@@ -3322,7 +3322,7 @@ static void __sd_resume(struct work_struct *work)
 	int ret;
 
 	if (!sdkp)	/* E.g.: runtime resume at the start of sd_probe() */
-		return 0;
+		return;
 
 	if (!sdkp->device->manage_start_stop)
 		return;
