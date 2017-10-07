@@ -3,6 +3,7 @@
 #
 
 obj-$(CONFIG_WLAN_VENDOR_ADMTEK) += admtek/
+obj-$(CONFIG_WLAN_VENDOR_ATH) += ath/
 obj-$(CONFIG_WLAN_VENDOR_ATMEL) += atmel/
 obj-$(CONFIG_WLAN_VENDOR_BROADCOM) += broadcom/
 obj-$(CONFIG_WLAN_VENDOR_CISCO) += cisco/
@@ -43,9 +44,3 @@ obj-$(CONFIG_P54_COMMON)	+= p54/
 obj-$(CONFIG_ATH_CARDS)		+= ath/
 
 obj-$(CONFIG_MAC80211_HWSIM)	+= mac80211_hwsim.o
-
-obj-$(CONFIG_WL_TI)	+= ti/
-
-obj-$(CONFIG_MWIFIEX)	+= mwifiex/
-
-obj-$(CONFIG_RSI_91X)	+= rsi/
