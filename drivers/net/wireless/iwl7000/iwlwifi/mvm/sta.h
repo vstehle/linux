@@ -352,6 +352,15 @@ struct iwl_mvm_key_pn {
 	} ____cacheline_aligned_in_smp q[];
 };
 
+struct iwl_mvm_delba_data {
+	u32 baid;
+} __packed;
+
+struct iwl_mvm_delba_notif {
+	struct iwl_mvm_internal_rxq_notif metadata;
+	struct iwl_mvm_delba_data delba;
+} __packed;
+
 /**
  * struct iwl_mvm_rxq_dup_data - per station per rx queue data
  * @last_seq: last sequence per tid for duplicate packet detection
@@ -377,6 +386,7 @@ struct iwl_mvm_rxq_dup_data {
  * @lock: lock to protect the whole struct. Since %tid_data is access from Tx
  * and from Tx response flow, it needs a spinlock.
  * @tid_data: per tid data + mgmt. Look at %iwl_mvm_tid_data.
+ * @tid_to_baid: a simple map of TID to baid
  * @reserved_queue: the queue reserved for this STA for DQA purposes
  *	Every STA has is given one reserved queue to allow it to operate. If no
  *	such queue can be guaranteed, the STA addition will fail.
@@ -410,6 +420,7 @@ struct iwl_mvm_sta {
 	bool next_status_eosp;
 	spinlock_t lock;
 	struct iwl_mvm_tid_data tid_data[IWL_MAX_TID_COUNT + 1];
+	u8 tid_to_baid[IWL_MAX_TID_COUNT];
 	struct iwl_lq_sta lq_sta;
 	struct ieee80211_vif *vif;
 	struct iwl_mvm_key_pn __rcu *ptk_pn[4];
@@ -425,6 +436,7 @@ struct iwl_mvm_sta {
 
 	bool disable_tx;
 	bool tlc_amsdu;
+	bool sleeping;
 	u8 agg_tids;
 	u8 sleep_tx_count;
 	u8 avg_energy;
@@ -497,7 +509,7 @@ void iwl_mvm_rx_eosp_notif(struct iwl_mvm *mvm,
 
 /* AMPDU */
 int iwl_mvm_sta_rx_agg(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
-		       int tid, u16 ssn, bool start, u8 buf_size);
+		       int tid, u16 ssn, bool start, u8 buf_size, u16 timeout);
 int iwl_mvm_sta_tx_agg_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 			struct ieee80211_sta *sta, u16 tid, u16 *ssn);
 int iwl_mvm_sta_tx_agg_oper(struct iwl_mvm *mvm, struct ieee80211_vif *vif,

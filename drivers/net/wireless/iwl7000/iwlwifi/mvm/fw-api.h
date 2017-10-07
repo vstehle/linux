@@ -91,6 +91,8 @@ enum {
  * DQA queue numbers
  *
  * @IWL_MVM_DQA_CMD_QUEUE: a queue reserved for sending HCMDs to the FW
+ * @IWL_MVM_DQA_AUX_QUEUE: a queue reserved for aux frames
+ * @IWL_MVM_DQA_P2P_DEVICE_QUEUE: a queue reserved for P2P device frames
  * @IWL_MVM_DQA_GCAST_QUEUE: a queue reserved for P2P GO/SoftAP GCAST frames
  * @IWL_MVM_DQA_BSS_CLIENT_QUEUE: a queue reserved for BSS activity, to ensure
  *	that we are never left without the possibility to connect to an AP.
@@ -98,6 +100,8 @@ enum {
  *	Each MGMT queue is mapped to a single STA
  *	MGMT frames are frames that return true on ieee80211_is_mgmt()
  * @IWL_MVM_DQA_MAX_MGMT_QUEUE: last TXQ in pool for MGMT frames
+ * @IWL_MVM_DQA_AP_PROBE_RESP_QUEUE: a queue reserved for P2P GO/SoftAP probe
+ *	responses
  * @IWL_MVM_DQA_MIN_DATA_QUEUE: first TXQ in pool for DATA frames.
  *	DATA frames are intended for !ieee80211_is_mgmt() frames, but if
  *	the MGMT TXQ pool is exhausted, mgmt frames can be sent on DATA queues
@@ -106,10 +110,13 @@ enum {
  */
 enum iwl_mvm_dqa_txq {
 	IWL_MVM_DQA_CMD_QUEUE = 0,
+	IWL_MVM_DQA_AUX_QUEUE = 1,
+	IWL_MVM_DQA_P2P_DEVICE_QUEUE = 2,
 	IWL_MVM_DQA_GCAST_QUEUE = 3,
 	IWL_MVM_DQA_BSS_CLIENT_QUEUE = 4,
 	IWL_MVM_DQA_MIN_MGMT_QUEUE = 5,
 	IWL_MVM_DQA_MAX_MGMT_QUEUE = 8,
+	IWL_MVM_DQA_AP_PROBE_RESP_QUEUE = 9,
 	IWL_MVM_DQA_MIN_DATA_QUEUE = 10,
 	IWL_MVM_DQA_MAX_DATA_QUEUE = 31,
 };
@@ -307,30 +314,45 @@ enum {
 enum iwl_mac_conf_subcmd_ids {
 	LINK_QUALITY_MEASUREMENT_CMD = 0x1,
 	LINK_QUALITY_MEASUREMENT_COMPLETE_NOTIF = 0xFE,
+	CHANNEL_SWITCH_NOA_NOTIF = 0xFF,
 };
 
 enum iwl_phy_ops_subcmd_ids {
 	CMD_DTS_MEASUREMENT_TRIGGER_WIDE = 0x0,
 	CTDP_CONFIG_CMD = 0x03,
 	TEMP_REPORTING_THRESHOLDS_CMD = 0x04,
+	GEO_TX_POWER_LIMIT = 0x05,
 	CT_KILL_NOTIFICATION = 0xFE,
 	DTS_MEASUREMENT_NOTIF_WIDE = 0xFF,
 };
 
 enum iwl_system_subcmd_ids {
 	SHARED_MEM_CFG_CMD = 0x0,
+	SOC_CONFIGURATION_CMD = 0x01,
 };
 
 enum iwl_data_path_subcmd_ids {
 	DQA_ENABLE_CMD = 0x0,
 	UPDATE_MU_GROUPS_CMD = 0x1,
 	TRIGGER_RX_QUEUES_NOTIF_CMD = 0x2,
+	STA_PM_NOTIF = 0xFD,
 	MU_GROUP_MGMT_NOTIF = 0xFE,
 	RX_QUEUES_NOTIFICATION = 0xFF,
 };
 
 enum iwl_prot_offload_subcmd_ids {
 	STORED_BEACON_NTF = 0xFF,
+};
+
+enum iwl_fmac_debug_cmds {
+	LMAC_RD_WR = 0x0,
+	UMAC_RD_WR = 0x1,
+};
+
+/* type of devices for defining SOC latency */
+enum iwl_soc_device_types {
+	SOC_CONFIG_CMD_INTEGRATED   = 0x0,
+	SOC_CONFIG_CMD_DISCRETE     = 0x1,
 };
 
 /* command groups */
@@ -345,6 +367,7 @@ enum {
 	NAN_GROUP = 0x7,
 	TOF_GROUP = 0x8,
 	PROT_OFFLOAD_GROUP = 0xb,
+	DEBUG_GROUP = 0xf,
 };
 
 /**
@@ -489,6 +512,17 @@ struct iwl_fw_paging_cmd {
 		__le64 addr64[NUM_OF_FW_PAGING_BLOCKS];
 	} device_phy_addr;
 } __packed; /* FW_PAGING_BLOCK_CMD_API_S_VER_2 */
+
+/*
+ * struct iwl_soc_configuration_cmd - Set device stabilization latency
+ *
+ * @device_type: the device type as defined in &enum iwl_soc_device_types
+ * @soc_latency: time for SOC to ensure stable power & XTAL
+*/
+struct iwl_soc_configuration_cmd {
+	__le32 device_type;
+	__le32 soc_latency;
+} __packed; /* SOC_CONFIGURATION_CMD_S_VER_1 */
 
 /*
  * Fw items ID's
@@ -741,7 +775,7 @@ enum iwl_time_event_type {
 
 	/* P2P GO Events */
 	TE_P2P_GO_ASSOC_PROT,
-	TE_P2P_GO_REPETITIVE_NOA,
+	TE_P2P_GO_REPETITIVET_NOA,
 	TE_P2P_GO_CT_WINDOW,
 
 	/* WiDi Sync Events */
@@ -2135,5 +2169,58 @@ struct iwl_link_qual_msrmnt_notif {
 	__le32 status;
 	__le32 reserved[3];
 } __packed; /* LQM_MEASUREMENT_COMPLETE_NTF_API_S_VER1 */
+
+/**
+ * Channel switch NOA notification
+ *
+ * @id_and_color: ID and color of the MAC
+ */
+struct iwl_channel_switch_noa_notif {
+	__le32 id_and_color;
+} __packed; /* CHANNEL_SWITCH_START_NTFY_API_S_VER_1 */
+
+/* Operation types for the debug mem access */
+enum {
+	DEBUG_MEM_OP_READ = 0,
+	DEBUG_MEM_OP_WRITE = 1,
+	DEBUG_MEM_OP_WRITE_BYTES = 2,
+};
+
+#define DEBUG_MEM_MAX_SIZE_DWORDS 32
+
+/**
+ * struct iwl_dbg_mem_access_cmd - Request the device to read/write memory
+ * @op: DEBUG_MEM_OP_*
+ * @addr: address to read/write from/to
+ * @len: in dwords, to read/write
+ * @data: for write opeations, contains the source buffer
+ */
+struct iwl_dbg_mem_access_cmd {
+	__le32 op;
+	__le32 addr;
+	__le32 len;
+	__le32 data[];
+} __packed; /* DEBUG_(U|L)MAC_RD_WR_CMD_API_S_VER_1 */
+
+/* Status responses for the debug mem access */
+enum {
+	DEBUG_MEM_STATUS_SUCCESS = 0x0,
+	DEBUG_MEM_STATUS_FAILED = 0x1,
+	DEBUG_MEM_STATUS_LOCKED = 0x2,
+	DEBUG_MEM_STATUS_HIDDEN = 0x3,
+	DEBUG_MEM_STATUS_LENGTH = 0x4,
+};
+
+/**
+ * struct iwl_dbg_mem_access_rsp - Response to debug mem commands
+ * @status: DEBUG_MEM_STATUS_*
+ * @len: read dwords (0 for write operations)
+ * @data: contains the read DWs
+ */
+struct iwl_dbg_mem_access_rsp {
+	__le32 status;
+	__le32 len;
+	__le32 data[];
+} __packed; /* DEBUG_(U|L)MAC_RD_WR_RSP_API_S_VER_1 */
 
 #endif /* __fw_api_h__ */

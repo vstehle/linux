@@ -496,6 +496,10 @@ int iwl_mvm_mac_setup_register(struct iwl_mvm *mvm)
 	ieee80211_hw_set(hw, SUPPORTS_CLONED_SKBS);
 	ieee80211_hw_set(hw, SUPPORTS_AMSDU_IN_AMPDU);
 	ieee80211_hw_set(hw, NEEDS_UNIQUE_STA_ADDR);
+	if (iwl_mvm_has_new_rx_api(mvm))
+		ieee80211_hw_set(hw, SUPPORTS_REORDERING_BUFFER);
+	if (fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_STA_PM_NOTIF))
+		ieee80211_hw_set(hw, AP_LINK_PS);
 
 	if (mvm->trans->num_rx_queues > 1)
 		ieee80211_hw_set(hw, USES_RSS);
@@ -995,6 +999,7 @@ static int iwl_mvm_mac_ampdu_action(struct ieee80211_hw *hw,
 	u16 *ssn = &params->ssn;
 	u8 buf_size = params->buf_size;
 	bool amsdu = params->amsdu;
+	u16 timeout = params->timeout;
 
 	IWL_DEBUG_HT(mvm, "A-MPDU action on addr %pM tid %d: action %d\n",
 		     sta->addr, tid, action);
@@ -1047,10 +1052,12 @@ static int iwl_mvm_mac_ampdu_action(struct ieee80211_hw *hw,
 			ret = -EINVAL;
 			break;
 		}
-		ret = iwl_mvm_sta_rx_agg(mvm, sta, tid, *ssn, true, buf_size);
+		ret = iwl_mvm_sta_rx_agg(mvm, sta, tid, *ssn, true, buf_size,
+					 timeout);
 		break;
 	case IEEE80211_AMPDU_RX_STOP:
-		ret = iwl_mvm_sta_rx_agg(mvm, sta, tid, 0, false, buf_size);
+		ret = iwl_mvm_sta_rx_agg(mvm, sta, tid, 0, false, buf_size,
+					 timeout);
 		break;
 	case IEEE80211_AMPDU_TX_START:
 		if (!iwl_enable_tx_ampdu(mvm->cfg)) {
@@ -1348,6 +1355,7 @@ static void iwl_mvm_mac_stop(struct ieee80211_hw *hw)
 	flush_work(&mvm->async_handlers_wk);
 	flush_work(&mvm->add_stream_wk);
 	cancel_delayed_work_sync(&mvm->fw_dump_wk);
+	cancel_delayed_work_sync(&mvm->cs_tx_unblock_dwork);
 	cancel_delayed_work_sync(&mvm->scan_timeout_dwork);
 	iwl_mvm_free_fw_dump_desc(mvm);
 
@@ -2284,22 +2292,6 @@ static int iwl_mvm_start_ap_ibss(struct ieee80211_hw *hw,
 	if (ret)
 		goto out_unbind;
 
-	/* enable the multicast queue, now that we have a station for it */
-	if (iwl_mvm_is_dqa_supported(mvm)) {
-		unsigned int wdg_timeout =
-			iwl_mvm_get_wd_timeout(mvm, vif, false, false);
-		struct iwl_trans_txq_scd_cfg cfg = {
-			.fifo = IWL_MVM_TX_FIFO_MCAST,
-			.sta_id = mvmvif->bcast_sta.sta_id,
-			.tid = IWL_MAX_TID_COUNT,
-			.aggregate = false,
-			.frame_limit = IWL_FRAME_LIMIT,
-		};
-
-		iwl_mvm_enable_txq(mvm, vif->cab_queue, vif->cab_queue, 0,
-				   &cfg, wdg_timeout);
-	}
-
 	/* must be set before quota calculations */
 	mvmvif->ap_ibss_active = true;
 
@@ -2524,10 +2516,9 @@ iwl_mvm_mac_release_buffered_frames(struct ieee80211_hw *hw,
 					  tids, more_data, true);
 }
 
-static void iwl_mvm_mac_sta_notify(struct ieee80211_hw *hw,
-				   struct ieee80211_vif *vif,
-				   enum sta_notify_cmd cmd,
-				   struct ieee80211_sta *sta)
+static void __iwl_mvm_mac_sta_notify(struct ieee80211_hw *hw,
+				     enum sta_notify_cmd cmd,
+				     struct ieee80211_sta *sta)
 {
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 	struct iwl_mvm_sta *mvmsta = iwl_mvm_sta_from_mac80211(sta);
@@ -2578,6 +2569,67 @@ static void iwl_mvm_mac_sta_notify(struct ieee80211_hw *hw,
 		break;
 	}
 	spin_unlock_bh(&mvmsta->lock);
+}
+
+static void iwl_mvm_mac_sta_notify(struct ieee80211_hw *hw,
+				   struct ieee80211_vif *vif,
+				   enum sta_notify_cmd cmd,
+				   struct ieee80211_sta *sta)
+{
+	__iwl_mvm_mac_sta_notify(hw, cmd, sta);
+}
+
+void iwl_mvm_sta_pm_notif(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
+{
+	struct iwl_rx_packet *pkt = rxb_addr(rxb);
+	struct iwl_mvm_pm_state_notification *notif = (void *)pkt->data;
+	struct ieee80211_sta *sta;
+	struct iwl_mvm_sta *mvmsta;
+	bool sleeping = (notif->type != IWL_MVM_PM_EVENT_AWAKE);
+
+	if (WARN_ON(notif->sta_id >= ARRAY_SIZE(mvm->fw_id_to_mac_id)))
+		return;
+
+	rcu_read_lock();
+	sta = rcu_dereference(mvm->fw_id_to_mac_id[notif->sta_id]);
+	if (WARN_ON(IS_ERR_OR_NULL(sta))) {
+		rcu_read_unlock();
+		return;
+	}
+
+	mvmsta = iwl_mvm_sta_from_mac80211(sta);
+
+	if (!mvmsta->vif ||
+	    mvmsta->vif->type != NL80211_IFTYPE_AP) {
+		rcu_read_unlock();
+		return;
+	}
+
+	if (mvmsta->sleeping != sleeping) {
+		mvmsta->sleeping = sleeping;
+		__iwl_mvm_mac_sta_notify(mvm->hw,
+			sleeping ? STA_NOTIFY_SLEEP : STA_NOTIFY_AWAKE,
+			sta);
+		ieee80211_sta_ps_transition(sta, sleeping);
+	}
+
+	if (sleeping) {
+		switch (notif->type) {
+		case IWL_MVM_PM_EVENT_AWAKE:
+		case IWL_MVM_PM_EVENT_ASLEEP:
+			break;
+		case IWL_MVM_PM_EVENT_UAPSD:
+			ieee80211_sta_uapsd_trigger(sta, IEEE80211_NUM_TIDS);
+			break;
+		case IWL_MVM_PM_EVENT_PS_POLL:
+			ieee80211_sta_pspoll(sta);
+			break;
+		default:
+			break;
+		}
+	}
+
+	rcu_read_unlock();
 }
 
 static void iwl_mvm_sta_pre_rcu_remove(struct ieee80211_hw *hw,
@@ -4000,6 +4052,13 @@ static int iwl_mvm_pre_channel_switch(struct ieee80211_hw *hw,
 			goto out_unlock;
 		}
 
+		/* we still didn't unblock tx. prevent new CS meanwhile */
+		if (rcu_dereference_protected(mvm->csa_tx_blocked_vif,
+					      lockdep_is_held(&mvm->mutex))) {
+			ret = -EBUSY;
+			goto out_unlock;
+		}
+
 		rcu_assign_pointer(mvm->csa_vif, vif);
 
 		if (WARN_ONCE(mvmvif->csa_countdown,
@@ -4007,6 +4066,8 @@ static int iwl_mvm_pre_channel_switch(struct ieee80211_hw *hw,
 			ret = -EBUSY;
 			goto out_unlock;
 		}
+
+		mvmvif->csa_target_freq = chsw->chandef.chan->center_freq;
 
 		break;
 	case NL80211_IFTYPE_STATION:

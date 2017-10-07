@@ -7,7 +7,7 @@
  *
  * Copyright(c) 2012 - 2014 Intel Corporation. All rights reserved.
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
- * Copyright(c) 2016        Intel Deutschland GmbH
+ * Copyright(c) 2016 - 2017 Intel Deutschland GmbH
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU General Public License as
@@ -34,7 +34,7 @@
  *
  * Copyright(c) 2012 - 2014 Intel Corporation. All rights reserved.
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
- * Copyright(c) 2016        Intel Deutschland GmbH
+ * Copyright(c) 2016 - 2017 Intel Deutschland GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -465,6 +465,7 @@ struct iwl_mvm_vif {
 	/* Indicates that CSA countdown may be started */
 	bool csa_countdown;
 	bool csa_failed;
+	u16 csa_target_freq;
 
 	/* TCP Checksum Offload */
 	netdev_features_t features;
@@ -704,6 +705,64 @@ struct iwl_mvm_gscan_beacon {
 };
 #endif
 
+/**
+ * struct iwl_mvm_reorder_buffer - per ra/tid/queue reorder buffer
+ * @head_sn: reorder window head sn
+ * @num_stored: number of mpdus stored in the buffer
+ * @buf_size: the reorder buffer size as set by the last addba request
+ * @sta_id: sta id of this reorder buffer
+ * @queue: queue of this reorder buffer
+ * @last_amsdu: track last ASMDU SN for duplication detection
+ * @last_sub_index: track ASMDU sub frame index for duplication detection
+ * @entries: list of skbs stored
+ * @reorder_time: time the packet was stored in the reorder buffer
+ * @reorder_timer: timer for frames are in the reorder buffer. For AMSDU
+ *	it is the time of last received sub-frame
+ * @removed: prevent timer re-arming
+ * @valid: reordering is valid for this queue
+ * @lock: protect reorder buffer internal state
+ * @mvm: mvm pointer, needed for frame timer context
+ */
+struct iwl_mvm_reorder_buffer {
+	u16 head_sn;
+	u16 num_stored;
+	u8 buf_size;
+	u8 sta_id;
+	int queue;
+	u16 last_amsdu;
+	u8 last_sub_index;
+	struct sk_buff_head entries[IEEE80211_MAX_AMPDU_BUF];
+	unsigned long reorder_time[IEEE80211_MAX_AMPDU_BUF];
+	struct timer_list reorder_timer;
+	bool removed;
+	bool valid;
+	spinlock_t lock;
+	struct iwl_mvm *mvm;
+} ____cacheline_aligned_in_smp;
+
+/**
+ * struct iwl_mvm_baid_data - BA session data
+ * @sta_id: station id
+ * @tid: tid of the session
+ * @baid baid of the session
+ * @timeout: the timeout set in the addba request
+ * @last_rx: last rx jiffies, updated only if timeout passed from last update
+ * @session_timer: timer to check if BA session expired, runs at 2 * timeout
+ * @mvm: mvm pointer, needed for timer context
+ * @reorder_buf: reorder buffer, allocated per queue
+ */
+struct iwl_mvm_baid_data {
+	struct rcu_head rcu_head;
+	u8 sta_id;
+	u8 tid;
+	u8 baid;
+	u16 timeout;
+	unsigned long last_rx;
+	struct timer_list session_timer;
+	struct iwl_mvm *mvm;
+	struct iwl_mvm_reorder_buffer reorder_buf[];
+};
+
 /*
  * enum iwl_mvm_queue_status - queue status
  * @IWL_MVM_QUEUE_FREE: the queue is not allocated nor reserved
@@ -745,6 +804,21 @@ enum iwl_mvm_queue_status {
 
 #define IWL_MVM_DQA_QUEUE_TIMEOUT	(5 * HZ)
 #define IWL_MVM_NUM_CIPHERS             10
+
+#ifdef CONFIG_ACPI
+#define IWL_MVM_SAR_TABLE_SIZE		10
+#define IWL_MVM_SAR_PROFILE_NUM		4
+#define IWL_MVM_GEO_TABLE_SIZE		18
+
+struct iwl_mvm_sar_profile {
+	bool enabled;
+	u8 table[IWL_MVM_SAR_TABLE_SIZE];
+};
+
+struct iwl_mvm_geo_table {
+	u8 values[IWL_MVM_GEO_TABLE_SIZE];
+};
+#endif
 
 struct iwl_mvm {
 	/* for logger access */
@@ -837,7 +911,6 @@ struct iwl_mvm {
 	atomic_t pending_frames[IWL_MVM_STATION_COUNT];
 	u32 tfd_drained[IWL_MVM_STATION_COUNT];
 	u8 rx_ba_sessions;
-	u32 secret_key[IWL_RSS_HASH_KEY_CNT];
 
 	/* configured by mac80211 */
 	u32 rts_threshold;
@@ -1104,12 +1177,23 @@ struct iwl_mvm {
 #endif
 
 	struct ieee80211_vif *nan_vif;
+#define IWL_MAX_BAID	32
+	struct iwl_mvm_baid_data __rcu *baid_map[IWL_MAX_BAID];
 
 	/*
 	 * Drop beacons from other APs in AP mode when there are no connected
 	 * clients.
 	 */
 	bool drop_bcn_ap_mode;
+
+	struct delayed_work cs_tx_unblock_dwork;
+#ifdef CONFIG_ACPI
+	struct iwl_mvm_sar_profile sar_profiles[IWL_MVM_SAR_PROFILE_NUM];
+#ifdef CPTCFG_IWLMVM_VENDOR_CMDS
+	u8 sar_chain_a_profile;
+	u8 sar_chain_b_profile;
+#endif
+#endif
 };
 
 /* Extract MVM priv from op_mode and _hw */
@@ -1496,12 +1580,15 @@ void iwl_mvm_rx_stored_beacon_notif(struct iwl_mvm *mvm,
 				    struct iwl_rx_cmd_buffer *rxb);
 void iwl_mvm_mu_mimo_grp_notif(struct iwl_mvm *mvm,
 			       struct iwl_rx_cmd_buffer *rxb);
+void iwl_mvm_sta_pm_notif(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb);
 void iwl_mvm_window_status_notif(struct iwl_mvm *mvm,
 				 struct iwl_rx_cmd_buffer *rxb);
 void iwl_mvm_mac_ctxt_recalc_tsf_id(struct iwl_mvm *mvm,
 				    struct ieee80211_vif *vif);
 unsigned long iwl_mvm_get_used_hw_queues(struct iwl_mvm *mvm,
 					 struct ieee80211_vif *exclude_vif);
+void iwl_mvm_channel_switch_noa_notif(struct iwl_mvm *mvm,
+				      struct iwl_rx_cmd_buffer *rxb);
 /* Bindings */
 int iwl_mvm_binding_add_vif(struct iwl_mvm *mvm, struct ieee80211_vif *vif);
 int iwl_mvm_binding_remove_vif(struct iwl_mvm *mvm, struct ieee80211_vif *vif);
@@ -1867,6 +1954,7 @@ iwl_mvm_tdls_peer_cache_find(struct iwl_mvm *mvm, const u8 *addr);
 void iwl_mvm_sync_rx_queues_internal(struct iwl_mvm *mvm,
 				     struct iwl_mvm_internal_rxq_notif *notif,
 				     u32 size);
+void iwl_mvm_reorder_timer_expired(unsigned long data);
 struct ieee80211_vif *iwl_mvm_get_bss_vif(struct iwl_mvm *mvm);
 
 void iwl_mvm_inactivity_check(struct iwl_mvm *mvm);
@@ -1955,5 +2043,6 @@ int iwl_mvm_send_lqm_cmd(struct ieee80211_vif *vif,
 			 enum iwl_lqm_cmd_operatrions operation,
 			 u32 duration, u32 timeout);
 bool iwl_mvm_lqm_active(struct iwl_mvm *mvm);
+int iwl_mvm_sar_select_profile(struct iwl_mvm *mvm, int prof_a, int prof_b);
 
 #endif /* __IWL_MVM_H__ */

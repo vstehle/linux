@@ -8,6 +8,9 @@
 #define ieee80211_start_tx_ba_cb_irqsafe __iwl7000_ieee80211_start_tx_ba_cb_irqsafe
 #define ieee80211_stop_tx_ba_session __iwl7000_ieee80211_stop_tx_ba_session
 #define ieee80211_stop_tx_ba_cb_irqsafe __iwl7000_ieee80211_stop_tx_ba_cb_irqsafe
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+#define ieee80211_data_to_8023_exthdr __iwl7000_ieee80211_data_to_8023_exthdr
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,7,0)
 #define dev_coredumpsg __iwl7000_dev_coredumpsg
 #endif /* < 4.7.0 */
@@ -20,6 +23,9 @@
 #define tso_build_data __iwl7000_tso_build_data
 #define tso_start __iwl7000_tso_start
 #endif /* < 4.4.0 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
+#define netdev_rss_key_fill __iwl7000_netdev_rss_key_fill
+#endif /* < 3.19.0 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
 #define memdup_user_nul __iwl7000_memdup_user_nul
 #endif /* < 4.5.0 */

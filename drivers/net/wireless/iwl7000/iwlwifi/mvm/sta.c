@@ -204,6 +204,19 @@ int iwl_mvm_sta_send_to_fw(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
 		cpu_to_le32(mpdu_dens << STA_FLG_AGG_MPDU_DENS_SHIFT);
 	add_sta_cmd.assoc_id = cpu_to_le16(sta->aid);
 
+	if (sta->wme) {
+		add_sta_cmd.modify_mask |= STA_MODIFY_UAPSD_ACS;
+
+		if (sta->uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_BK)
+			add_sta_cmd.uapsd_trigger_acs |= BIT(AC_BK);
+		if (sta->uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_BE)
+			add_sta_cmd.uapsd_trigger_acs |= BIT(AC_BE);
+		if (sta->uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_VI)
+			add_sta_cmd.uapsd_trigger_acs |= BIT(AC_VI);
+		if (sta->uapsd_queues & IEEE80211_WMM_IE_STA_QOSINFO_AC_VO)
+			add_sta_cmd.uapsd_trigger_acs |= BIT(AC_VO);
+	}
+
 	status = ADD_STA_SUCCESS;
 	ret = iwl_mvm_send_cmd_pdu_status(mvm, ADD_STA,
 					  iwl_mvm_add_sta_cmd_size(mvm),
@@ -222,6 +235,39 @@ int iwl_mvm_sta_send_to_fw(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
 	}
 
 	return ret;
+}
+
+static void iwl_mvm_rx_agg_session_expired(unsigned long data)
+{
+	struct iwl_mvm_baid_data __rcu **rcu_ptr = (void *)data;
+	struct iwl_mvm_baid_data *ba_data;
+	struct ieee80211_sta *sta;
+	struct iwl_mvm_sta *mvm_sta;
+	unsigned long timeout;
+
+	rcu_read_lock();
+
+	ba_data = rcu_dereference(*rcu_ptr);
+
+	if (WARN_ON(!ba_data))
+		goto unlock;
+
+	if (!ba_data->timeout)
+		goto unlock;
+
+	timeout = ba_data->last_rx + TU_TO_JIFFIES(ba_data->timeout * 2);
+	if (time_is_after_jiffies(timeout)) {
+		mod_timer(&ba_data->session_timer, timeout);
+		goto unlock;
+	}
+
+	/* Timer expired */
+	sta = rcu_dereference(ba_data->mvm->fw_id_to_mac_id[ba_data->sta_id]);
+	mvm_sta = iwl_mvm_sta_from_mac80211(sta);
+	ieee80211_stop_rx_ba_session_offl(mvm_sta->vif,
+					  sta->addr, ba_data->tid);
+unlock:
+	rcu_read_unlock();
 }
 
 static int iwl_mvm_tdls_sta_init(struct iwl_mvm *mvm,
@@ -1676,14 +1722,28 @@ int iwl_mvm_add_aux_sta(struct iwl_mvm *mvm)
 	lockdep_assert_held(&mvm->mutex);
 
 	/* Map Aux queue to fifo - needs to happen before adding Aux station */
-	iwl_mvm_enable_ac_txq(mvm, mvm->aux_queue, mvm->aux_queue,
-			      IWL_MVM_TX_FIFO_MCAST, 0, wdg_timeout);
+	if (!iwl_mvm_is_dqa_supported(mvm))
+		iwl_mvm_enable_ac_txq(mvm, mvm->aux_queue, mvm->aux_queue,
+				      IWL_MVM_TX_FIFO_MCAST, 0, wdg_timeout);
 
 	/* Allocate aux station and assign to it the aux queue */
 	ret = iwl_mvm_allocate_int_sta(mvm, &mvm->aux_sta, BIT(mvm->aux_queue),
 				       NL80211_IFTYPE_UNSPECIFIED);
 	if (ret)
 		return ret;
+
+	if (iwl_mvm_is_dqa_supported(mvm)) {
+		struct iwl_trans_txq_scd_cfg cfg = {
+			.fifo = IWL_MVM_TX_FIFO_MCAST,
+			.sta_id = mvm->aux_sta.sta_id,
+			.tid = IWL_MAX_TID_COUNT,
+			.aggregate = false,
+			.frame_limit = IWL_FRAME_LIMIT,
+		};
+
+		iwl_mvm_enable_txq(mvm, mvm->aux_queue, mvm->aux_queue, 0, &cfg,
+				   wdg_timeout);
+	}
 
 	ret = iwl_mvm_add_int_sta_common(mvm, &mvm->aux_sta, NULL,
 					 MAC_INDEX_AUX, 0);
@@ -1741,8 +1801,33 @@ int iwl_mvm_send_add_bcast_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 	struct iwl_mvm_int_sta *bsta = &mvmvif->bcast_sta;
 	static const u8 _baddr[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 	const u8 *baddr = _baddr;
+	int ret;
 
 	lockdep_assert_held(&mvm->mutex);
+
+	if (iwl_mvm_is_dqa_supported(mvm)) {
+		struct iwl_trans_txq_scd_cfg cfg = {
+			.fifo = IWL_MVM_TX_FIFO_VO,
+			.sta_id = mvmvif->bcast_sta.sta_id,
+			.tid = IWL_MAX_TID_COUNT,
+			.aggregate = false,
+			.frame_limit = IWL_FRAME_LIMIT,
+		};
+		unsigned int wdg_timeout =
+			iwl_mvm_get_wd_timeout(mvm, vif, false, false);
+		int queue;
+
+		if (vif->type == NL80211_IFTYPE_AP)
+			queue = IWL_MVM_DQA_AP_PROBE_RESP_QUEUE;
+		else if (vif->type == NL80211_IFTYPE_P2P_DEVICE)
+			queue = IWL_MVM_DQA_P2P_DEVICE_QUEUE;
+		else if (WARN(1, "Missing required TXQ for adding bcast STA\n"))
+			return -EINVAL;
+
+		iwl_mvm_enable_txq(mvm, queue, vif->hw_queue[0], 0, &cfg,
+				   wdg_timeout);
+		bsta->tfd_queue_msk |= BIT(queue);
+	}
 
 	if (vif->type == NL80211_IFTYPE_ADHOC)
 		baddr = vif->bss_conf.bssid;
@@ -1750,8 +1835,67 @@ int iwl_mvm_send_add_bcast_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 	if (WARN_ON_ONCE(bsta->sta_id == IWL_MVM_STATION_COUNT))
 		return -ENOSPC;
 
-	return iwl_mvm_add_int_sta_common(mvm, bsta, baddr,
-					  mvmvif->id, mvmvif->color);
+	ret = iwl_mvm_add_int_sta_common(mvm, bsta, baddr,
+					 mvmvif->id, mvmvif->color);
+	if (ret)
+		return ret;
+
+	/*
+	 * In AP vif type, we also need to enable the cab_queue. However, we
+	 * have to enable it after the ADD_STA command is sent, otherwise the
+	 * FW will throw an assert once we send the ADD_STA command (it'll
+	 * detect a mismatch in the tfd_queue_msk, as we can't add the
+	 * enabled-cab_queue to the mask)
+	 */
+	if (iwl_mvm_is_dqa_supported(mvm) &&
+	    vif->type == NL80211_IFTYPE_AP) {
+		struct iwl_trans_txq_scd_cfg cfg = {
+			.fifo = IWL_MVM_TX_FIFO_MCAST,
+			.sta_id = mvmvif->bcast_sta.sta_id,
+			.tid = IWL_MAX_TID_COUNT,
+			.aggregate = false,
+			.frame_limit = IWL_FRAME_LIMIT,
+		};
+		unsigned int wdg_timeout =
+			iwl_mvm_get_wd_timeout(mvm, vif, false, false);
+
+		iwl_mvm_enable_txq(mvm, vif->cab_queue, vif->cab_queue,
+				   0, &cfg, wdg_timeout);
+	}
+
+	return 0;
+}
+
+static void iwl_mvm_free_bcast_sta_queues(struct iwl_mvm *mvm,
+					  struct ieee80211_vif *vif)
+{
+	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
+
+	lockdep_assert_held(&mvm->mutex);
+
+	if (vif->type == NL80211_IFTYPE_AP)
+		iwl_mvm_disable_txq(mvm, vif->cab_queue, vif->cab_queue,
+				    IWL_MAX_TID_COUNT, 0);
+
+	if (mvmvif->bcast_sta.tfd_queue_msk &
+	    BIT(IWL_MVM_DQA_AP_PROBE_RESP_QUEUE)) {
+		iwl_mvm_disable_txq(mvm,
+				    IWL_MVM_DQA_AP_PROBE_RESP_QUEUE,
+				    vif->hw_queue[0], IWL_MAX_TID_COUNT,
+				    0);
+		mvmvif->bcast_sta.tfd_queue_msk &=
+			~BIT(IWL_MVM_DQA_AP_PROBE_RESP_QUEUE);
+	}
+
+	if (mvmvif->bcast_sta.tfd_queue_msk &
+	    BIT(IWL_MVM_DQA_P2P_DEVICE_QUEUE)) {
+		iwl_mvm_disable_txq(mvm,
+				    IWL_MVM_DQA_P2P_DEVICE_QUEUE,
+				    vif->hw_queue[0], IWL_MAX_TID_COUNT,
+				    0);
+		mvmvif->bcast_sta.tfd_queue_msk &=
+			~BIT(IWL_MVM_DQA_P2P_DEVICE_QUEUE);
+	}
 }
 
 /* Send the FW a request to remove the station from it's internal data
@@ -1763,6 +1907,9 @@ int iwl_mvm_send_rm_bcast_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 
 	lockdep_assert_held(&mvm->mutex);
 
+	if (iwl_mvm_is_dqa_supported(mvm))
+		iwl_mvm_free_bcast_sta_queues(mvm, vif);
+
 	ret = iwl_mvm_rm_sta_common(mvm, mvmvif->bcast_sta.sta_id);
 	if (ret)
 		IWL_WARN(mvm, "Failed sending remove station\n");
@@ -1772,19 +1919,21 @@ int iwl_mvm_send_rm_bcast_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 int iwl_mvm_alloc_bcast_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 {
 	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
-	u32 qmask;
+	u32 qmask = 0;
 
 	lockdep_assert_held(&mvm->mutex);
 
-	qmask = iwl_mvm_mac_get_queues_mask(vif);
+	if (!iwl_mvm_is_dqa_supported(mvm)) {
+		qmask = iwl_mvm_mac_get_queues_mask(vif);
 
-	/*
-	 * The firmware defines the TFD queue mask to only be relevant
-	 * for *unicast* queues, so the multicast (CAB) queue shouldn't
-	 * be included.
-	 */
-	if (vif->type == NL80211_IFTYPE_AP)
+		/*
+		 * The firmware defines the TFD queue mask to only be relevant
+		 * for *unicast* queues, so the multicast (CAB) queue shouldn't
+		 * be included. This only happens in NL80211_IFTYPE_AP vif type,
+		 * so the next line will only have an effect there.
+		 */
 		qmask &= ~BIT(vif->cab_queue);
+	}
 
 	return iwl_mvm_allocate_int_sta(mvm, &mvmvif->bcast_sta, qmask,
 					ieee80211_vif_type_p2p(vif));
@@ -1843,11 +1992,93 @@ int iwl_mvm_rm_bcast_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 
 #define IWL_MAX_RX_BA_SESSIONS 16
 
+static void iwl_mvm_sync_rxq_del_ba(struct iwl_mvm *mvm, u8 baid)
+{
+	struct iwl_mvm_delba_notif notif = {
+		.metadata.type = IWL_MVM_RXQ_NOTIF_DEL_BA,
+		.metadata.sync = 1,
+		.delba.baid = baid,
+	};
+	iwl_mvm_sync_rx_queues_internal(mvm, (void *)&notif, sizeof(notif));
+};
+
+static void iwl_mvm_free_reorder(struct iwl_mvm *mvm,
+				 struct iwl_mvm_baid_data *data)
+{
+	int i;
+
+	iwl_mvm_sync_rxq_del_ba(mvm, data->baid);
+
+	for (i = 0; i < mvm->trans->num_rx_queues; i++) {
+		int j;
+		struct iwl_mvm_reorder_buffer *reorder_buf =
+			&data->reorder_buf[i];
+
+		spin_lock_bh(&reorder_buf->lock);
+		if (likely(!reorder_buf->num_stored)) {
+			spin_unlock_bh(&reorder_buf->lock);
+			continue;
+		}
+
+		/*
+		 * This shouldn't happen in regular DELBA since the internal
+		 * delBA notification should trigger a release of all frames in
+		 * the reorder buffer.
+		 */
+		WARN_ON(1);
+
+		for (j = 0; j < reorder_buf->buf_size; j++)
+			__skb_queue_purge(&reorder_buf->entries[j]);
+		/*
+		 * Prevent timer re-arm. This prevents a very far fetched case
+		 * where we timed out on the notification. There may be prior
+		 * RX frames pending in the RX queue before the notification
+		 * that might get processed between now and the actual deletion
+		 * and we would re-arm the timer although we are deleting the
+		 * reorder buffer.
+		 */
+		reorder_buf->removed = true;
+		spin_unlock_bh(&reorder_buf->lock);
+		del_timer_sync(&reorder_buf->reorder_timer);
+	}
+}
+
+static void iwl_mvm_init_reorder_buffer(struct iwl_mvm *mvm,
+					u32 sta_id,
+					struct iwl_mvm_baid_data *data,
+					u16 ssn, u8 buf_size)
+{
+	int i;
+
+	for (i = 0; i < mvm->trans->num_rx_queues; i++) {
+		struct iwl_mvm_reorder_buffer *reorder_buf =
+			&data->reorder_buf[i];
+		int j;
+
+		reorder_buf->num_stored = 0;
+		reorder_buf->head_sn = ssn;
+		reorder_buf->buf_size = buf_size;
+		/* rx reorder timer */
+		reorder_buf->reorder_timer.function =
+			iwl_mvm_reorder_timer_expired;
+		reorder_buf->reorder_timer.data = (unsigned long)reorder_buf;
+		init_timer(&reorder_buf->reorder_timer);
+		spin_lock_init(&reorder_buf->lock);
+		reorder_buf->mvm = mvm;
+		reorder_buf->queue = i;
+		reorder_buf->sta_id = sta_id;
+		reorder_buf->valid = false;
+		for (j = 0; j < reorder_buf->buf_size; j++)
+			__skb_queue_head_init(&reorder_buf->entries[j]);
+	}
+}
+
 int iwl_mvm_sta_rx_agg(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
-		       int tid, u16 ssn, bool start, u8 buf_size)
+		       int tid, u16 ssn, bool start, u8 buf_size, u16 timeout)
 {
 	struct iwl_mvm_sta *mvm_sta = iwl_mvm_sta_from_mac80211(sta);
 	struct iwl_mvm_add_sta_cmd cmd = {};
+	struct iwl_mvm_baid_data *baid_data = NULL;
 	int ret;
 	u32 status;
 
@@ -1856,6 +2087,19 @@ int iwl_mvm_sta_rx_agg(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
 	if (start && mvm->rx_ba_sessions >= IWL_MAX_RX_BA_SESSIONS) {
 		IWL_WARN(mvm, "Not enough RX BA SESSIONS\n");
 		return -ENOSPC;
+	}
+
+	if (iwl_mvm_has_new_rx_api(mvm) && start) {
+		/*
+		 * Allocate here so if allocation fails we can bail out early
+		 * before starting the BA session in the firmware
+		 */
+		baid_data = kzalloc(sizeof(*baid_data) +
+				    mvm->trans->num_rx_queues *
+				    sizeof(baid_data->reorder_buf[0]),
+				    GFP_KERNEL);
+		if (!baid_data)
+			return -ENOMEM;
 	}
 
 	cmd.mac_id_n_color = cpu_to_le32(mvm_sta->mac_id_n_color);
@@ -1876,12 +2120,12 @@ int iwl_mvm_sta_rx_agg(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
 					  iwl_mvm_add_sta_cmd_size(mvm),
 					  &cmd, &status);
 	if (ret)
-		return ret;
+		goto out_free;
 
 	switch (status & IWL_ADD_STA_STATUS_MASK) {
 	case ADD_STA_SUCCESS:
-		IWL_DEBUG_INFO(mvm, "RX BA Session %sed in fw\n",
-			       start ? "start" : "stopp");
+		IWL_DEBUG_HT(mvm, "RX BA Session %sed in fw\n",
+			     start ? "start" : "stopp");
 		break;
 	case ADD_STA_IMMEDIATE_BA_FAILURE:
 		IWL_WARN(mvm, "RX BA Session refused by fw\n");
@@ -1894,14 +2138,77 @@ int iwl_mvm_sta_rx_agg(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
 		break;
 	}
 
-	if (!ret) {
-		if (start)
-			mvm->rx_ba_sessions++;
-		else if (mvm->rx_ba_sessions > 0)
+	if (ret)
+		goto out_free;
+
+	if (start) {
+		u8 baid;
+
+		mvm->rx_ba_sessions++;
+
+		if (!iwl_mvm_has_new_rx_api(mvm))
+			return 0;
+
+		if (WARN_ON(!(status & IWL_ADD_STA_BAID_VALID_MASK))) {
+			ret = -EINVAL;
+			goto out_free;
+		}
+		baid = (u8)((status & IWL_ADD_STA_BAID_MASK) >>
+			    IWL_ADD_STA_BAID_SHIFT);
+		baid_data->baid = baid;
+		baid_data->timeout = timeout;
+		baid_data->last_rx = jiffies;
+		setup_timer(&baid_data->session_timer,
+			    iwl_mvm_rx_agg_session_expired,
+			    (unsigned long)&mvm->baid_map[baid]);
+		baid_data->mvm = mvm;
+		baid_data->tid = tid;
+		baid_data->sta_id = mvm_sta->sta_id;
+
+		mvm_sta->tid_to_baid[tid] = baid;
+		if (timeout)
+			mod_timer(&baid_data->session_timer,
+				  TU_TO_EXP_TIME(timeout * 2));
+
+		iwl_mvm_init_reorder_buffer(mvm, mvm_sta->sta_id,
+					    baid_data, ssn, buf_size);
+		/*
+		 * protect the BA data with RCU to cover a case where our
+		 * internal RX sync mechanism will timeout (not that it's
+		 * supposed to happen) and we will free the session data while
+		 * RX is being processed in parallel
+		 */
+		IWL_DEBUG_HT(mvm, "Sta %d(%d) is assigned to BAID %d\n",
+			     mvm_sta->sta_id, tid, baid);
+		WARN_ON(rcu_access_pointer(mvm->baid_map[baid]));
+		rcu_assign_pointer(mvm->baid_map[baid], baid_data);
+	} else  {
+		u8 baid = mvm_sta->tid_to_baid[tid];
+
+		if (mvm->rx_ba_sessions > 0)
 			/* check that restart flow didn't zero the counter */
 			mvm->rx_ba_sessions--;
-	}
+		if (!iwl_mvm_has_new_rx_api(mvm))
+			return 0;
 
+		if (WARN_ON(baid == IWL_RX_REORDER_DATA_INVALID_BAID))
+			return -EINVAL;
+
+		baid_data = rcu_access_pointer(mvm->baid_map[baid]);
+		if (WARN_ON(!baid_data))
+			return -EINVAL;
+
+		/* synchronize all rx queues so we can safely delete */
+		iwl_mvm_free_reorder(mvm, baid_data);
+		del_timer_sync(&baid_data->session_timer);
+		RCU_INIT_POINTER(mvm->baid_map[baid], NULL);
+		kfree_rcu(baid_data, rcu_head);
+		IWL_DEBUG_HT(mvm, "BAID %d is free\n", baid);
+	}
+	return 0;
+
+out_free:
+	kfree(baid_data);
 	return ret;
 }
 

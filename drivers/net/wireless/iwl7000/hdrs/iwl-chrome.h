@@ -1,6 +1,10 @@
 #ifndef __IWL_CHROME
 #define __IWL_CHROME
-/* This file is pre-included from the Makefile (cc command line) */
+/* This file is pre-included from the Makefile (cc command line)
+ *
+ * ChromeOS backport definitions
+ * Copyright (C) 2016 Intel Deutschland GmbH
+ */
 
 #include <linux/version.h>
 #include <linux/types.h>
@@ -400,6 +404,10 @@ pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
 {
 	return -EOPNOTSUPP;
 }
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
+void netdev_rss_key_fill(void *buffer, size_t len);
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(4, 1, 0) && \

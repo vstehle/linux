@@ -331,6 +331,8 @@ static const struct iwl_rx_handlers iwl_mvm_rx_handlers[] = {
 		       iwl_mvm_rx_stored_beacon_notif, RX_HANDLER_SYNC),
 	RX_HANDLER_GRP(DATA_PATH_GROUP, MU_GROUP_MGMT_NOTIF,
 		       iwl_mvm_mu_mimo_grp_notif, RX_HANDLER_SYNC),
+	RX_HANDLER_GRP(DATA_PATH_GROUP, STA_PM_NOTIF,
+		       iwl_mvm_sta_pm_notif, RX_HANDLER_SYNC),
 #ifdef CPTCFG_IWLMVM_VENDOR_CMDS
 	RX_HANDLER_GRP(SCAN_GROUP, GSCAN_RESULTS_AVAILABLE_EVENT,
 		       iwl_mvm_rx_gscan_results_available,
@@ -347,6 +349,10 @@ static const struct iwl_rx_handlers iwl_mvm_rx_handlers[] = {
 		       iwl_mvm_nan_match, RX_HANDLER_SYNC),
 	RX_HANDLER_GRP(MAC_CONF_GROUP, LINK_QUALITY_MEASUREMENT_COMPLETE_NOTIF,
 		       iwl_mvm_vendor_lqm_notif, RX_HANDLER_SYNC),
+	RX_HANDLER_GRP(MAC_CONF_GROUP, CHANNEL_SWITCH_NOA_NOTIF,
+		       iwl_mvm_channel_switch_noa_notif,
+		       RX_HANDLER_SYNC),
+
 #endif
 
 #ifdef CPTCFG_IWLWIFI_DEVICE_TESTMODE
@@ -471,6 +477,7 @@ static const struct iwl_hcmd_names iwl_mvm_legacy_names[] = {
  */
 static const struct iwl_hcmd_names iwl_mvm_system_names[] = {
 	HCMD_NAME(SHARED_MEM_CFG_CMD),
+	HCMD_NAME(SOC_CONFIGURATION_CMD),
 };
 
 /* Please keep this array *SORTED* by hex value.
@@ -479,6 +486,7 @@ static const struct iwl_hcmd_names iwl_mvm_system_names[] = {
 static const struct iwl_hcmd_names iwl_mvm_mac_conf_names[] = {
 	HCMD_NAME(LINK_QUALITY_MEASUREMENT_CMD),
 	HCMD_NAME(LINK_QUALITY_MEASUREMENT_COMPLETE_NOTIF),
+	HCMD_NAME(CHANNEL_SWITCH_NOA_NOTIF),
 };
 
 /* Please keep this array *SORTED* by hex value.
@@ -488,6 +496,7 @@ static const struct iwl_hcmd_names iwl_mvm_phy_names[] = {
 	HCMD_NAME(CMD_DTS_MEASUREMENT_TRIGGER_WIDE),
 	HCMD_NAME(CTDP_CONFIG_CMD),
 	HCMD_NAME(TEMP_REPORTING_THRESHOLDS_CMD),
+	HCMD_NAME(GEO_TX_POWER_LIMIT),
 	HCMD_NAME(CT_KILL_NOTIFICATION),
 	HCMD_NAME(DTS_MEASUREMENT_NOTIF_WIDE),
 };
@@ -499,6 +508,7 @@ static const struct iwl_hcmd_names iwl_mvm_data_path_names[] = {
 	HCMD_NAME(DQA_ENABLE_CMD),
 	HCMD_NAME(UPDATE_MU_GROUPS_CMD),
 	HCMD_NAME(TRIGGER_RX_QUEUES_NOTIF_CMD),
+	HCMD_NAME(STA_PM_NOTIF),
 	HCMD_NAME(MU_GROUP_MGMT_NOTIF),
 	HCMD_NAME(RX_QUEUES_NOTIFICATION),
 };
@@ -589,6 +599,55 @@ static u32 calc_min_backoff(struct iwl_trans *trans, const struct iwl_cfg *cfg)
 
 static void iwl_mvm_fw_error_dump_wk(struct work_struct *work);
 
+static void iwl_mvm_tx_unblock_dwork(struct work_struct *work)
+{
+	struct iwl_mvm *mvm =
+		container_of(work, struct iwl_mvm, cs_tx_unblock_dwork.work);
+	struct ieee80211_vif *tx_blocked_vif;
+	struct iwl_mvm_vif *mvmvif;
+
+	mutex_lock(&mvm->mutex);
+
+	tx_blocked_vif =
+		rcu_dereference_protected(mvm->csa_tx_blocked_vif,
+					  lockdep_is_held(&mvm->mutex));
+
+	if (!tx_blocked_vif)
+		goto unlock;
+
+	mvmvif = iwl_mvm_vif_from_mac80211(tx_blocked_vif);
+	iwl_mvm_modify_all_sta_disable_tx(mvm, mvmvif, false);
+	RCU_INIT_POINTER(mvm->csa_tx_blocked_vif, NULL);
+unlock:
+	mutex_unlock(&mvm->mutex);
+}
+
+#ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
+static void iwl_mvm_init_modparams(struct iwl_mvm *mvm)
+{
+#define IWL_DBG_CFG(t, n)			/* nothing */
+#define IWL_DBG_CFG_STR(n)			/* nothing */
+#define IWL_DBG_CFG_NODEF(t, n)			/* nothing */
+#define IWL_DBG_CFG_BIN(n)			/* nothing */
+#define IWL_DBG_CFG_BINA(n, max)		/* nothing */
+#define IWL_DBG_CFG_RANGE(t, n, min, max)	/* nothing */
+#define IWL_MOD_PARAM(t, n)			/* nothing */
+#define IWL_MVM_MOD_PARAM(t, n)				\
+	if (mvm->trans->dbg_cfg.__mvm_mod_param_##n)	\
+		iwlmvm_mod_params.n = mvm->trans->dbg_cfg.mvm_##n;
+#define DBG_CFG_REINCLUDE
+#include "iwl-dbg-cfg.h"
+#undef IWL_DBG_CFG
+#undef IWL_DBG_CFG_STR
+#undef IWL_DBG_CFG_NODEF
+#undef IWL_DBG_CFG_BIN
+#undef IWL_DBG_CFG_BINA
+#undef IWL_DBG_CFG_RANGE
+#undef IWL_MOD_PARAM
+#undef IWL_MVM_MOD_PARAM
+}
+#endif
+
 static struct iwl_op_mode *
 iwl_op_mode_mvm_start(struct iwl_trans *trans, const struct iwl_cfg *cfg,
 		      const struct iwl_fw *fw, struct dentry *dbgfs_dir)
@@ -648,17 +707,20 @@ iwl_op_mode_mvm_start(struct iwl_trans *trans, const struct iwl_cfg *cfg,
 
 	mvm->restart_fw = iwlwifi_mod_params.restart_fw ? -1 : 0;
 
-	mvm->aux_queue = 15;
 	if (!iwl_mvm_is_dqa_supported(mvm)) {
-		mvm->first_agg_queue = 16;
 		mvm->last_agg_queue = mvm->cfg->base_params->num_of_queues - 1;
+
+		if (mvm->cfg->base_params->num_of_queues == 16) {
+			mvm->aux_queue = 11;
+			mvm->first_agg_queue = 12;
+		} else {
+			mvm->aux_queue = 15;
+			mvm->first_agg_queue = 16;
+		}
 	} else {
+		mvm->aux_queue = IWL_MVM_DQA_AUX_QUEUE;
 		mvm->first_agg_queue = IWL_MVM_DQA_MIN_DATA_QUEUE;
 		mvm->last_agg_queue = IWL_MVM_DQA_MAX_DATA_QUEUE;
-	}
-	if (mvm->cfg->base_params->num_of_queues == 16) {
-		mvm->aux_queue = 11;
-		mvm->first_agg_queue = 12;
 	}
 	mvm->sf_state = SF_UNINIT;
 	mvm->cur_ucode = IWL_UCODE_INIT;
@@ -710,6 +772,8 @@ iwl_op_mode_mvm_start(struct iwl_trans *trans, const struct iwl_cfg *cfg,
 	spin_lock_init(&mvm->gscan_beacons_lock);
 	mvm->rx_filters = IWL_MVM_VENDOR_RXFILTER_EINVAL;
 #endif
+
+	INIT_DELAYED_WORK(&mvm->cs_tx_unblock_dwork, iwl_mvm_tx_unblock_dwork);
 
 	/*
 	 * Populate the state variables that the transport layer needs
@@ -844,6 +908,10 @@ iwl_op_mode_mvm_start(struct iwl_trans *trans, const struct iwl_cfg *cfg,
 		iwl_trans_unref(mvm->trans);
 
 	iwl_mvm_tof_init(mvm);
+
+#ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
+	iwl_mvm_init_modparams(mvm);
+#endif
 
 	return op_mode;
 
