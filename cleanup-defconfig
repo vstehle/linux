@@ -1,0 +1,45 @@
+#!/bin/bash
+set -eux
+
+sed -i \
+	" \
+	s/.*ACPI.*=[ym]$//g; \
+	s/.*ALPINE.*=[ym]$//g; \
+	s/.*ARMADA.*=[ym]$//g; \
+	s/.*BCM.*=[ym]$//g; \
+	s/.*BERLIN.*=[ym]$//g; \
+	s/.*BRCM.*=[ym]$//g; \
+	s/.*CEVA.*=[ym]$//g; \
+	s/.*EXYNOS.*=[ym]$//g; \
+	s/.*HISI.*=[ym]$//g; \
+	s/.*IP6.*=[ym]$//g; \
+	s/.*IPV6.*=[ym]$//g; \
+	s/.*KIRIN.*=[ym]$//g; \
+	s/.*LAYERSCAPE.*=[ym]$//g; \
+	s/.*MEDIATEK.*=[ym]$//g; \
+	s/.*MESON.*=[ym]$//g; \
+	s/.*MVEBU.*=[ym]$//g; \
+	s/.*MVEBU.*=[ym]$//g; \
+	s/.*MSM.*=[ym]$//g; \
+	s/.*ORION.*=[ym]$//g; \
+	s/.*QCOM.*=[ym]$//g; \
+	s/.*QORIQ.*=[ym]$//g; \
+	s/.*R8A.*=[ym]$//g; \
+	s/.*RASPBERRYPI.*=[ym]$//g; \
+	s/.*RCAR.*=[ym]$//g; \
+	s/.*RENESAS.*=[ym]$//g; \
+	s/.*SEATTLE.*=[ym]$//g; \
+	s/.*STRATIX.*=[ym]$//g; \
+	s/.*SUNXI.*=[ym]$//g; \
+	s/.*SYNQUACER.*=[ym]$//g; \
+	s/.*TEGRA.*=[ym]$//g; \
+	s/.*TEGRA.*=[ym]$//g; \
+	s/.*THUNDER.*=[ym]$//g; \
+	s/.*UNIPHIER.*=[ym]$//g; \
+	s/.*VEXPRESS.*=[ym]$//g; \
+	s/.*XGENE.*=[ym]$//g; \
+	s/.*XILINX.*=[ym]$//g; \
+	s/.*ZYNQ.*=[ym]$//g; \
+	s/.*AMD.*=[ym]$//g; \
+	" \
+	arch/arm64/configs/defconfig

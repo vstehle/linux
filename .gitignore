@@ -133,3 +133,9 @@ all.config
 
 # Kdevelop4
 *.kdev4
+
+# armelle
+/install/
+/vmlinux.kpart
+/vmlinux.uimg
+/zero
