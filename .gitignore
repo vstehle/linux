@@ -162,3 +162,9 @@ x509.genkey
 
 # Documentation toolchain
 sphinx_*/
+
+# armelle
+/install/
+/vmlinux.kpart
+/vmlinux.uimg
+/zero
