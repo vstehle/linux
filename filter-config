@@ -1,0 +1,11 @@
+#!/bin/bash
+set -eu
+
+args=()
+
+for w in $(cat filter.txt); do
+	args+=(-e 's/\(.*'$w'.*\)=[my]/\1=n/')
+done
+
+set -x
+sed -i.orig "${args[@]}" .config
