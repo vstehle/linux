@@ -147,3 +147,9 @@ x509.genkey
 
 # Clang's compilation database file
 /compile_commands.json
+
+# armelle
+/install/
+/vmlinux.kpart
+/vmlinux.uimg
+/zero
