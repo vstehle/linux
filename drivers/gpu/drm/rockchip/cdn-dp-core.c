@@ -25,15 +25,12 @@
 #include <linux/crc16.h>
 #include <linux/extcon.h>
 #include <linux/firmware.h>
-#include <linux/hdmi-notifier.h>
 #include <linux/iopoll.h>
 #include <linux/regmap.h>
 #include <linux/reset.h>
 #include <linux/mfd/syscon.h>
 #include <linux/nvmem-consumer.h>
 #include <linux/phy/phy.h>
-
-#include <sound/hdmi-codec.h>
 
 #include "cdn-dp-core.h"
 #include "cdn-dp-reg.h"
@@ -391,7 +388,6 @@ static int cdn_dp_connector_get_modes(struct drm_connector *connector)
 		DRM_DEV_DEBUG_KMS(dp->dev, "got edid: width[%d] x height[%d]\n",
 				  edid->width_cm, edid->height_cm);
 
-		dp->sink_has_audio = drm_detect_monitor_audio(edid);
 		ret = drm_add_edid_modes(connector, edid);
 		if (ret) {
 			drm_mode_connector_update_edid_property(connector,
@@ -785,8 +781,6 @@ static void cdn_dp_encoder_enable(struct drm_encoder *encoder)
 	}
 out:
 	mutex_unlock(&dp->lock);
-	if (!ret)
-		hdmi_event_connect(dp->dev);
 }
 
 static void cdn_dp_encoder_disable(struct drm_encoder *encoder)
@@ -803,7 +797,6 @@ static void cdn_dp_encoder_disable(struct drm_encoder *encoder)
 		}
 	}
 	mutex_unlock(&dp->lock);
-	hdmi_event_disconnect(dp->dev);
 
 	/*
 	 * In the following 2 cases, we need to run the event_work to re-enable
@@ -910,115 +903,6 @@ static int cdn_dp_parse_dt(struct cdn_dp_device *dp)
 	}
 
 	return 0;
-}
-
-static int cdn_dp_audio_hw_params(struct device *dev,  void *data,
-				  struct hdmi_codec_daifmt *daifmt,
-				  struct hdmi_codec_params *params)
-{
-	struct cdn_dp_device *dp = dev_get_drvdata(dev);
-	struct audio_info audio = {
-		.sample_width = params->sample_width,
-		.sample_rate = params->sample_rate,
-		.channels = params->channels,
-	};
-	int ret;
-
-	mutex_lock(&dp->lock);
-	if (!dp->active) {
-		ret = -ENODEV;
-		goto out;
-	}
-
-	switch (daifmt->fmt) {
-	case HDMI_I2S:
-		audio.format = AFMT_I2S;
-		break;
-	case HDMI_SPDIF:
-		audio.format = AFMT_SPDIF;
-		break;
-	default:
-		DRM_DEV_ERROR(dev, "Invalid format %d\n", daifmt->fmt);
-		ret = -EINVAL;
-		goto out;
-	}
-
-	ret = cdn_dp_audio_config(dp, &audio);
-	if (!ret)
-		dp->audio_info = audio;
-
-out:
-	mutex_unlock(&dp->lock);
-	return ret;
-}
-
-static void cdn_dp_audio_shutdown(struct device *dev, void *data)
-{
-	struct cdn_dp_device *dp = dev_get_drvdata(dev);
-	int ret;
-
-	mutex_lock(&dp->lock);
-	if (!dp->active)
-		goto out;
-
-	ret = cdn_dp_audio_stop(dp, &dp->audio_info);
-	if (!ret)
-		dp->audio_info.format = AFMT_UNUSED;
-out:
-	mutex_unlock(&dp->lock);
-}
-
-static int cdn_dp_audio_digital_mute(struct device *dev, void *data,
-				     bool enable)
-{
-	struct cdn_dp_device *dp = dev_get_drvdata(dev);
-	int ret;
-
-	mutex_lock(&dp->lock);
-	if (!dp->active) {
-		ret = -ENODEV;
-		goto out;
-	}
-
-	ret = cdn_dp_audio_mute(dp, enable);
-
-out:
-	mutex_unlock(&dp->lock);
-	return ret;
-}
-
-static int cdn_dp_audio_get_eld(struct device *dev, void *data,
-				u8 *buf, size_t len)
-{
-	struct cdn_dp_device *dp = dev_get_drvdata(dev);
-
-	memcpy(buf, dp->connector.eld, min(sizeof(dp->connector.eld), len));
-
-	return 0;
-}
-
-static const struct hdmi_codec_ops audio_codec_ops = {
-	.hw_params = cdn_dp_audio_hw_params,
-	.audio_shutdown = cdn_dp_audio_shutdown,
-	.digital_mute = cdn_dp_audio_digital_mute,
-	.get_eld = cdn_dp_audio_get_eld,
-};
-
-static int cdn_dp_audio_codec_init(struct cdn_dp_device *dp,
-				   struct device *dev)
-{
-	struct hdmi_codec_pdata codec_data = {
-		.i2s = 1,
-		.spdif = 1,
-		.ops = &audio_codec_ops,
-		.max_i2s_channels = 8,
-	};
-
-	dp->audio_pdev = platform_device_register_data(
-			 dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
-			 &codec_data, sizeof(codec_data));
-
-	return PTR_ERR_OR_ZERO(dp->audio_pdev);
 }
 
 static int cdn_dp_request_firmware(struct cdn_dp_device *dp)
@@ -1206,8 +1090,6 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
 		goto err_free_connector;
 	}
 
-	cdn_dp_audio_codec_init(dp, dev);
-
 	for (i = 0; i < dp->ports; i++) {
 		port = dp->port[i];
 
@@ -1242,7 +1124,6 @@ static void cdn_dp_unbind(struct device *dev, struct device *master, void *data)
 	struct drm_connector *connector = &dp->connector;
 
 	cancel_work_sync(&dp->event_work);
-	platform_device_unregister(dp->audio_pdev);
 	cdn_dp_encoder_disable(encoder);
 	encoder->funcs->destroy(encoder);
 	connector->funcs->destroy(connector);

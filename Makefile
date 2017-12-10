@@ -395,6 +395,13 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
+		   -Wno-format-truncation \
+		   -Wno-misleading-indentation \
+		   -Wno-duplicate-decl-specifier \
+		   -Wno-format-overflow \
+		   -Wno-memset-elt-size \
+		   -Wno-tautological-compare \
+		   -Wno-int-in-bool-context \
 		   -std=gnu89 $(call cc-option,-fno-PIE)
 
 

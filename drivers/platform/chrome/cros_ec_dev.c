@@ -597,12 +597,6 @@ static void ec_device_shutdown(struct platform_device *pdev)
 	cros_ec_debugfs_remove(ec);
 }
 
-static const struct platform_device_id cros_ec_id[] = {
-	{ "cros-ec-ctl", 0 },
-	{ /* sentinel */ },
-};
-MODULE_DEVICE_TABLE(platform, cros_ec_id);
-
 static int __maybe_unused ec_device_suspend(struct device *dev)
 {
 	struct cros_ec_dev *ec = dev_get_drvdata(dev);

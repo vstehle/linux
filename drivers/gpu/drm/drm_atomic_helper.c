@@ -253,11 +253,11 @@ steal_encoder(struct drm_atomic_state *state,
 		connector_state = drm_atomic_get_connector_state(state,
 								 connector);
 		if (IS_ERR(connector_state))
-			return PTR_ERR(connector_state);
+			return;
 
 		ret = drm_atomic_set_crtc_for_connector(connector_state, NULL);
 		if (ret)
-			return ret;
+			return;
 
 		if (connector_state->best_encoder != encoder)
 			continue;
