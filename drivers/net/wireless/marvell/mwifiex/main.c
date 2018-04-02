@@ -952,19 +952,11 @@ int mwifiex_set_mac_address(struct mwifiex_private *priv,
 		mac_addr = ether_addr_to_u64(new_mac);
 	} else {
 		/* Internal mac address change */
-		if (priv->bss_type == MWIFIEX_BSS_TYPE_ANY)
-			return -ENOTSUPP;
+		if (priv->bss_type != MWIFIEX_BSS_TYPE_P2P)
+			goto done;
 
 		mac_addr = old_mac_addr;
-
-		if (priv->bss_type == MWIFIEX_BSS_TYPE_P2P) {
-			mac_addr |= BIT_ULL(MWIFIEX_MAC_LOCAL_ADMIN_BIT);
-			mac_addr += priv->bss_num;
-		} else if (priv->adapter->priv[0] != priv) {
-			/* Set mac address based on bss_type/bss_num */
-			mac_addr ^= BIT_ULL(priv->bss_type + 8);
-			mac_addr += priv->bss_num;
-		}
+		mac_addr |= BIT_ULL(MWIFIEX_MAC_LOCAL_ADMIN_BIT);
 	}
 
 	u64_to_ether_addr(mac_addr, priv->curr_addr);
@@ -980,6 +972,7 @@ int mwifiex_set_mac_address(struct mwifiex_private *priv,
 		return ret;
 	}
 
+done:
 	ether_addr_copy(dev->dev_addr, priv->curr_addr);
 	return 0;
 }
