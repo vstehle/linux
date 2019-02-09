@@ -467,7 +467,7 @@
 		As of now the device is alwas out of reset & under the power
 		*/
 		pwn-gpios = <&pca9555 8 GPIO_ACTIVE_LOW>;
-		rst-gpios = <&pca9555 7 GPIO_ACTIVE_HIGH>;
+		rst-gpios = <&pca9555 3 GPIO_ACTIVE_HIGH>;
 
 		mclk = <24000000>;
 		mclk_source = <0>;
