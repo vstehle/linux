@@ -360,39 +360,6 @@ static const struct drm_sched_backend_ops panfrost_sched_ops = {
 	.free_job = panfrost_job_free
 };
 
-static const char *job_exception_name(u32 exception_code)
-{
-	switch (exception_code) {
-		/* Non-Fault Status code */
-	case 0x00: return "NOT_STARTED/IDLE/OK";
-	case 0x01: return "DONE";
-	case 0x02: return "INTERRUPTED";
-	case 0x03: return "STOPPED";
-	case 0x04: return "TERMINATED";
-	case 0x08: return "ACTIVE";
-		/* Job exceptions */
-	case 0x40: return "JOB_CONFIG_FAULT";
-	case 0x41: return "JOB_POWER_FAULT";
-	case 0x42: return "JOB_READ_FAULT";
-	case 0x43: return "JOB_WRITE_FAULT";
-	case 0x44: return "JOB_AFFINITY_FAULT";
-	case 0x48: return "JOB_BUS_FAULT";
-	case 0x50: return "INSTR_INVALID_PC";
-	case 0x51: return "INSTR_INVALID_ENC";
-	case 0x52: return "INSTR_TYPE_MISMATCH";
-	case 0x53: return "INSTR_OPERAND_FAULT";
-	case 0x54: return "INSTR_TLS_FAULT";
-	case 0x55: return "INSTR_BARRIER_FAULT";
-	case 0x56: return "INSTR_ALIGN_FAULT";
-	case 0x58: return "DATA_INVALID_FAULT";
-	case 0x59: return "TILE_RANGE_FAULT";
-	case 0x5A: return "ADDR_RANGE_FAULT";
-	case 0x60: return "OUT_OF_MEMORY";
-	}
-
-	return "UNKNOWN";
-}
-
 static irqreturn_t panfrost_job_irq_handler(int irq, void *data)
 {
 	struct panfrost_device *pfdev = data;
@@ -418,7 +385,7 @@ static irqreturn_t panfrost_job_irq_handler(int irq, void *data)
 
 			dev_err(pfdev->dev, "js fault, js=%d, status=%s, head=0x%x, tail=0x%x",
 				j,
-				job_exception_name(job_read(pfdev, JS_STATUS(j))),
+				panfrost_exception_name(pfdev, job_read(pfdev, JS_STATUS(j))),
 				job_read(pfdev, JS_HEAD_LO(j)),
 				job_read(pfdev, JS_TAIL_LO(j)));
 		}

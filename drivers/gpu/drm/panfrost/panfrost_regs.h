@@ -46,6 +46,9 @@
 #define   GPU_CMD_SOFT_RESET		0x01
 #define GPU_STATUS			0x34
 #define GPU_LATEST_FLUSH_ID		0x38
+#define GPU_FAULT_STATUS		0x3C
+#define GPU_FAULT_ADDRESS_LO		0x40
+#define GPU_FAULT_ADDRESS_HI		0x44
 
 #define GPU_THREAD_MAX_THREADS		0x0A0	/* (RO) Maximum number of threads per core */
 #define GPU_THREAD_MAX_WORKGROUP_SIZE	0x0A4	/* (RO) Maximum workgroup size */

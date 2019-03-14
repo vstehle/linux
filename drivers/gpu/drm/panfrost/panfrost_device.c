@@ -7,6 +7,7 @@
 #include <linux/regulator/consumer.h>
 
 #include "panfrost_device.h"
+#include "panfrost_features.h"
 #include "panfrost_gpu.h"
 #include "panfrost_job.h"
 #include "panfrost_mmu.h"
@@ -127,4 +128,60 @@ void panfrost_device_fini(struct panfrost_device *pfdev)
 	panfrost_regulator_fini(pfdev);
 
 	panfrost_clk_fini(pfdev);
+}
+
+const char *panfrost_exception_name(struct panfrost_device *pfdev, u32 exception_code)
+{
+	switch (exception_code) {
+		/* Non-Fault Status code */
+	case 0x00: return "NOT_STARTED/IDLE/OK";
+	case 0x01: return "DONE";
+	case 0x02: return "INTERRUPTED";
+	case 0x03: return "STOPPED";
+	case 0x04: return "TERMINATED";
+	case 0x08: return "ACTIVE";
+		/* Job exceptions */
+	case 0x40: return "JOB_CONFIG_FAULT";
+	case 0x41: return "JOB_POWER_FAULT";
+	case 0x42: return "JOB_READ_FAULT";
+	case 0x43: return "JOB_WRITE_FAULT";
+	case 0x44: return "JOB_AFFINITY_FAULT";
+	case 0x48: return "JOB_BUS_FAULT";
+	case 0x50: return "INSTR_INVALID_PC";
+	case 0x51: return "INSTR_INVALID_ENC";
+	case 0x52: return "INSTR_TYPE_MISMATCH";
+	case 0x53: return "INSTR_OPERAND_FAULT";
+	case 0x54: return "INSTR_TLS_FAULT";
+	case 0x55: return "INSTR_BARRIER_FAULT";
+	case 0x56: return "INSTR_ALIGN_FAULT";
+	case 0x58: return "DATA_INVALID_FAULT";
+	case 0x59: return "TILE_RANGE_FAULT";
+	case 0x5A: return "ADDR_RANGE_FAULT";
+	case 0x60: return "OUT_OF_MEMORY";
+		/* GPU exceptions */
+	case 0x80: return "DELAYED_BUS_FAULT";
+	case 0x88: return "SHAREABILITY_FAULT";
+		/* MMU exceptions */
+	case 0xC1: return "TRANSLATION_FAULT_LEVEL1";
+	case 0xC2: return "TRANSLATION_FAULT_LEVEL2";
+	case 0xC3: return "TRANSLATION_FAULT_LEVEL3";
+	case 0xC4: return "TRANSLATION_FAULT_LEVEL4";
+	case 0xC8: return "PERMISSION_FAULT";
+	case 0xD1: return "TRANSTAB_BUS_FAULT_LEVEL1";
+	case 0xD2: return "TRANSTAB_BUS_FAULT_LEVEL2";
+	case 0xD3: return "TRANSTAB_BUS_FAULT_LEVEL3";
+	case 0xD4: return "TRANSTAB_BUS_FAULT_LEVEL4";
+	case 0xD8: return "ACCESS_FLAG";
+	}
+
+	if (panfrost_has_hw_feature(pfdev, HW_FEATURE_AARCH64_MMU)) {
+		switch (exception_code) {
+		case 0xC9 ... 0xCF: return "PERMISSION_FAULT";
+		case 0xD9 ... 0xDF: return "ACCESS_FLAG";
+		case 0xE0 ... 0xE7: return "ADDRESS_SIZE_FAULT";
+		case 0xE8 ... 0xEF: return "MEMORY_ATTRIBUTES_FAULT";
+		};
+	}
+
+	return "UNKNOWN";
 }

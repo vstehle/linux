@@ -202,27 +202,6 @@ static const struct iommu_gather_ops mmu_tlb_ops = {
 	.tlb_sync	= mmu_tlb_sync_context,
 };
 
-static const char *mmu_exception_name(struct panfrost_device *pfdev,
-				      u32 exception_code)
-{
-	switch (exception_code) {
-	case 0xC0 ... 0xC7: return "TRANSLATION_FAULT";
-	case 0xC8: return "PERMISSION_FAULT";
-	case 0xD0 ... 0xD7: return "TRANSTAB_BUS_FAULT";
-	case 0xD8: return "ACCESS_FLAG";
-	}
-
-	if (panfrost_has_hw_feature(pfdev, HW_FEATURE_AARCH64_MMU)) {
-		switch (exception_code) {
-		case 0xC9 ... 0xCF: return "PERMISSION_FAULT";
-		case 0xD9 ... 0xDF: return "ACCESS_FLAG";
-		case 0xE0 ... 0xE7: return "ADDRESS_SIZE_FAULT";
-		case 0xE8 ... 0xEF: return "MEMORY_ATTRIBUTES_FAULT";
-		};
-	}
-	return "UNKNOWN";
-}
-
 static const char *access_type_name(struct panfrost_device *pfdev,
 		u32 fault_status)
 {
@@ -288,7 +267,7 @@ static irqreturn_t panfrost_mmu_irq_handler(int irq, void *data)
 			"TODO",
 			fault_status,
 			(fault_status & (1 << 10) ? "DECODER FAULT" : "SLAVE FAULT"),
-			exception_type, mmu_exception_name(pfdev, exception_type),
+			exception_type, panfrost_exception_name(pfdev, exception_type),
 			access_type, access_type_name(pfdev, fault_status),
 			source_id);
 

@@ -98,4 +98,6 @@ static inline bool panfrost_model_eq(struct panfrost_device *pfdev, s32 id)
 int panfrost_device_init(struct panfrost_device *pfdev);
 void panfrost_device_fini(struct panfrost_device *pfdev);
 
+const char *panfrost_exception_name(struct panfrost_device *pfdev, u32 exception_code);
+
 #endif

@@ -22,15 +22,23 @@ static irqreturn_t panfrost_gpu_irq_handler(int irq, void *data)
 {
 	struct panfrost_device *pfdev = data;
 	u32 state = gpu_read(pfdev, GPU_INT_STAT);
-	u32 status = gpu_read(pfdev, GPU_STATUS);
+	u32 fault_status = gpu_read(pfdev, GPU_FAULT_STATUS);
+	u64 address;
 	bool done = false;
 
 	if (!state)
 		return IRQ_NONE;
 
 	if (state & GPU_IRQ_MASK_ERROR) {
-		dev_err(pfdev->dev, "gpu error irq state=%x status=%x\n",
-			state, status);
+		address = (u64) gpu_read(pfdev, GPU_FAULT_ADDRESS_HI) << 32;
+		address |= gpu_read(pfdev, GPU_FAULT_ADDRESS_LO);
+
+		dev_warn(pfdev->dev, "GPU Fault 0x%08x (%s) at 0x%016llx\n",
+			 fault_status & 0xFF, panfrost_exception_name(pfdev, fault_status),
+			 address);
+
+		if (state & GPU_IRQ_MULTIPLE_FAULT)
+			dev_warn(pfdev->dev, "There were multiple GPU faults - some have not been reported\n");
 
 		gpu_write(pfdev, GPU_INT_MASK, 0);
 
@@ -288,7 +296,8 @@ static void panfrost_gpu_init_features(struct panfrost_device *pfdev)
 		 gpu_read(pfdev, GPU_AS_PRESENT),
 		 gpu_read(pfdev, GPU_JS_PRESENT));
 
-	dev_info(pfdev->dev, "shader_present=0x%0llx", pfdev->features.shader_present);
+	dev_info(pfdev->dev, "shader_present=0x%0llx l2_present=0x%0llx",
+		 pfdev->features.shader_present, pfdev->features.l2_present);
 }
 
 static void panfrost_gpu_power_on(struct panfrost_device *pfdev)
