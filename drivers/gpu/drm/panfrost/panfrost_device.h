@@ -52,6 +52,8 @@ struct panfrost_device {
 	struct drm_device *ddev;
 	struct platform_device *pdev;
 
+	spinlock_t hwaccess_lock;
+
 	struct drm_mm mm;
 	spinlock_t mm_lock;
 

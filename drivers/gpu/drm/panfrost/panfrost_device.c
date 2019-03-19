@@ -76,6 +76,8 @@ int panfrost_device_init(struct panfrost_device *pfdev)
 	mutex_init(&pfdev->sched_lock);
 	INIT_LIST_HEAD(&pfdev->scheduled_jobs);
 
+	spin_lock_init(&pfdev->hwaccess_lock);
+
 	err = panfrost_clk_init(pfdev);
 	if (err) {
 		dev_err(pfdev->dev, "clk init failed %d\n", err);
