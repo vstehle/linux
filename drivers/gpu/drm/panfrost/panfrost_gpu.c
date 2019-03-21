@@ -50,7 +50,7 @@ static irqreturn_t panfrost_gpu_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static int panfrost_gpu_soft_reset(struct panfrost_device *pfdev)
+int panfrost_gpu_soft_reset(struct panfrost_device *pfdev)
 {
 	int ret;
 	u32 val;
@@ -300,7 +300,7 @@ static void panfrost_gpu_init_features(struct panfrost_device *pfdev)
 		 pfdev->features.shader_present, pfdev->features.l2_present);
 }
 
-static void panfrost_gpu_power_on(struct panfrost_device *pfdev)
+void panfrost_gpu_power_on(struct panfrost_device *pfdev)
 {
 	int ret;
 	u32 val;

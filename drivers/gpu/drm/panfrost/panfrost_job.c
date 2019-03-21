@@ -15,6 +15,8 @@
 #include "panfrost_issues.h"
 #include "panfrost_gem.h"
 #include "panfrost_regs.h"
+#include "panfrost_gpu.h"
+#include "panfrost_mmu.h"
 
 #define job_write(dev, reg, data) writel(data, dev->iomem + (reg))
 #define job_read(dev, reg) readl(dev->iomem + (reg))
@@ -328,29 +330,61 @@ static struct dma_fence *panfrost_job_run(struct drm_sched_job *sched_job)
 	return fence;
 }
 
+static void panfrost_job_enable_interrupts(struct panfrost_device *pfdev)
+{
+	int j;
+	u32 irq_mask = 0;
+
+	for (j = 0; j < NUM_JOB_SLOTS; j++) {
+		irq_mask |= MK_JS_MASK(j);
+	}
+
+	job_write(pfdev, JOB_INT_CLEAR, irq_mask);
+	job_write(pfdev, JOB_INT_MASK, irq_mask);
+}
+
 static void panfrost_job_timedout(struct drm_sched_job *sched_job)
 {
 	struct panfrost_job *job = to_panfrost_job(sched_job);
 	struct panfrost_device *pfdev = job->pfdev;
 	int js = panfrost_job_get_slot(job);
+	int i;
 
-	job_write(pfdev, JS_COMMAND_NEXT(js), JS_COMMAND_NOP);
+	/*
+	 * If the GPU managed to complete this jobs fence, the timeout is
+	 * spurious. Bail out.
+	 */
+	if (dma_fence_is_signaled(job->done_fence))
+		return;
 
-	job_write(pfdev, JS_COMMAND(js), JS_COMMAND_HARD_STOP_0);
-	dev_err(pfdev->dev, "gpu sched timeout, js=%d, status=0x%x, head=0x%x, tail=0x%x",
+	dev_err(pfdev->dev, "gpu sched timeout, js=%d, status=0x%x, head=0x%x, tail=0x%x, sched_job=%p",
 		js,
 		job_read(pfdev, JS_STATUS(js)),
 		job_read(pfdev, JS_HEAD_LO(js)),
-		job_read(pfdev, JS_TAIL_LO(js)));
+		job_read(pfdev, JS_TAIL_LO(js)),
+		sched_job);
 
-	if (job_read(pfdev, JS_STATUS(js)) == 8) {
-//		dev_err(pfdev->dev, "reseting gpu");
-//		panfrost_gpu_reset(pfdev);
-	}
+	for (i = 0; i < NUM_JOB_SLOTS; i++)
+		drm_sched_stop(&pfdev->js->queue[i].sched);
 
-	/* For now, just say we're done. No reset and retry. */
-//	job_write(pfdev, JS_COMMAND(js), JS_COMMAND_HARD_STOP);
-	dma_fence_signal(job->done_fence);
+	if(sched_job)
+		drm_sched_increase_karma(sched_job);
+
+	//panfrost_core_dump(pfdev);
+
+	panfrost_gpu_soft_reset(pfdev);
+
+	/* TODO: Re-enable all other address spaces */
+	panfrost_mmu_enable(pfdev, 0);
+	panfrost_gpu_power_on(pfdev);
+	panfrost_job_enable_interrupts(pfdev);
+
+	for (i = 0; i < NUM_JOB_SLOTS; i++)
+		drm_sched_resubmit_jobs(&pfdev->js->queue[i].sched);
+
+	/* restart scheduler after GPU is usable again */
+	for (i = 0; i < NUM_JOB_SLOTS; i++)
+		drm_sched_start(&pfdev->js->queue[i].sched, true);
 }
 
 static const struct drm_sched_backend_ops panfrost_sched_ops = {
@@ -404,7 +438,6 @@ int panfrost_job_init(struct panfrost_device *pfdev)
 {
 	struct panfrost_job_slot *js;
 	int ret, j, irq;
-	u32 irq_mask = 0;
 
 	pfdev->js = js = devm_kzalloc(pfdev->dev, sizeof(*js), GFP_KERNEL);
 	if (!js)
@@ -434,12 +467,9 @@ int panfrost_job_init(struct panfrost_device *pfdev)
 			dev_err(pfdev->dev, "Failed to create scheduler: %d.", ret);
 			goto err_sched;
 		}
-
-		irq_mask |= MK_JS_MASK(j);
 	}
 
-	job_write(pfdev, JOB_INT_CLEAR, irq_mask);
-	job_write(pfdev, JOB_INT_MASK, irq_mask);
+	panfrost_job_enable_interrupts(pfdev);
 
 	return 0;
 

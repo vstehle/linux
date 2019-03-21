@@ -19,6 +19,7 @@
 #define mmu_read(dev, reg) readl(dev->iomem + reg)
 
 struct panfrost_mmu {
+	struct io_pgtable_cfg pgtbl_cfg;
 	struct io_pgtable_ops *pgtbl_ops;
 	struct mutex lock;
 };
@@ -93,9 +94,12 @@ static int mmu_hw_do_operation(struct panfrost_device *pfdev, u32 as_nr,
 	return wait_ready(pfdev, as_nr);
 }
 
-static void mmu_enable(struct panfrost_device *pfdev, u32 as_nr,
-		       u64 pgt_base, u64 mem_attr)
+void panfrost_mmu_enable(struct panfrost_device *pfdev, u32 as_nr)
 {
+	struct io_pgtable_cfg *cfg = &pfdev->mmu->pgtbl_cfg;
+	u64 pgt_base = cfg->arm_lpae_s1_cfg.ttbr[0];
+	u64 mem_attr = cfg->arm_lpae_s1_cfg.mair[0];
+
 //	if (kbdev->system_coherency == COHERENCY_ACE)
 //		current_setup->transtab |= AS_TRANSTAB_LPAE_SHARE_OUTER;
 
@@ -104,6 +108,9 @@ static void mmu_enable(struct panfrost_device *pfdev, u32 as_nr,
 	mmu_write(pfdev, AS_TRANSTAB_LO(as_nr), pgt_base & 0xffffffffUL);
 	mmu_write(pfdev, AS_TRANSTAB_HI(as_nr), pgt_base >> 32);
 
+	/* Need to revisit mem attrs.
+	 * NC is the default, Mali driver is inner WT.
+	 */
 	mmu_write(pfdev, AS_MEMATTR_LO(as_nr), mem_attr & 0xffffffffUL);
 	mmu_write(pfdev, AS_MEMATTR_HI(as_nr), mem_attr >> 32);
 
@@ -282,7 +289,6 @@ static irqreturn_t panfrost_mmu_irq_handler(int irq, void *data)
 int panfrost_mmu_init(struct panfrost_device *pfdev)
 {
 	struct io_pgtable_ops *pgtbl_ops;
-	struct io_pgtable_cfg pgtbl_cfg;
 	int err, irq;
 
 	pfdev->mmu = devm_kzalloc(pfdev->dev, sizeof(*pfdev->mmu), GFP_KERNEL);
@@ -305,7 +311,7 @@ int panfrost_mmu_init(struct panfrost_device *pfdev)
 	mmu_write(pfdev, MMU_INT_CLEAR, ~0);
 	mmu_write(pfdev, MMU_INT_MASK, ~0);
 
-	pgtbl_cfg = (struct io_pgtable_cfg) {
+	pfdev->mmu->pgtbl_cfg = (struct io_pgtable_cfg) {
 		.pgsize_bitmap	= SZ_4K, // | SZ_2M | SZ_1G),
 		.ias		= 48,
 		.oas		= 40,	/* Should come from dma mask? */
@@ -313,17 +319,14 @@ int panfrost_mmu_init(struct panfrost_device *pfdev)
 		.iommu_dev	= pfdev->dev,
 	};
 
-	pgtbl_ops = alloc_io_pgtable_ops(ARM_MALI_LPAE, &pgtbl_cfg, pfdev);
+	pgtbl_ops = alloc_io_pgtable_ops(ARM_MALI_LPAE, &pfdev->mmu->pgtbl_cfg,
+					 pfdev);
 	if (!pgtbl_ops)
 		return -ENOMEM;
 
 	pfdev->mmu->pgtbl_ops = pgtbl_ops;
 
-	/* Need to revisit mem attrs.
-	 * NC is the default, Mali driver is inner WT.
-	 */
-	mmu_enable(pfdev, 0, pgtbl_cfg.arm_lpae_s1_cfg.ttbr[0],
-		   pgtbl_cfg.arm_lpae_s1_cfg.mair[0]);
+	panfrost_mmu_enable(pfdev, 0);
 
 	return 0;
 }
