@@ -32,6 +32,8 @@ static int panfrost_devfreq_target(struct device *dev, unsigned long *freq,
 	if (old_clk_rate == target_rate)
 		return 0;
 
+	return 0;
+
 	/*
 	 * If frequency scaling from low to high, adjust voltage first.
 	 * If frequency scaling from high to low, adjust frequency first.
