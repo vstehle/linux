@@ -146,8 +146,6 @@ static void panfrost_job_hw_submit(struct panfrost_job *job, int js)
 	u64 jc_head = job->jc;
 	int ret;
 
-	panfrost_devfreq_update_utilization(pfdev, js, false);
-
 	ret = pm_runtime_get_sync(pfdev->dev);
 	if (ret < 0)
 		return;
@@ -155,6 +153,7 @@ static void panfrost_job_hw_submit(struct panfrost_job *job, int js)
 	if (WARN_ON(job_read(pfdev, JS_COMMAND_NEXT(js))))
 		goto end;
 
+	panfrost_devfreq_record_transition(pfdev, js);
 	spin_lock_irqsave(&pfdev->hwaccess_lock, flags);
 
 	job_write(pfdev, JS_HEAD_NEXT_LO(js), jc_head & 0xFFFFFFFF);
@@ -393,7 +392,7 @@ static void panfrost_job_timedout(struct drm_sched_job *sched_job)
 
 	/* panfrost_core_dump(pfdev); */
 
-	panfrost_devfreq_update_utilization(pfdev, js, true);
+	panfrost_devfreq_record_transition(pfdev, js);
 	panfrost_gpu_soft_reset(pfdev);
 
 	/* TODO: Re-enable all other address spaces */
@@ -449,7 +448,7 @@ static irqreturn_t panfrost_job_irq_handler(int irq, void *data)
 		}
 
 		if (status & JOB_INT_MASK_DONE(j)) {
-			panfrost_devfreq_update_utilization(pfdev, j, true);
+			panfrost_devfreq_record_transition(pfdev, j);
 			dma_fence_signal(pfdev->jobs[j]->done_fence);
 		}
 
@@ -552,7 +551,7 @@ int panfrost_job_is_idle(struct panfrost_device *pfdev)
 			return false;
 
 		/* Check whether the hardware is idle */
-		if (job_read(pfdev, JS_STATUS(i)) == JS_STATUS_EVENT_ACTIVE)
+		if (pfdev->devfreq.slot[i].busy)
 			return false;
 	}
 
