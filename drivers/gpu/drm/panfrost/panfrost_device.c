@@ -241,11 +241,10 @@ int panfrost_device_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct panfrost_device *pfdev = platform_get_drvdata(pdev);
 
-	panfrost_devfreq_suspend(pfdev);
-
 	if (!panfrost_job_is_idle(pfdev))
 		return -EBUSY;
 
+	panfrost_devfreq_suspend(pfdev);
 	panfrost_gpu_power_off(pfdev);
 
 	return 0;

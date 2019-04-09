@@ -47,6 +47,13 @@ struct panfrost_features {
 	unsigned long hw_issues[64 / BITS_PER_LONG];
 };
 
+struct panfrost_devfreq_slot {
+	ktime_t busy_time;
+	ktime_t idle_time;
+	ktime_t time_last_update;
+	bool busy;
+};
+
 struct panfrost_device {
 	struct device *dev;
 	struct drm_device *ddev;
@@ -77,9 +84,7 @@ struct panfrost_device {
 		struct thermal_cooling_device *cooling;
 		unsigned long cur_freq;
 		unsigned long cur_volt;
-		ktime_t busy_time[NUM_JOB_SLOTS];
-		ktime_t idle_time[NUM_JOB_SLOTS];
-		ktime_t time_last_update[NUM_JOB_SLOTS];
+		struct panfrost_devfreq_slot slot[NUM_JOB_SLOTS];
 	} devfreq;
 };
 
