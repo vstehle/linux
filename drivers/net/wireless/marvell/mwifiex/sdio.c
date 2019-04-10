@@ -147,6 +147,8 @@ mwifiex_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
 		goto err_disable;
 	}
 
+	pm_runtime_forbid(func->card->host->parent);
+
 	return 0;
 
 err_disable:
