@@ -395,6 +395,246 @@
 		status = "disabled";
 	};
 
+	funnel@fe401000 {
+		compatible = "arm,coresight-dynamic-funnel", "arm,primecell";
+		reg = <0 0xfe401000 0 0x1000>;
+
+		// Clock guessed; TODO! refine
+		clocks = <&cru PCLK_PERIHP>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+
+		out-ports {
+			port {
+				funnel_out_port: endpoint {
+					remote-endpoint = <&tpiu_in_port>;
+				};
+			};
+		};
+
+		funnel_in_ports: in-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				funnel_in_port0: endpoint {
+					remote-endpoint = <&clusterl_etm0_out_port>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				funnel_in_port1: endpoint {
+					remote-endpoint = <&clusterl_etm1_out_port>;
+				};
+			};
+
+			port@2 {
+				reg = <2>;
+				funnel_in_port2: endpoint {
+					remote-endpoint = <&clusterl_etm2_out_port>;
+				};
+			};
+
+			port@3 {
+				reg = <3>;
+				funnel_in_port3: endpoint {
+					remote-endpoint = <&clusterl_etm3_out_port>;
+				};
+			};
+
+			port@4 {
+				reg = <4>;
+				funnel_in_port4: endpoint {
+					remote-endpoint = <&clusterb_etm0_out_port>;
+				};
+			};
+
+			port@5 {
+				reg = <5>;
+				funnel_in_port5: endpoint {
+					remote-endpoint = <&clusterb_etm1_out_port>;
+				};
+			};
+		};
+	};
+
+	tpiu: tpiu@fe405000 {
+		compatible = "arm,coresight-tpiu", "arm,primecell";
+		reg = <0 0xfe405000 0 0x1000>;
+
+		// Clock guessed; TODO! refine
+		clocks = <&cru PCLK_PERIHP>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+
+		in-ports {
+			port {
+				tpiu_in_port: endpoint {
+					remote-endpoint = <&funnel_out_port>;
+				};
+			};
+		};
+	};
+
+	clusterl_dbg0: cpu-debug@fe430000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		reg = <0x0 0xfe430000 0x0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_L>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+	};
+
+	clusterl_dbg1: cpu-debug@fe432000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		reg = <0x0 0xfe432000 0x0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_L>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+	};
+
+	clusterl_dbg2: cpu-debug@fe434000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		reg = <0x0 0xfe434000 0x0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_L>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+	};
+
+	clusterl_dbg3: cpu-debug@fe436000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		reg = <0x0 0xfe436000 0x0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_L>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+	};
+
+	clusterl_etm0: etm@fe43c000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		reg = <0 0xfe43c000 0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_L>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+
+		out-ports {
+			port {
+				clusterl_etm0_out_port: endpoint {
+					remote-endpoint = <&funnel_in_port0>;
+				};
+			};
+		};
+	};
+
+	clusterl_etm1: etm@fe43d000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		reg = <0 0xfe43d000 0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_L>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+
+		out-ports {
+			port {
+				clusterl_etm1_out_port: endpoint {
+					remote-endpoint = <&funnel_in_port1>;
+				};
+			};
+		};
+	};
+
+	clusterl_etm2: etm@fe43e000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		reg = <0 0xfe43e000 0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_L>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+
+		out-ports {
+			port {
+				clusterl_etm2_out_port: endpoint {
+					remote-endpoint = <&funnel_in_port2>;
+				};
+			};
+		};
+	};
+
+	clusterl_etm3: etm@fe43f000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		reg = <0 0xfe43f000 0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_L>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+
+		out-ports {
+			port {
+				clusterl_etm3_out_port: endpoint {
+					remote-endpoint = <&funnel_in_port3>;
+				};
+			};
+		};
+	};
+
+	clusterb_dbg0: cpu-debug@fe610000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		reg = <0x0 0xfe610000 0x0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_B>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+	};
+
+	clusterb_etm0: etm@fe640000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		reg = <0 0xfe640000 0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_B>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+
+		out-ports {
+			port {
+				clusterb_etm0_out_port: endpoint {
+					remote-endpoint = <&funnel_in_port4>;
+				};
+			};
+		};
+	};
+
+	// This one is called debug1 (and not dbg1) in RK3399 TRM.
+	clusterb_debug1: cpu-debug@fe710000 {
+		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+		reg = <0x0 0xfe710000 0x0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_B>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+	};
+
+	clusterb_etm1: etm@fe740000 {
+		compatible = "arm,coresight-etm4x", "arm,primecell";
+		reg = <0 0xfe740000 0 0x1000>;
+
+		clocks = <&cru PCLK_COREDBG_B>;
+		clock-names = "apb_pclk";
+	//	power-domains = <&scpi_devpd 0>;
+
+		out-ports {
+			port {
+				clusterb_etm1_out_port: endpoint {
+					remote-endpoint = <&funnel_in_port5>;
+				};
+			};
+		};
+	};
+
 	usbdrd3_0: usb@fe800000 {
 		compatible = "rockchip,rk3399-dwc3";
 		#address-cells = <2>;
