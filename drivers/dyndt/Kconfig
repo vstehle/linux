@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# dyndt drivers
+#
+
+config DYNDT
+	bool "dyndt"
+	help
+	  dyndt
+
+if DYNDT
+
+config DYNDT_MANAGER
+	tristate "dyndt manager"
+	select OF_DYNAMIC
+	help
+	  dyndt manager
+
+config DYNDT_DUMMY
+	tristate "dyndt dummy"
+	help
+	  dyndt dummy
+
+endif
