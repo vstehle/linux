@@ -19,6 +19,7 @@ subdir-y += marvell
 subdir-y += mediatek
 subdir-y += nvidia
 subdir-y += qcom
+subdir-y += qemu
 subdir-y += realtek
 subdir-y += renesas
 subdir-y += rockchip
