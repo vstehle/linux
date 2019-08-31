@@ -7,6 +7,8 @@
  * device tree nodes.
  */
 
+#define DEBUG
+
 #define pr_fmt(fmt)	"OF: " fmt
 
 #include <linux/of.h>

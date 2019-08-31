@@ -14,6 +14,8 @@
  *  Grant Likely.
  */
 
+#define DEBUG
+
 #define pr_fmt(fmt)	"OF: " fmt
 
 #include <linux/bitmap.h>
