@@ -36,29 +36,6 @@
 			linux,default-trigger = "heartbeat";
 		};
 	};
-#if 0
-	//Fake regulator provides WL_REG_ON signal for wireless interface
-	wlwake_host: wlwakehost-regulator {
-		compatible = "regulator-fixed";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		regulator-name = "wlwake_host";
-		gpio = <&gpio2 9 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-		startup-delay-us = <100>;
-	};
-
-	wlreg_on: wlregon-regulator {
-		compatible = "regulator-fixed";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		regulator-name = "wlreg_on";
-		gpio = <&gpio2 10 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-		startup-delay-us = <100>;
-		vin-supply = <&wlwake_host>;
-	};
-#endif
 
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
@@ -136,11 +113,6 @@
 		reset-post-delay-ms = <40>;
 		#reset-cells = <0>;
 	};
-};
-
-&clk {
-	assigned-clocks = <&clk IMX8MM_AUDIO_PLL1>, <&clk IMX8MM_AUDIO_PLL2>;
-	assigned-clock-rates = <786432000>, <722534400>;
 };
 
 &iomuxc {
