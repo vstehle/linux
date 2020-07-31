@@ -1123,7 +1123,7 @@ netcp_tx_map_skb(struct sk_buff *skb, struct netcp_intf *netcp)
 
 		dma_addr = dma_map_page(dev, page, page_offset, buf_len,
 					DMA_TO_DEVICE);
-		if (unlikely(!dma_addr)) {
+		if (unlikely(dma_mapping_error(dev, dma_addr))) {
 			dev_err(netcp->ndev_dev, "Failed to map skb page\n");
 			goto free_descs;
 		}
