@@ -323,7 +323,7 @@ static int gelic_card_init_chain(struct gelic_card *card,
 				       GELIC_DESCR_SIZE,
 				       DMA_BIDIRECTIONAL);
 
-		if (!descr->bus_addr)
+		if (dma_mapping_error(ctodev(card), descr->bus_addr))
 			goto iommu_error;
 
 		descr->next = descr + 1;
@@ -779,7 +779,7 @@ static int gelic_descr_prepare_tx(struct gelic_card *card,
 
 	buf = dma_map_single(ctodev(card), skb->data, skb->len, DMA_TO_DEVICE);
 
-	if (!buf) {
+	if (dma_mapping_error(ctodev(card), buf)) {
 		dev_err(ctodev(card),
 			"dma map 2 failed (%p, %i). Dropping packet\n",
 			skb->data, skb->len);
