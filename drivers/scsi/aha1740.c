@@ -591,7 +591,7 @@ static int aha1740_probe (struct device *dev)
 	host->ecb_dma_addr = dma_map_single (&edev->dev, host->ecb,
 					     sizeof (host->ecb),
 					     DMA_BIDIRECTIONAL);
-	if (!host->ecb_dma_addr) {
+	if (dma_mapping_error(&edev->dev, host->ecb_dma_addr)) {
 		printk (KERN_ERR "aha1740_probe: Couldn't map ECB, giving up\n");
 		goto err_host_put;
 	}
