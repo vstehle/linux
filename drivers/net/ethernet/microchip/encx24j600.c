@@ -346,7 +346,7 @@ static int encx24j600_receive_packet(struct encx24j600_priv *priv,
 
 	skb->dev = dev;
 	skb->protocol = eth_type_trans(skb, dev);
-	skb->ip_summed = CHECKSUM_COMPLETE;
+	skb->ip_summed = CHECKSUM_NONE;
 
 	/* Maintain stats */
 	dev->stats.rx_packets++;
@@ -998,7 +998,7 @@ static const struct net_device_ops encx24j600_netdev_ops = {
 	.ndo_validate_addr = eth_validate_addr,
 };
 
-static int encx24j600_spi_probe(struct spi_device *spi)
+static int encx24j600_probe(struct spi_device *spi)
 {
 	int ret;
 
@@ -1095,7 +1095,7 @@ error_out:
 	return ret;
 }
 
-static int encx24j600_spi_remove(struct spi_device *spi)
+static int encx24j600_remove(struct spi_device *spi)
 {
 	struct encx24j600_priv *priv = dev_get_drvdata(&spi->dev);
 
@@ -1106,34 +1106,22 @@ static int encx24j600_spi_remove(struct spi_device *spi)
 	return 0;
 }
 
-static const struct spi_device_id encx24j600_spi_id_table[] = {
-	{ .name = "encx24j600" },
+static const struct of_device_id encx24j600_dt_ids[] = {
+	{ .compatible = "microchip,encx24j600" },
 	{ /* sentinel */ }
 };
-MODULE_DEVICE_TABLE(spi, encx24j600_spi_id_table);
+MODULE_DEVICE_TABLE(of, encx24j600_dt_ids);
 
-static struct spi_driver encx24j600_spi_net_driver = {
+static struct spi_driver encx24j600_driver = {
 	.driver = {
 		.name	= DRV_NAME,
-		.owner	= THIS_MODULE,
-		.bus	= &spi_bus_type,
+		.of_match_table = encx24j600_dt_ids,
 	},
-	.probe		= encx24j600_spi_probe,
-	.remove		= encx24j600_spi_remove,
-	.id_table	= encx24j600_spi_id_table,
+	.probe		= encx24j600_probe,
+	.remove		= encx24j600_remove,
 };
 
-static int __init encx24j600_init(void)
-{
-	return spi_register_driver(&encx24j600_spi_net_driver);
-}
-module_init(encx24j600_init);
-
-static void encx24j600_exit(void)
-{
-	spi_unregister_driver(&encx24j600_spi_net_driver);
-}
-module_exit(encx24j600_exit);
+module_spi_driver(encx24j600_driver);
 
 MODULE_DESCRIPTION(DRV_NAME " ethernet driver");
 MODULE_AUTHOR("Jon Ringle <jringle@gridpoint.com>");
