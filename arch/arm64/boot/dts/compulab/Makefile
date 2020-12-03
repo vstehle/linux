@@ -6,6 +6,7 @@ dtb-$(CONFIG_ARCH_MXC) += ucm-imx8m-mini.dtb
 dtb-$(CONFIG_ARCH_MXC) += sb-iotgimx8.dtb
 dtb-$(CONFIG_ARCH_MXC) += sb-iotgimx8-can.dtb
 dtb-$(CONFIG_ARCH_MXC) += sb-iotgimx8-ied.dtb
+dtb-$(CONFIG_ARCH_MXC) += sb-iotgimx8-poed.dtb
 
 always         := $(dtb-y)
 subdir-y       := $(dts-dirs)
