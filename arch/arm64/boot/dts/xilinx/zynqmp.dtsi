@@ -660,7 +660,7 @@
 
 		sata: ahci@fd0c0000 {
 			compatible = "ceva,ahci-1v84";
-			status = "disabled";
+			status = "okay";
 			reg = <0x0 0xfd0c0000 0x0 0x2000>;
 			interrupt-parent = <&gic>;
 			interrupts = <0 133 4>;
